@@ -11,4 +11,11 @@ describe('service task generation', () => {
     expect(tasks.some((task) => task.capability === 'dish-pre-rinse')).toBe(true)
     expect(tasks.filter((task) => task.orderId).length).toBeGreaterThan(50)
   })
+
+  it('uses configurable station duration ranges', () => {
+    const project = createSeedProject()
+    project.scenarios[0].taskDurations = { 'tandoor-cook': { minSeconds: 42, maxSeconds: 42 } }
+    const tasks = generateServiceTasks(project.scenarios[0], project.variants[0].equipment, createRng(20260831))
+    expect(tasks.find((task) => task.capability === 'tandoor-cook')?.durationSeconds).toBe(42)
+  })
 })

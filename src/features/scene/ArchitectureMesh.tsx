@@ -2,6 +2,8 @@ import { useMemo } from 'react'
 import * as THREE from 'three'
 import type { Architecture, Opening, PointMm } from '../../domain/project'
 
+// Shared by procedural scene modules and synchronization tests.
+// eslint-disable-next-line react-refresh/only-export-components
 export const toWorld = (millimetres: number) => millimetres / 1000
 
 type WallSegment = {
@@ -24,6 +26,7 @@ const wallName = (start: PointMm, end: PointMm, architecture: Architecture): Ope
   return null
 }
 
+// eslint-disable-next-line react-refresh/only-export-components
 export function buildWallSegments(architecture: Architecture): WallSegment[] {
   const segments: WallSegment[] = []
   const points = architecture.roomPolygon

@@ -6,6 +6,13 @@ const COOKING: StationCapability[] = ['flat-top-cook', 'fryer-cook', 'range-cook
 const COOK_ROLES: StaffRole[] = ['head-chef', 'sous-chef', 'cdp']
 const WASH_ROLES: StaffRole[] = ['busser-washer']
 
+const duration = (scenario: SimulationScenario, capability: StationCapability, rng: Rng, fallbackMin: number, fallbackMax: number) => {
+  const configured = scenario.taskDurations?.[capability]
+  const min = configured?.minSeconds ?? fallbackMin
+  const max = configured?.maxSeconds ?? fallbackMax
+  return rng.between(Math.min(min, max), Math.max(min, max))
+}
+
 function stationFor(capability: StationCapability, equipment: readonly EquipmentItem[], stage: string): string {
   const preferredId = stage === 'pre-rinse' ? 'pre-rinse-sink' : stage === 'dirty-window' || stage === 'dirty-landing' ? 'dirty-landing' : undefined
   const preferred = preferredId && equipment.find((item) => item.id === preferredId)
@@ -46,22 +53,22 @@ export function generateServiceTasks(scenario: SimulationScenario, equipment: re
     const cook = availableCooking[index % availableCooking.length]
     const cookedToOrder = index < Math.round(orderCount * scenario.cookToOrderRatio)
     addChain(tasks, orderId, arrivalTime(index, orderCount, scenario, rng), 'clean', COOK_ROLES, [
-      { stage: 'retrieve', capability: 'cold-retrieval', duration: rng.between(20, 45) },
-      { stage: 'prep', capability: 'food-prep', duration: rng.between(45, 120) },
-      { stage: 'cook', capability: cook, duration: cookedToOrder ? rng.between(180, 540) : rng.between(60, 150) },
-      { stage: 'finish', capability: 'finish-plate', duration: rng.between(25, 60) },
-      { stage: 'pass', capability: 'clean-window', duration: rng.between(5, 15) },
+      { stage: 'retrieve', capability: 'cold-retrieval', duration: duration(scenario, 'cold-retrieval', rng, 20, 45) },
+      { stage: 'prep', capability: 'food-prep', duration: duration(scenario, 'food-prep', rng, 45, 120) },
+      { stage: 'cook', capability: cook, duration: cookedToOrder ? duration(scenario, cook, rng, 180, 540) : rng.between(60, 150) },
+      { stage: 'finish', capability: 'finish-plate', duration: duration(scenario, 'finish-plate', rng, 25, 60) },
+      { stage: 'pass', capability: 'clean-window', duration: duration(scenario, 'clean-window', rng, 5, 15) },
     ], equipment, orderId)
   }
   const dishBatchCount = Math.max(1, Math.ceil(scenario.covers / 3))
   for (let index = 0; index < dishBatchCount; index += 1) {
     const id = `dish-${index + 1}`
     addChain(tasks, id, scenario.durationMinutes * 60 * (.38 + .52 * (index / dishBatchCount)), 'dirty', WASH_ROLES, [
-      { stage: 'dirty-window', capability: 'dirty-window', duration: rng.between(8, 16) },
-      { stage: 'dirty-landing', capability: 'dirty-landing', duration: rng.between(8, 20) },
-      { stage: 'pre-rinse', capability: 'dish-pre-rinse', duration: rng.between(25, 55) },
-      { stage: 'wash', capability: 'dish-wash', duration: rng.between(55, 110) },
-      { stage: 'clean-landing', capability: 'clean-landing', duration: rng.between(12, 30) },
+      { stage: 'dirty-window', capability: 'dirty-window', duration: duration(scenario, 'dirty-window', rng, 8, 16) },
+      { stage: 'dirty-landing', capability: 'dirty-landing', duration: duration(scenario, 'dirty-landing', rng, 8, 20) },
+      { stage: 'pre-rinse', capability: 'dish-pre-rinse', duration: duration(scenario, 'dish-pre-rinse', rng, 25, 55) },
+      { stage: 'wash', capability: 'dish-wash', duration: duration(scenario, 'dish-wash', rng, 55, 110) },
+      { stage: 'clean-landing', capability: 'clean-landing', duration: duration(scenario, 'clean-landing', rng, 12, 30) },
     ], equipment, undefined, id)
   }
   return tasks

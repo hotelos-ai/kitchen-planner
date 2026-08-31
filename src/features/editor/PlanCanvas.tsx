@@ -3,9 +3,11 @@ import { Stage } from 'react-konva'
 import { useStore } from 'zustand'
 import type { ProjectStore } from '../../state/project-store'
 import { getActiveVariant } from '../../state/project-store'
+import { analyzeLayout } from '../../domain/layout-diagnostics'
 import { ArchitectureLayer } from './ArchitectureLayer'
 import { EquipmentLayer } from './EquipmentNode'
 import { GridLayer } from './GridLayer'
+import { OpeningOverlayLayer } from './OpeningOverlayLayer'
 
 type Props = {
   store: ProjectStore
@@ -18,6 +20,7 @@ export function PlanCanvas({ store, showReference }: Props) {
   const project = useStore(store, (state) => state.project)
   const selectedIds = useStore(store, (state) => state.selectedIds)
   const variant = useStore(store, getActiveVariant)
+  const warningIds = [...new Set(analyzeLayout(project.architecture, variant.equipment).flatMap((issue) => issue.itemIds))]
 
   useLayoutEffect(() => {
     const element = containerRef.current
@@ -50,13 +53,17 @@ export function PlanCanvas({ store, showReference }: Props) {
         <EquipmentLayer
           items={variant.equipment}
           selectedIds={selectedIds}
+          warningIds={warningIds}
           displayUnit={project.displayUnit}
           pixelsPerMm={pixelsPerMm}
           originX={originX}
           originY={originY}
+          snapMm={project.snapMm}
           onSelect={(id, additive) => additive ? store.getState().toggleItemSelection(id) : store.getState().selectItems([id])}
           onMove={(id, point) => store.getState().moveItems([id], point)}
+          onTransform={(id, patch) => store.getState().updateItem(id, patch)}
         />
+        <OpeningOverlayLayer architecture={project.architecture} pixelsPerMm={pixelsPerMm} originX={originX} originY={originY} />
       </Stage>
       <div className="canvas-scale"><span />1 metre · 10 squares</div>
     </div>

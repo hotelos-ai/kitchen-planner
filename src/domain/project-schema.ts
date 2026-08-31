@@ -83,6 +83,8 @@ const scenarioSchema = z.object({
   seed: z.number().int(),
   staff: z.array(z.object({ role: z.enum(['head-chef', 'sous-chef', 'cdp', 'busser-washer']), count: z.number().int().nonnegative() }).strict()).min(1),
   checks: z.object({ collisions: z.boolean(), doorSwings: z.boolean(), dirtyCleanCrossings: z.boolean() }).strict(),
+  taskDurations: z.partialRecord(capabilitySchema, z.object({ minSeconds: z.number().positive().finite(), maxSeconds: z.number().positive().finite() }).strict()).optional(),
+  stationCapacities: z.record(z.string(), z.number().int().positive()).optional(),
 }).strict()
 
 export const projectSchema = z.object({

@@ -1,6 +1,10 @@
-import { Group, Layer, Rect, Text } from 'react-konva'
+import { Fragment, useEffect, useRef, useState } from 'react'
+import Konva from 'konva'
+import { Group, Layer, Rect, Text, Transformer } from 'react-konva'
 import type { DisplayUnit, EquipmentItem, PointMm } from '../../domain/project'
-import { formatDimensions } from '../../domain/units'
+import { snapMm as snapValue } from '../../domain/geometry'
+import { formatDimensions, formatLength } from '../../domain/units'
+import { equipmentTransformPatch } from './equipment-transform'
 
 const COLORS: Record<EquipmentItem['category'], { fill: string; stroke: string; text: string }> = {
   cooking: { fill: '#efd3ca', stroke: '#a35643', text: '#612c22' },
@@ -20,56 +24,100 @@ type NodeProps = {
   pixelsPerMm: number
   originX: number
   originY: number
+  snapMm: number
   onSelect(itemId: string, additive: boolean): void
   onMove(itemId: string, point: PointMm): void
+  onTransform(itemId: string, patch: Partial<EquipmentItem>): void
+  warning?: boolean
 }
 
-export function EquipmentNode({ item, selected, displayUnit, pixelsPerMm: scale, originX, originY, onSelect, onMove }: NodeProps) {
+export function EquipmentNode({ item, selected, warning = false, displayUnit, pixelsPerMm: scale, originX, originY, snapMm, onSelect, onMove, onTransform }: NodeProps) {
+  const nodeRef = useRef<Konva.Group>(null)
+  const transformerRef = useRef<Konva.Transformer>(null)
+  const [feedback, setFeedback] = useState<PointMm | null>(null)
   const colors = COLORS[item.category]
   const width = item.widthMm * scale
   const height = item.depthMm * scale
   const label = `${item.label}\n${formatDimensions(item, displayUnit)}`
 
-  return (
+  useEffect(() => {
+    if (!selected || item.dimensionsLocked || !nodeRef.current || !transformerRef.current) return
+    transformerRef.current.nodes([nodeRef.current])
+    transformerRef.current.getLayer()?.batchDraw()
+  }, [item.dimensionsLocked, selected])
+
+  return <Fragment>
     <Group
+      ref={nodeRef}
       x={originX + item.xMm * scale}
       y={originY + item.yMm * scale}
       rotation={item.rotationDeg}
       draggable={item.movable}
       onClick={(event) => onSelect(item.id, Boolean(event.evt.shiftKey))}
       onTap={() => onSelect(item.id, false)}
-      onDragEnd={(event) => onMove(item.id, {
-        x: (event.target.x() - originX) / scale,
-        y: (event.target.y() - originY) / scale,
-      })}
+      onDragStart={(event) => setFeedback({ x: snapValue((event.target.x() - originX) / scale, snapMm), y: snapValue((event.target.y() - originY) / scale, snapMm) })}
+      onDragMove={(event) => setFeedback({ x: snapValue((event.target.x() - originX) / scale, snapMm), y: snapValue((event.target.y() - originY) / scale, snapMm) })}
+      onDragEnd={(event) => {
+        onMove(item.id, { x: (event.target.x() - originX) / scale, y: (event.target.y() - originY) / scale })
+        setFeedback(null)
+      }}
+      onTransform={() => setFeedback({ x: snapValue((nodeRef.current!.x() - originX) / scale, snapMm), y: snapValue((nodeRef.current!.y() - originY) / scale, snapMm) })}
+      onTransformEnd={() => {
+        const node = nodeRef.current
+        if (!node) return
+        const patch = equipmentTransformPatch({ x: node.x(), y: node.y(), scaleX: node.scaleX(), scaleY: node.scaleY(), rotation: node.rotation() }, { widthMm: item.widthMm, depthMm: item.depthMm, originX, originY, pixelsPerMm: scale, snapMm })
+        node.scale({ x: 1, y: 1 })
+        onTransform(item.id, patch)
+        setFeedback(null)
+      }}
     >
       <Rect x={-6} y={-6} width={width + 12} height={height + 12} fill="transparent" />
       <Rect
         width={width}
         height={height}
         fill={colors.fill}
-        stroke={selected ? '#d46847' : colors.stroke}
+        stroke={selected ? '#d46847' : warning ? '#d29122' : colors.stroke}
         strokeWidth={selected ? 3 : 1.5}
-        dash={item.category === 'hood' ? [7, 4] : undefined}
+        dash={item.category === 'hood' || warning ? [7, 4] : undefined}
         shadowColor="#101513"
         shadowOpacity={item.category === 'hood' ? 0 : 0.13}
         shadowBlur={selected ? 8 : 3}
       />
       <Text text={label} width={width} height={height} padding={4} align="center" verticalAlign="middle" fill={colors.text} fontSize={Math.max(7, Math.min(11, Math.min(width, height) / 7))} fontStyle="bold" wrap="word" ellipsis />
       {item.approximate && <Text x={width - 16} y={3} width={13} text="~" fill={colors.stroke} fontSize={10} fontStyle="bold" align="right" />}
+      {feedback && <Group x={0} y={-26} rotation={-item.rotationDeg}>
+        <Rect width={150} height={20} fill="#17211e" cornerRadius={3} opacity={.94} />
+        <Text x={5} y={4} width={140} height={13} text={`X ${formatLength(feedback.x, displayUnit)} · Y ${formatLength(feedback.y, displayUnit)}`} fill="#fffaf0" fontSize={8} align="center" />
+      </Group>}
     </Group>
-  )
+    {selected && !item.dimensionsLocked && <Transformer
+      ref={transformerRef}
+      rotateEnabled
+      rotationSnaps={[0, 90, 180, 270]}
+      enabledAnchors={['top-left', 'top-center', 'top-right', 'middle-left', 'middle-right', 'bottom-left', 'bottom-center', 'bottom-right']}
+      anchorFill="#fffaf0"
+      anchorStroke="#d46847"
+      borderStroke="#d46847"
+      anchorSize={9}
+      padding={3}
+      flipEnabled={false}
+      boundBoxFunc={(oldBox, newBox) => Math.abs(newBox.width) < snapMm * scale || Math.abs(newBox.height) < snapMm * scale ? oldBox : newBox}
+    />}
+  </Fragment>
 }
 
 type LayerProps = Omit<NodeProps, 'item' | 'selected'> & {
   items: EquipmentItem[]
   selectedIds: string[]
+  warningIds: string[]
 }
 
+// Shared with a focused draw-order regression test.
+// eslint-disable-next-line react-refresh/only-export-components
 export function orderEquipmentForPlan(items: EquipmentItem[]) {
   return [...items].sort((left, right) => Number(left.category !== 'hood') - Number(right.category !== 'hood'))
 }
 
-export function EquipmentLayer({ items, selectedIds, ...nodeProps }: LayerProps) {
-  return <Layer>{orderEquipmentForPlan(items).map((item) => <EquipmentNode key={item.id} item={item} selected={selectedIds.includes(item.id)} {...nodeProps} />)}</Layer>
+export function EquipmentLayer({ items, selectedIds, warningIds, ...nodeProps }: LayerProps) {
+  return <Layer>{orderEquipmentForPlan(items).map((item) => <EquipmentNode key={item.id} item={item} selected={selectedIds.includes(item.id)} warning={warningIds.includes(item.id)} {...nodeProps} />)}</Layer>
 }

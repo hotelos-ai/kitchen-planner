@@ -7,3 +7,6 @@ coverage/
 .worktrees/
 .playwright-cli/
 output/
+test-results/
+playwright-report/
+blob-report/

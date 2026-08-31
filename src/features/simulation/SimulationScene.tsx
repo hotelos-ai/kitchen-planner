@@ -1,18 +1,22 @@
 import type { Architecture, EquipmentItem, StaffRole } from '../../domain/project'
 import type { SimulationResult } from '../../simulation/types'
 
+// Shared by the visual agent layer and its accessible legend.
+// eslint-disable-next-line react-refresh/only-export-components
 export const ROLE_COLORS: Record<StaffRole, string> = { 'head-chef': '#c94f39', 'sous-chef': '#8c5bb3', cdp: '#277c91', 'busser-washer': '#b78a28' }
 
 type Layers = { heatmap: boolean; trails: boolean; queues: boolean; clearances: boolean; flows: boolean }
 
-export function SimulationScene({ result, elapsedSeconds, architecture, equipment, layers }: { result: SimulationResult; elapsedSeconds: number; architecture: Architecture; equipment: EquipmentItem[]; layers: Layers }) {
+export function SimulationScene({ result, elapsedSeconds, architecture, equipment, layers, followRole }: { result: SimulationResult; elapsedSeconds: number; architecture: Architecture; equipment: EquipmentItem[]; layers: Layers; followRole: StaffRole | 'overview' }) {
   const frameIndex = Math.min(result.frames.length - 1, Math.floor(elapsedSeconds))
   const frame = result.frames[frameIndex]
   const maxVisits = Math.max(1, ...result.metrics.trafficCells.map((cell) => cell.visits))
   const trailStart = Math.max(0, frameIndex - 90)
+  const followedAgent = followRole === 'overview' ? undefined : frame.agents.find((agent) => agent.role === followRole)
+  const viewBox = followedAgent ? `${followedAgent.xMm - 1600} ${followedAgent.yMm - 1600} 3200 3200` : `-180 -180 ${architecture.widthMm + 360} ${architecture.depthMm + 360}`
   return (
     <div className="simulation-scene">
-      <svg viewBox={`-180 -180 ${architecture.widthMm + 360} ${architecture.depthMm + 360}`} role="img" aria-label={`Kitchen service at ${Math.floor(elapsedSeconds / 60)} minutes ${Math.floor(elapsedSeconds % 60)} seconds`}>
+      <svg viewBox={viewBox} role="img" aria-label={`Kitchen service at ${Math.floor(elapsedSeconds / 60)} minutes ${Math.floor(elapsedSeconds % 60)} seconds`}>
         <defs><pattern id="sim-grid" width="100" height="100" patternUnits="userSpaceOnUse"><path d="M 100 0 L 0 0 0 100" fill="none" stroke="#aab4b0" strokeWidth="3" opacity=".4" /></pattern></defs>
         <polygon points={architecture.roomPolygon.map((point) => `${point.x},${point.y}`).join(' ')} fill="#fbfaf6" stroke="#27322e" strokeWidth="30" />
         <polygon points={architecture.roomPolygon.map((point) => `${point.x},${point.y}`).join(' ')} fill="url(#sim-grid)" />
@@ -26,7 +30,7 @@ export function SimulationScene({ result, elapsedSeconds, architecture, equipmen
           const points = result.frames.slice(trailStart, frameIndex + 1).map((candidate) => candidate.agents.find((value) => value.agentId === agent.agentId)).filter(Boolean).map((value) => `${value!.xMm},${value!.yMm}`).join(' ')
           return <polyline key={`trail-${agent.agentId}`} points={points} fill="none" stroke={ROLE_COLORS[agent.role]} strokeWidth="22" opacity=".35" />
         })}
-        {frame.agents.map((agent) => <g key={agent.agentId} transform={`translate(${agent.xMm} ${agent.yMm})`}><circle r="105" fill={ROLE_COLORS[agent.role]} stroke="white" strokeWidth="24" /><circle r="135" fill="none" stroke={ROLE_COLORS[agent.role]} strokeWidth="12" opacity={agent.state === 'waiting' ? .35 : .85} /><text y="25" textAnchor="middle" fontSize="75" fontWeight="900" fill="white">{agent.agentId.split('-').at(-1)}</text></g>)}
+        {frame.agents.map((agent) => <g key={agent.agentId} transform={`translate(${agent.xMm} ${agent.yMm})`} opacity={followRole === 'overview' || agent.role === followRole ? 1 : .22}><circle r="105" fill={ROLE_COLORS[agent.role]} stroke="white" strokeWidth="24" /><circle r="135" fill="none" stroke={ROLE_COLORS[agent.role]} strokeWidth="12" opacity={agent.state === 'waiting' ? .35 : .85} /><text y="25" textAnchor="middle" fontSize="75" fontWeight="900" fill="white">{agent.agentId.split('-').at(-1)}</text></g>)}
         {layers.queues && Object.entries(result.metrics.queueSeconds).filter(([, seconds]) => seconds > 0).map(([stationId, seconds]) => { const item = equipment.find((value) => value.id === stationId); return item ? <g key={`queue-${stationId}`} transform={`translate(${item.xMm + item.widthMm} ${item.yMm})`}><circle r="90" fill="#752f21" /><text y="22" textAnchor="middle" fontSize="62" fontWeight="900" fill="white">{Math.ceil(seconds / 60)}m</text></g> : null })}
       </svg>
       <div className="role-legend">{Object.entries(ROLE_COLORS).map(([role, color]) => <span key={role}><i style={{ background: color }} />{role.replaceAll('-', ' ')}</span>)}</div>

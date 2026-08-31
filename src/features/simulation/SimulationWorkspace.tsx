@@ -1,7 +1,9 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useStore } from 'zustand'
+import type { StaffRole } from '../../domain/project'
 import { runSimulation } from '../../simulation/engine'
 import type { SimulationInput, SimulationResult } from '../../simulation/types'
+import { validateSimulationInput } from '../../simulation/validation'
 import { getActiveVariant, projectStore, type ProjectStore } from '../../state/project-store'
 import { FindingsPanel } from './FindingsPanel'
 import { PlaybackControls } from './PlaybackControls'
@@ -21,9 +23,12 @@ export function SimulationWorkspace({ store = projectStore, run = runSimulation 
   const [playing, setPlaying] = useState(false)
   const [speed, setSpeed] = useState(1)
   const [layers, setLayers] = useState<Layers>({ heatmap: true, trails: true, queues: true, clearances: false, flows: true })
+  const [followRole, setFollowRole] = useState<StaffRole | 'overview'>('overview')
   const lastTick = useRef(0)
   const staffCount = scenario.staff.reduce((sum, entry) => sum + entry.count, 0)
-  const validationError = staffCount < 1 ? 'Add at least one staff member.' : null
+  const validationErrors = useMemo(() => validateSimulationInput({ architecture: project.architecture, equipment: variant.equipment, scenario }), [project.architecture, scenario, variant.equipment])
+  if (staffCount < 1) validationErrors.unshift({ code: 'missing-capability', message: 'Add at least one staff member.', itemIds: [] })
+  const hasValidationErrors = validationErrors.length > 0
 
   useEffect(() => {
     if (!playing || !result) return
@@ -44,7 +49,7 @@ export function SimulationWorkspace({ store = projectStore, run = runSimulation 
   }, [playing, result, speed])
 
   const startRun = () => {
-    if (validationError) return
+    if (hasValidationErrors) return
     const next = run({ architecture: project.architecture, equipment: variant.equipment, scenario })
     setResult(next); setElapsedSeconds(0); setPlaying(false)
   }
@@ -56,13 +61,14 @@ export function SimulationWorkspace({ store = projectStore, run = runSimulation 
         <div className="simulation-toolbar">
           <div><span className="eyebrow">Active layout</span><strong>{variant.name}</strong></div>
           <div className="layer-toggles">{(Object.keys(layers) as (keyof Layers)[]).map((key) => <button type="button" key={key} aria-pressed={layers[key]} onClick={() => toggleLayer(key)}>{key[0].toUpperCase() + key.slice(1)}</button>)}</div>
-          <button type="button" className="run-simulation" disabled={Boolean(validationError)} onClick={startRun}>Run {scenario.durationMinutes}-minute service</button>
+          <label className="follow-control">Follow<select aria-label="Follow staff role" value={followRole} onChange={(event) => setFollowRole(event.target.value as StaffRole | 'overview')}><option value="overview">Overview</option><option value="head-chef">Head chef</option><option value="sous-chef">Sous chef</option><option value="cdp">CDP</option><option value="busser-washer">Busser / washer</option></select></label>
+          <button type="button" className="run-simulation" disabled={hasValidationErrors} onClick={startRun}>Run {scenario.durationMinutes}-minute service</button>
         </div>
-        {validationError && <p role="alert" className="simulation-validation">{validationError}</p>}
+        {validationErrors.length > 0 && <div role="alert" className="simulation-validation"><strong>Resolve before simulation</strong>{validationErrors.map((error, index) => <button type="button" key={`${error.code}-${index}`} onClick={() => error.itemIds.length && store.getState().selectItems(error.itemIds)}>{error.message}{error.itemIds.length ? ' Select affected equipment, then open Plan.' : ''}</button>)}</div>}
         {result ? <>
-          <SimulationScene result={result} elapsedSeconds={elapsedSeconds} architecture={project.architecture} equipment={variant.equipment} layers={layers} />
+          <SimulationScene result={result} elapsedSeconds={elapsedSeconds} architecture={project.architecture} equipment={variant.equipment} layers={layers} followRole={followRole} />
           <PlaybackControls elapsedSeconds={elapsedSeconds} durationSeconds={result.durationSeconds} playing={playing} speed={speed} onPlaying={setPlaying} onElapsed={setElapsedSeconds} onSpeed={setSpeed} />
-        </> : <div className="simulation-empty"><div className="service-orbit" aria-hidden="true"><span /><span /><span /><span /><span /></div><h2>Pressure-test this layout</h2><p>Run the approved five-person dinner scenario to see routes, queues, station pressure, and dirty/clean crossings.</p><button type="button" disabled={Boolean(validationError)} onClick={startRun}>Start pressure test</button></div>}
+        </> : <div className="simulation-empty"><div className="service-orbit" aria-hidden="true"><span /><span /><span /><span /><span /></div><h2>Pressure-test this layout</h2><p>Run the approved five-person dinner scenario to see routes, queues, station pressure, and dirty/clean crossings.</p><button type="button" disabled={hasValidationErrors} onClick={startRun}>Start pressure test</button></div>}
       </div>
       <div className="simulation-sidebar">
         <ScenarioEditor scenario={scenario} onChange={(patch) => { store.getState().updateScenario(scenario.id, patch); setResult(null); setPlaying(false) }} />

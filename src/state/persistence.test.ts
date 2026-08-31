@@ -39,4 +39,15 @@ describe('project persistence', () => {
     saveProject(storage, createSeedProject())
     expect(storage.length).toBe(2)
   })
+
+  it('migrates the supported legacy project version and rejects future versions clearly', () => {
+    const legacy = structuredClone(createSeedProject()) as unknown as Record<string, unknown>
+    legacy.schemaVersion = 0
+    const architecture = legacy.architecture as Record<string, unknown>
+    delete architecture.wallHeightMm
+    const migrated = importProject(JSON.stringify(legacy))
+    expect(migrated.schemaVersion).toBe(1)
+    expect(migrated.architecture.wallHeightMm).toBe(2800)
+    expect(() => importProject('{"schemaVersion":99}')).toThrow(/unsupported future schema version 99/i)
+  })
 })

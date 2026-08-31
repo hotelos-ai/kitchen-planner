@@ -126,6 +126,8 @@ export interface SimulationScenario {
   seed: number
   staff: StaffAssignment[]
   checks: ScenarioChecks
+  taskDurations?: Partial<Record<StationCapability, { minSeconds: number; maxSeconds: number }>>
+  stationCapacities?: Record<string, number>
 }
 
 export interface KitchenProject {

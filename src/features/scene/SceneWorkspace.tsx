@@ -62,7 +62,7 @@ export function SceneWorkspace({ store = projectStore, renderer: Renderer, compa
           <button type="button" aria-pressed={showClearances} onClick={() => setShowClearances((value) => !value)}>Clearances</button>
         </div>
       </div>
-      <div className="scene-canvas">
+      <div className="scene-canvas" data-testid="kitchen-scene">
         <SceneErrorBoundary>
           <Canvas shadows gl={{ alpha: false, antialias: true, preserveDrawingBuffer: true }} camera={{ position: [6.2, 6.8, 8.2], fov: 43, near: .05, far: 80 }} dpr={[1, 2]}>
             <CameraRig mode={cameraMode} fitSignal={fitSignal} />

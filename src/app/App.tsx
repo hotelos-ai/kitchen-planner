@@ -1,4 +1,6 @@
 import { lazy, Suspense, useState } from 'react'
+import { ErrorBoundary } from './ErrorBoundary'
+import { ProjectExchange } from './ProjectExchange'
 import './styles.css'
 
 const PlanWorkspace = lazy(() => import('../features/editor/PlanWorkspace').then((module) => ({ default: module.PlanWorkspace })))
@@ -29,6 +31,7 @@ export function App() {
             <p>Metric kitchen planning and service simulation</p>
           </div>
         </div>
+        <ProjectExchange />
         <nav aria-label="Workspace views" className="view-switcher">
           {(Object.keys(VIEW_LABELS) as WorkspaceView[]).map((next) => (
             <button
@@ -42,13 +45,15 @@ export function App() {
           ))}
         </nav>
       </header>
-      <Suspense fallback={<section className="workspace-placeholder">Loading workspace…</section>}>
-        {view === 'plan' && <PlanWorkspace />}
-        {view === 'scene' && <SceneWorkspace />}
-        {view === 'split' && <section className="split-workspace"><PlanWorkspace compact /><SceneWorkspace compact /></section>}
-        {view === 'simulate' && <SimulationWorkspace />}
-        {view === 'compare' && <CompareWorkspace />}
-      </Suspense>
+      <ErrorBoundary>
+        <Suspense fallback={<section className="workspace-placeholder">Loading workspace…</section>}>
+          {view === 'plan' && <PlanWorkspace />}
+          {view === 'scene' && <SceneWorkspace />}
+          {view === 'split' && <section className="split-workspace"><PlanWorkspace compact /><SceneWorkspace compact /></section>}
+          {view === 'simulate' && <SimulationWorkspace />}
+          {view === 'compare' && <CompareWorkspace />}
+        </Suspense>
+      </ErrorBoundary>
     </main>
   )
 }

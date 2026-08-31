@@ -5,8 +5,22 @@ import { createSeedProject } from '../domain/seed-project'
 export const CURRENT_PROJECT_KEY = 'manta-raja:project:v1'
 export const LAST_GOOD_PROJECT_KEY = 'manta-raja:project:last-good:v1'
 
+function migrate(value: unknown): unknown {
+  if (!value || typeof value !== 'object') return value
+  const source = value as Record<string, unknown>
+  if (source.schemaVersion !== 0) return value
+  const migrated = structuredClone(source)
+  migrated.schemaVersion = 1
+  if (migrated.architecture && typeof migrated.architecture === 'object') {
+    const architecture = migrated.architecture as Record<string, unknown>
+    architecture.wallHeightMm ??= 2800
+    architecture.locked ??= true
+  }
+  return migrated
+}
+
 function validated(value: unknown): KitchenProject | null {
-  const result = projectSchema.safeParse(value)
+  const result = projectSchema.safeParse(migrate(value))
   return result.success ? result.data : null
 }
 
@@ -46,7 +60,11 @@ export function importProject(json: string): KitchenProject {
   } catch {
     throw new Error('Import is not valid JSON')
   }
-  const parsed = projectSchema.safeParse(candidate)
+  if (candidate && typeof candidate === 'object') {
+    const version = (candidate as Record<string, unknown>).schemaVersion
+    if (typeof version === 'number' && version > 1) throw new Error(`Unsupported future schema version ${version}`)
+  }
+  const parsed = projectSchema.safeParse(migrate(candidate))
   if (!parsed.success) throw new Error('Import is not a valid kitchen project')
   return parsed.data
 }

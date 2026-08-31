@@ -72,7 +72,7 @@ export function runSimulation(input: SimulationInput): SimulationResult {
   const warnings: string[] = []
   const taskFinished = new Map<string, number>()
   const taskStarted = new Map<string, number>()
-  const stationAvailable = new Map<string, number>()
+  const stationAvailable = new Map<string, number[]>()
   const stationById = new Map(equipment.map((item) => [item.id, item]))
   const traffic = new Map<string, { xMm: number; yMm: number; visits: number }>()
 
@@ -88,7 +88,10 @@ export function runSimulation(input: SimulationInput): SimulationResult {
     const distance = routeDistanceMm(route)
     const travelSeconds = distance / WALK_SPEED_MM_S
     const arrival = departure + travelSeconds
-    const workStart = Math.max(arrival, stationAvailable.get(station.id) ?? 0)
+    const capacity = Math.max(1, input.scenario.stationCapacities?.[station.id] ?? 1)
+    const slots = stationAvailable.get(station.id) ?? Array.from({ length: capacity }, () => 0)
+    const slotIndex = slots.reduce((best, value, index) => value < slots[best] ? index : best, 0)
+    const workStart = Math.max(arrival, slots[slotIndex])
     const queueSeconds = workStart - arrival
     const workEnd = workStart + task.durationSeconds
     if (travelSeconds > 0) agent.intervals.push({ start: departure, end: arrival, state: 'walking', taskId: task.id, from: agent.point, to: route.at(-1)!, route })
@@ -111,7 +114,8 @@ export function runSimulation(input: SimulationInput): SimulationResult {
     }
     agent.availableAt = workEnd
     agent.point = route.at(-1)!
-    stationAvailable.set(station.id, workEnd)
+    slots[slotIndex] = workEnd
+    stationAvailable.set(station.id, slots)
     taskStarted.set(task.id, workStart)
     taskFinished.set(task.id, workEnd)
     const next = tasks.find((candidate) => candidate.predecessorId === task.id)
@@ -139,6 +143,6 @@ export function runSimulation(input: SimulationInput): SimulationResult {
     }
   })
   const metrics = aggregateMetrics(events)
-  Object.keys(metrics.stationUtilization).forEach((stationId) => { metrics.stationUtilization[stationId] = Math.min(1, metrics.stationUtilization[stationId] / durationSeconds) })
+  Object.keys(metrics.stationUtilization).forEach((stationId) => { metrics.stationUtilization[stationId] = Math.min(1, metrics.stationUtilization[stationId] / durationSeconds / Math.max(1, input.scenario.stationCapacities?.[stationId] ?? 1)) })
   return { seed: input.scenario.seed, durationSeconds, frames, events, metrics, warnings: [...new Set(warnings)] }
 }

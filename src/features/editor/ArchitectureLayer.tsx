@@ -36,7 +36,6 @@ export function ArchitectureLayer({ architecture, pixelsPerMm: scale, originX, o
         return (
           <Group key={opening.id}>
             <Line points={vertical ? [x, y, x, y + length] : [x, y, x + length, y]} stroke={color} strokeWidth={opening.kind === 'sealed-opening' ? 7 : 5} dash={opening.kind === 'sealed-opening' ? [5, 4] : undefined} />
-            <Text x={vertical ? x - 106 : x} y={vertical ? y + 5 : y - 17} width={vertical ? 100 : length} align={vertical ? 'right' : 'center'} text={opening.label} fill={color} fontSize={8} fontStyle="bold" />
           </Group>
         )
       })}

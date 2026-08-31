@@ -4,6 +4,7 @@ import { projectStore, type ProjectStore } from '../../state/project-store'
 import { EquipmentInspector } from './EquipmentInspector'
 import { EquipmentLibrary } from './EquipmentLibrary'
 import { LayoutVariants } from './LayoutVariants'
+import { LayoutDiagnostics } from './LayoutDiagnostics'
 import { PlanCanvas } from './PlanCanvas'
 import { ProjectSettings } from './ProjectSettings'
 
@@ -27,7 +28,8 @@ export function PlanWorkspace({ store = projectStore, showCanvas = typeof Resize
       const command = event.metaKey || event.ctrlKey
       if (command && event.key.toLowerCase() === 'z') {
         event.preventDefault()
-        event.shiftKey ? store.getState().redo() : store.getState().undo()
+        if (event.shiftKey) store.getState().redo()
+        else store.getState().undo()
         return
       }
       if (command && event.key.toLowerCase() === 'd' && selectedIds[0]) {
@@ -73,7 +75,7 @@ export function PlanWorkspace({ store = projectStore, showCanvas = typeof Resize
           <div className="canvas-status"><span>10 cm source grid</span><span>Architecture locked by default</span><span>{selectedIds.length ? `${selectedIds.length} selected` : 'Select equipment to edit'}</span></div>
           {showCanvas ? <PlanCanvas store={store} showReference={showReference} /> : <div className="test-canvas-placeholder" />}
         </div>
-        <div className="right-panel"><EquipmentInspector store={store} /><ProjectSettings store={store} /></div>
+        <div className="right-panel"><EquipmentInspector store={store} /><LayoutDiagnostics store={store} /><ProjectSettings store={store} /></div>
       </div>
     </section>
   )

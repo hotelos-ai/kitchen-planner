@@ -12,7 +12,7 @@ describe('simulation workspace', () => {
   it('runs the approved five-person 50-cover scenario and displays metrics', async () => {
     render(<SimulationWorkspace run={runSimulation} />)
     expect(screen.getByLabelText(/Covers/i)).toHaveValue(50)
-    expect(screen.getByText(/Head chef/i)).toBeInTheDocument()
+    expect(screen.getByLabelText(/Head chef count/i)).toHaveValue(1)
     await userEvent.click(screen.getByRole('button', { name: /Run 60-minute service/i }))
     expect(await screen.findByText(/Total staff travel/i)).toBeInTheDocument()
     expect(screen.getByText(/Dirty-clean crossings/i)).toBeInTheDocument()

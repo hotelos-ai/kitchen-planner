@@ -23,6 +23,10 @@ export function Clearances({ items, architecture, visible }: { items: EquipmentI
         const z = opening.wall === 'bottom' ? toWorld(architecture.depthMm) : opening.wall === 'top' ? 0 : toWorld(opening.offsetMm)
         return <mesh key={opening.id} position={[x, .022, z]} rotation={[-Math.PI / 2, 0, 0]}><ringGeometry args={[radius - .025, radius, 36, 1, 0, Math.PI / 2]} /><meshBasicMaterial color="#5d8178" transparent opacity={.7} side={THREE.DoubleSide} /></mesh>
       })}
+      {items.filter((item) => item.category === 'cold' && /fridge|freezer/i.test(item.label)).map((item) => {
+        const radius = toWorld(Math.min(item.widthMm, item.clearance?.frontMm ?? item.depthMm))
+        return <mesh key={`swing-${item.id}`} position={[toWorld(item.xMm), .025, toWorld(item.yMm + item.depthMm)]} rotation={[-Math.PI / 2, 0, -THREE.MathUtils.degToRad(item.rotationDeg)]}><ringGeometry args={[Math.max(0, radius - .025), radius, 32, 1, 0, Math.PI / 2]} /><meshBasicMaterial color="#4e8e98" transparent opacity={.65} side={THREE.DoubleSide} /></mesh>
+      })}
     </group>
   )
 }
