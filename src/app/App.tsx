@@ -3,6 +3,7 @@ import './styles.css'
 
 const PlanWorkspace = lazy(() => import('../features/editor/PlanWorkspace').then((module) => ({ default: module.PlanWorkspace })))
 const SceneWorkspace = lazy(() => import('../features/scene/SceneWorkspace').then((module) => ({ default: module.SceneWorkspace })))
+const SimulationWorkspace = lazy(() => import('../features/simulation/SimulationWorkspace').then((module) => ({ default: module.SimulationWorkspace })))
 
 export type WorkspaceView = 'plan' | 'scene' | 'split' | 'simulate' | 'compare'
 
@@ -44,7 +45,8 @@ export function App() {
         {view === 'plan' && <PlanWorkspace />}
         {view === 'scene' && <SceneWorkspace />}
         {view === 'split' && <section className="split-workspace"><PlanWorkspace compact /><SceneWorkspace compact /></section>}
-        {(view === 'simulate' || view === 'compare') && <section aria-live="polite" className="workspace-placeholder"><span>{VIEW_LABELS[view]} workspace</span></section>}
+        {view === 'simulate' && <SimulationWorkspace />}
+        {view === 'compare' && <section aria-live="polite" className="workspace-placeholder"><span>{VIEW_LABELS[view]} workspace</span></section>}
       </Suspense>
     </main>
   )

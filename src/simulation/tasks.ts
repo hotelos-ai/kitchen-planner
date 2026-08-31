@@ -44,10 +44,11 @@ export function generateServiceTasks(scenario: SimulationScenario, equipment: re
   for (let index = 0; index < orderCount; index += 1) {
     const orderId = `order-${index + 1}`
     const cook = availableCooking[index % availableCooking.length]
+    const cookedToOrder = index < Math.round(orderCount * scenario.cookToOrderRatio)
     addChain(tasks, orderId, arrivalTime(index, orderCount, scenario, rng), 'clean', COOK_ROLES, [
       { stage: 'retrieve', capability: 'cold-retrieval', duration: rng.between(20, 45) },
       { stage: 'prep', capability: 'food-prep', duration: rng.between(45, 120) },
-      { stage: 'cook', capability: cook, duration: rng.between(180, 540) },
+      { stage: 'cook', capability: cook, duration: cookedToOrder ? rng.between(180, 540) : rng.between(60, 150) },
       { stage: 'finish', capability: 'finish-plate', duration: rng.between(25, 60) },
       { stage: 'pass', capability: 'clean-window', duration: rng.between(5, 15) },
     ], equipment, orderId)
