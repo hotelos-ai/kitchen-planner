@@ -1,0 +1,46 @@
+import type { StaffRole } from '../domain/project'
+import type { SimulationEvent, SimulationMetrics } from './types'
+
+const ROLES: StaffRole[] = ['head-chef', 'sous-chef', 'cdp', 'busser-washer']
+const percentile = (values: number[], fraction: number) => values.length ? [...values].sort((a, b) => a - b)[Math.min(values.length - 1, Math.ceil(values.length * fraction) - 1)] : 0
+
+export function emptyMetrics(): SimulationMetrics {
+  return {
+    totalTravelMm: 0,
+    travelByRoleMm: Object.fromEntries(ROLES.map((role) => [role, 0])) as Record<StaffRole, number>,
+    timeByRoleSeconds: Object.fromEntries(ROLES.map((role) => [role, { walking: 0, working: 0, waiting: 0 }])) as SimulationMetrics['timeByRoleSeconds'],
+    stationUtilization: {}, queueSeconds: {}, congestionEvents: 0, hotLineCongestionEvents: 0,
+    opposingFlowEvents: 0, doorConflictEvents: 0, dirtyCleanCrossings: 0, unreachableTasks: 0,
+    finishToPassTravelMm: 0, dirtyToWashTravelMm: 0, completedOrders: 0,
+    orderCompletionP50Seconds: 0, orderCompletionP90Seconds: 0, trafficCells: [],
+  }
+}
+
+export function aggregateMetrics(events: readonly SimulationEvent[]): SimulationMetrics {
+  const metrics = emptyMetrics()
+  const completions: number[] = []
+  const traffic = new Map<string, { xMm: number; yMm: number; visits: number }>()
+  events.forEach((event) => {
+    if (event.type === 'travel') { metrics.totalTravelMm += event.distanceMm; metrics.travelByRoleMm[event.role] += event.distanceMm }
+    else if (event.type === 'state-time') metrics.timeByRoleSeconds[event.role][event.state] += event.durationSeconds
+    else if (event.type === 'station-work') metrics.stationUtilization[event.stationId] = (metrics.stationUtilization[event.stationId] ?? 0) + event.durationSeconds
+    else if (event.type === 'queue') metrics.queueSeconds[event.stationId] = (metrics.queueSeconds[event.stationId] ?? 0) + event.durationSeconds
+    else if (event.type === 'congestion') { metrics.congestionEvents += 1; if (event.hotLine) metrics.hotLineCongestionEvents += 1 }
+    else if (event.type === 'opposing-flow') metrics.opposingFlowEvents += 1
+    else if (event.type === 'door-conflict') metrics.doorConflictEvents += 1
+    else if (event.type === 'dirty-clean-crossing') metrics.dirtyCleanCrossings += 1
+    else if (event.type === 'unreachable') metrics.unreachableTasks += 1
+    else if (event.type === 'path-metric') metrics[event.kind === 'finish-to-pass' ? 'finishToPassTravelMm' : 'dirtyToWashTravelMm'] += event.distanceMm
+    else if (event.type === 'order-completed') { metrics.completedOrders += 1; completions.push(event.durationSeconds) }
+    else if (event.type === 'traffic') {
+      const key = `${event.xMm},${event.yMm}`
+      const cell = traffic.get(key) ?? { xMm: event.xMm, yMm: event.yMm, visits: 0 }
+      cell.visits += event.visits
+      traffic.set(key, cell)
+    }
+  })
+  metrics.orderCompletionP50Seconds = percentile(completions, .5)
+  metrics.orderCompletionP90Seconds = percentile(completions, .9)
+  metrics.trafficCells = [...traffic.values()].sort((left, right) => right.visits - left.visits || left.yMm - right.yMm || left.xMm - right.xMm)
+  return metrics
+}
