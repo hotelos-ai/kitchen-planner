@@ -59,7 +59,7 @@ export function createSeedProject(): KitchenProject {
       capabilities: ['range-cook'], clearanceFrontMm: 1100,
     }),
     equipment('tandoor', 'Tandoor', 'cooking', 700, 700, 2400, 900, {
-      heightMm: 1000, capabilities: ['tandoor-cook'], clearanceFrontMm: 1000,
+      heightMm: 900, capabilities: ['tandoor-cook'], clearanceFrontMm: 1000,
       notes: 'Confirmed directly against the shaded pillar.',
     }),
     equipment('upright-freezer', 'Upright freezer', 'cold', 700, 800, 2800, 0, {

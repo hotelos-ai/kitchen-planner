@@ -10,11 +10,12 @@ import { ProjectSettings } from './ProjectSettings'
 type Props = {
   store?: ProjectStore
   showCanvas?: boolean
+  compact?: boolean
 }
 
 const isTextEntry = (target: EventTarget | null) => target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement || target instanceof HTMLSelectElement
 
-export function PlanWorkspace({ store = projectStore, showCanvas = typeof ResizeObserver !== 'undefined' }: Props) {
+export function PlanWorkspace({ store = projectStore, showCanvas = typeof ResizeObserver !== 'undefined', compact = false }: Props) {
   const [showReference, setShowReference] = useState(false)
   const selectedIds = useStore(store, (state) => state.selectedIds)
   const canUndo = useStore(store, (state) => state.past.length > 0)
@@ -45,6 +46,15 @@ export function PlanWorkspace({ store = projectStore, showCanvas = typeof Resize
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
   }, [selectedIds, store])
+
+  if (compact) return (
+    <section className="plan-workspace compact" aria-label="2D plan workspace">
+      <div className="canvas-column">
+        <div className="canvas-status"><span>2D plan · 10 cm grid</span><span>{selectedIds.length ? `${selectedIds.length} selected` : 'Select equipment'}</span></div>
+        {showCanvas ? <PlanCanvas store={store} showReference={false} /> : <div className="test-canvas-placeholder" />}
+      </div>
+    </section>
+  )
 
   return (
     <section className="plan-workspace">
