@@ -1,5 +1,7 @@
-import { useState } from 'react'
+import { lazy, Suspense, useState } from 'react'
 import './styles.css'
+
+const PlanWorkspace = lazy(() => import('../features/editor/PlanWorkspace').then((module) => ({ default: module.PlanWorkspace })))
 
 export type WorkspaceView = 'plan' | 'scene' | 'split' | 'simulate' | 'compare'
 
@@ -37,9 +39,9 @@ export function App() {
           ))}
         </nav>
       </header>
-      <section aria-live="polite" className="workspace-placeholder">
-        <span>{VIEW_LABELS[view]} workspace</span>
-      </section>
+      {view === 'plan'
+        ? <Suspense fallback={<section className="workspace-placeholder">Loading plan…</section>}><PlanWorkspace /></Suspense>
+        : <section aria-live="polite" className="workspace-placeholder"><span>{VIEW_LABELS[view]} workspace</span></section>}
     </main>
   )
 }

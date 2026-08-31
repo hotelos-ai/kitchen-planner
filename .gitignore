@@ -5,3 +5,5 @@ dist/
 coverage/
 *.local
 .worktrees/
+.playwright-cli/
+output/

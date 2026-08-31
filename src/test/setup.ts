@@ -1,4 +1,6 @@
 import '@testing-library/jest-dom/vitest'
+import { cleanup } from '@testing-library/react'
+import { afterEach } from 'vitest'
 
 const values = new Map<string, string>()
 const testStorage: Storage = {
@@ -13,4 +15,9 @@ const testStorage: Storage = {
 Object.defineProperty(globalThis, 'localStorage', {
   value: testStorage,
   configurable: true,
+})
+
+afterEach(() => {
+  cleanup()
+  testStorage.clear()
 })
