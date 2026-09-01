@@ -124,6 +124,23 @@ This separation allows a future domain to provide its own agents, resources, wor
 - Cross-feature imports flow through documented public module entry points.
 - Browser-only input and pointer-lock logic is isolated behind adapters and can be replaced in tests.
 
+### Incremental scene synchronization
+
+The 3D renderer is a persistent presentation surface, not a disposable preview. Editing the plan must update the corresponding scene components without resetting the surrounding 3D experience.
+
+- The React Three Fiber `Canvas`, WebGL renderer, camera rig, orbit controls, lighting, architecture group, and unchanged equipment meshes retain stable component identities during ordinary layout edits.
+- Moving or rotating an item updates only that item's transform.
+- Resizing an item updates only that item's dimension-driven geometry and collision bounds.
+- Adding or removing an item mounts or unmounts only that item's registered visual component.
+- Editing labels, metadata, selection, clearances, or materials updates only the affected presentation properties.
+- Split-view plan gestures must not remount the Canvas, increment its recovery key, refit the room, reset the camera target, reset orbit/pan/zoom, or interrupt pointer interaction.
+- Renderer remounting is reserved for explicit WebGL context recovery or another unrecoverable graphics failure.
+- Active simulation playback and first-person position remain intact when a compatible item edit is made. If an edit invalidates current navigation, the application pauses playback and reports the exact reason rather than silently resetting the scene.
+- Scene component keys use stable item IDs, never collection indices or document revisions.
+- Derived scene data is memoized at the smallest useful boundary so one item's change does not rebuild unrelated procedural geometry.
+
+The split view should feel like editing a live model: the changed item moves immediately on the right while the user's camera and the rest of the scene remain visually stationary.
+
 ### Planned phase-two adapter
 
 The future WebMCP layer will be a thin adapter that:
@@ -356,6 +373,7 @@ Implementation follows test-first development.
 - Commands and queries accept and return JSON-safe data without React, DOM, Konva, or Three.js objects.
 - Kitchen visual and simulation presets are resolved through registries with a safe generic fallback.
 - Dry-run commands report mutations and validation findings without changing the document revision.
+- Moving, rotating, resizing, adding, and removing an item through the plan updates only the affected 3D component while preserving the Canvas instance and camera/control state.
 
 ### Browser tests
 
@@ -367,6 +385,7 @@ Implementation follows test-first development.
 - Enter Walk Kitchen, use keyboard controls, jump, release pointer lock, and exit.
 - Trigger WebGL context loss and verify the renderer can restart in normal and simulation 3D views.
 - Run without uncaught page errors or WebGL warnings under repeated view changes.
+- In Split view, orbit to a non-default camera, edit several items in the plan, and confirm the same WebGL canvas, camera transform, orbit target, and unaffected mesh instances remain active.
 
 ## Acceptance Criteria
 
@@ -384,4 +403,5 @@ The feature is complete when:
 10. Every seeded appliance, counter, sink, and wash-up item is recognizable without relying solely on its floating label.
 11. Layout mutations are available through validated, serializable application commands used by the UI and suitable for a future WebMCP adapter.
 12. Core geometry, editing, rendering orchestration, and agent playback do not assume a kitchen domain; kitchen-specific presets and workflow rules are registered modules.
-13. All automated tests, production build, browser checks, and WebGL recovery checks pass.
+13. Plan edits incrementally update the live 3D scene without remounting the renderer or resetting the camera and controls.
+14. All automated tests, production build, browser checks, and WebGL recovery checks pass.
