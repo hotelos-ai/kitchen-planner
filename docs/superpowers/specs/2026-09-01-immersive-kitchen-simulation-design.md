@@ -30,6 +30,112 @@ The existing 2D Operations view remains available because it is the clearest ana
 
 This approach avoids separate simulation logic, prevents metric drift between views, and keeps the 3D implementation lightweight enough to preserve WebGL stability.
 
+## Phase-Two Extensibility Boundary
+
+Phase one presents a kitchen-planning product, but the foundations must support other spatial layouts and future WebMCP tools. WebMCP exposure itself is explicitly deferred to phase two. Phase one creates the stable, validated application interfaces that a later WebMCP adapter will call.
+
+The application is organized into three layers:
+
+1. **Spatial core:** domain-neutral documents, geometry, transforms, commands, validation primitives, units, history, and serialization.
+2. **Domain modules:** kitchen catalog, commercial-equipment visuals, kitchen workflow capabilities, kitchen simulation rules, and Manta Raja seed data.
+3. **Presentation adapters:** React editor, Three.js scene, Full Sim dashboards, persistence, and the future WebMCP adapter.
+
+React components and Three.js meshes must not become the source of truth. They render and dispatch against the spatial core.
+
+## Component and Tool-Call Architecture
+
+### Generic spatial core
+
+The reusable core describes concepts such as:
+
+- project and layout variants;
+- bounded spaces and polygons;
+- placed items with stable identifiers, dimensions, transforms, tags, and metadata;
+- openings, structural obstacles, zones, and clearance regions;
+- display units and canonical millimetre storage;
+- agent positions, routes, tasks, resources, and playback frames.
+
+Kitchen-specific categories and capabilities remain domain-module data rather than assumptions embedded in generic geometry or editor code. Existing public project data must retain migration compatibility while the internals are separated.
+
+### Validated command surface
+
+Every material layout mutation goes through a serializable command with a discriminated type and a Zod-validated payload. Initial commands include:
+
+- create or reset a project;
+- add, update, duplicate, and remove a placed item;
+- move, resize, and rotate one or more items;
+- update project settings and units;
+- create, rename, activate, duplicate, and remove variants;
+- update architecture only when explicitly unlocked;
+- update a scenario and start a deterministic simulation.
+
+Commands return structured success or failure results with stable error codes, affected IDs, and optional warnings. They do not depend on DOM events, React components, Konva nodes, Three.js objects, browser globals, or pointer coordinates.
+
+The UI translates gestures into these commands. A future WebMCP adapter translates tool inputs into the same commands. Neither path may bypass validation, history, locking rules, or collision/boundary analysis.
+
+### Read-only query surface
+
+Deterministic, JSON-safe queries expose the state an agent or UI needs without leaking store internals:
+
+- project and active-layout snapshot;
+- list/filter placed items and catalog entries;
+- selected item geometry and properties;
+- room bounds, openings, obstacles, and available zones;
+- collision, clearance, reachability, and validation findings;
+- simulation assumptions, progress, queues, metrics, and recommendations;
+- supported commands, item presets, units, and domain capabilities.
+
+Large visual artifacts are not returned by default. Tool callers receive concise structured state and can request more detail explicitly.
+
+### Stable identifiers and tool safety
+
+- IDs are stable across 2D, 3D, simulation, persistence, undo/redo, and eventual tool calls.
+- Commands are atomic and deterministic where practical.
+- Destructive commands identify exact targets and return enough state for confirmation or undo.
+- Tool-facing operations support dry-run validation before mutation.
+- Imported or tool-supplied data passes through the same schema and migration boundary as browser-saved data.
+- Command results include the resulting document revision so automated callers can detect stale writes.
+- No command accepts executable code, selectors, arbitrary property paths, or unvalidated free-form mutations.
+
+### Rendering registry
+
+Placed items select their 2D and 3D representation through registered visual presets rather than hard-coded conditionals spread throughout the scene. A visual preset can provide:
+
+- plan symbol;
+- procedural 3D component;
+- materials and detail level;
+- footprint and fixed collision bounds;
+- optional interaction anchors and state visualization.
+
+The kitchen module registers ranges, tandoors, refrigeration, tables, sinks, dishwashing, mixers, hoods, and generic fallbacks. Later domains can register furniture, retail fixtures, warehouse equipment, office assets, or other objects without changing the core renderer.
+
+### Simulation module boundary
+
+The generic agent/playback layer owns positions, routes, interpolation, occupancy, queues, time, and visualization. The kitchen module supplies roles, task chains, station capabilities, service windows, durations, and operational metrics.
+
+This separation allows a future domain to provide its own agents, resources, workflows, and KPIs while reusing the scene, walk mode, path playback, and live visualization infrastructure.
+
+### Component contracts
+
+- Components receive explicit typed props and emit semantic callbacks or commands.
+- Stateful orchestration lives at workspace boundaries; leaf renderers remain focused and reusable.
+- Shared scene components work in normal 3D, simulation overview, and first person without copying geometry.
+- Editor, scene, simulation, and persistence consume selectors and public services rather than reaching into mutable store internals.
+- Cross-feature imports flow through documented public module entry points.
+- Browser-only input and pointer-lock logic is isolated behind adapters and can be replaced in tests.
+
+### Planned phase-two adapter
+
+The future WebMCP layer will be a thin adapter that:
+
+1. publishes command and query schemas as tools;
+2. validates an agent request;
+3. optionally performs a dry run;
+4. executes through the same application service as the UI;
+5. returns structured results, findings, and the new revision.
+
+No WebMCP-specific protocol code, tool discovery, or remote-agent authorization is required in this phase.
+
 ## 3D Workspace Controls
 
 The regular 3D toolbar will contain:
@@ -246,6 +352,10 @@ Implementation follows test-first development.
 - Collision resolution prevents traversal through walls, pillar, equipment, and pass ledges.
 - D2 spawn is valid and inside the navigable room.
 - Equipment presets expose identifying geometry for every seeded equipment family while retaining their exact configured bounds.
+- UI gestures and direct application-service calls produce the same validated command result.
+- Commands and queries accept and return JSON-safe data without React, DOM, Konva, or Three.js objects.
+- Kitchen visual and simulation presets are resolved through registries with a safe generic fallback.
+- Dry-run commands report mutations and validation findings without changing the document revision.
 
 ### Browser tests
 
@@ -272,4 +382,6 @@ The feature is complete when:
 8. The player cannot walk through solid architecture or equipment and does not fall through the floor.
 9. Other simulated staff remain visible while the user walks the kitchen.
 10. Every seeded appliance, counter, sink, and wash-up item is recognizable without relying solely on its floating label.
-11. All automated tests, production build, browser checks, and WebGL recovery checks pass.
+11. Layout mutations are available through validated, serializable application commands used by the UI and suitable for a future WebMCP adapter.
+12. Core geometry, editing, rendering orchestration, and agent playback do not assume a kitchen domain; kitchen-specific presets and workflow rules are registered modules.
+13. All automated tests, production build, browser checks, and WebGL recovery checks pass.
