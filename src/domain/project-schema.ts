@@ -73,7 +73,7 @@ const architectureSchema = z.object({
   locked: z.boolean(),
 }).strict()
 
-const scenarioSchema = z.object({
+export const scenarioSchema = z.object({
   id: z.string().min(1),
   name: z.string().min(1),
   covers: z.number().int().positive(),
