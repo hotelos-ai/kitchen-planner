@@ -4,6 +4,7 @@ import * as THREE from 'three'
 import type { EquipmentItem } from '../../domain/project'
 import { toWorld } from './ArchitectureMesh'
 import { getEquipmentVisual } from './equipment/equipment-visual-registry'
+import { equipmentSelectionDescriptor } from './equipment-selection'
 
 type Props = {
   item: EquipmentItem
@@ -13,9 +14,10 @@ type Props = {
 }
 
 export function EquipmentMesh({ item, selected, wallHeightMm, onSelect }: Props) {
-  const widthM = toWorld(item.widthMm)
-  const heightM = toWorld(item.heightMm)
-  const depthM = toWorld(item.depthMm)
+  const selection = equipmentSelectionDescriptor(item)
+  const widthM = selection.widthM
+  const heightM = selection.heightM
+  const depthM = selection.depthM
   const isHood = item.category === 'hood'
   const baseY = isHood ? toWorld(wallHeightMm) - heightM - .15 : 0
   return (
@@ -35,8 +37,9 @@ export function EquipmentMesh({ item, selected, wallHeightMm, onSelect }: Props)
         <Html position={[0, heightM + .13, 0]} center distanceFactor={8} className={`scene-label${selected ? ' selected' : ''}`}>
           <button type="button" onClick={(event) => { event.stopPropagation(); onSelect(item.id) }} aria-label={`Select ${item.label} in 3D`}>{item.label}</button>
         </Html>
-        {selected && <mesh position={[0, -baseY + .015, 0]} rotation={[-Math.PI / 2, 0, 0]}><ringGeometry args={[Math.max(widthM, depthM) * .58, Math.max(widthM, depthM) * .64, 36]} /><meshBasicMaterial color="#e56f4e" transparent opacity={.8} side={THREE.DoubleSide} /></mesh>}
       </group>
     </group>
   )
 }
+
+export { equipmentSelectionDescriptor } from './equipment-selection'

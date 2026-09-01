@@ -3,6 +3,7 @@ import { useMemo } from 'react'
 import * as THREE from 'three'
 import type { Architecture, Opening, PointMm } from '../../domain/project'
 import { ServiceWindowMesh } from './ServiceWindowMesh'
+import { wallSurfaceRenderState } from './wall-material'
 import { buildWallPanels, serviceWindowFixtures, type WallPanel } from './wall-geometry'
 
 // Shared by procedural scene modules and synchronization tests.
@@ -79,15 +80,18 @@ function FloorMesh({ polygon }: { polygon: PointMm[] }) {
   )
 }
 
-function WallMesh({ panel, transparent }: { panel: WallPanel; transparent: boolean }) {
+function WallMesh({ panel, transparent: outlineOnly }: { panel: WallPanel; transparent: boolean }) {
+  const { castShadow, ...materialState } = wallSurfaceRenderState(outlineOnly)
   return (
-    <mesh position={[toWorld(panel.centerMm.x), toWorld(panel.centerMm.y), toWorld(panel.centerMm.z)]} rotation={[0, panel.rotationYRad, 0]} castShadow receiveShadow>
+    <mesh position={[toWorld(panel.centerMm.x), toWorld(panel.centerMm.y), toWorld(panel.centerMm.z)]} rotation={[0, panel.rotationYRad, 0]} castShadow={castShadow} receiveShadow={!outlineOnly}>
       <boxGeometry args={[toWorld(panel.sizeMm.width), toWorld(panel.sizeMm.height), toWorld(panel.sizeMm.depth)]} />
-      <meshStandardMaterial color="#f3efe5" roughness={0.88} transparent={transparent} opacity={transparent ? .16 : 1} depthWrite={!transparent} />
+      <meshStandardMaterial color="#f3efe5" roughness={0.88} {...materialState} />
       <Edges color="#34413d" threshold={15} />
     </mesh>
   )
 }
+
+export { wallSurfaceRenderState } from './wall-material'
 
 export function ArchitectureMesh({ architecture, wallsTransparent = false }: { architecture: Architecture; wallsTransparent?: boolean }) {
   const heightM = toWorld(architecture.wallHeightMm)
