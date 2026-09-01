@@ -131,7 +131,9 @@ export function findJumpObstacle(body: WalkBody, direction: PointMm, colliders: 
   const length = Math.hypot(direction.x, direction.y)
   if (length < .001) return undefined
   const unit = { x: direction.x / length, y: direction.y / length }
-  const jumpable = colliders.filter((collider) => collider.jumpable)
+  const jumpable = colliders.filter((collider) =>
+    collider.jumpable && !pointInPolygon(body.positionMm, collider.polygon),
+  )
   for (let distance = body.radiusMm; distance <= 1400; distance += 40) {
     const sample = {
       x: body.positionMm.x + unit.x * distance,

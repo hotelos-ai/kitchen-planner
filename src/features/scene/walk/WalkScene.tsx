@@ -1,6 +1,7 @@
-import type { Architecture, EquipmentItem, PointMm } from '../../../domain/project'
+import type { Architecture, EquipmentItem } from '../../../domain/project'
 import { FirstPersonController } from './FirstPersonController'
 import { FirstPersonHands } from './FirstPersonHands'
+import type { WalkPlayerPosition } from './types'
 
 export function WalkScene({ active, architecture, equipment, staff, reducedMotion, onLockedChange, onNearbyChange, onPositionChange }: {
   active: boolean
@@ -10,7 +11,7 @@ export function WalkScene({ active, architecture, equipment, staff, reducedMotio
   reducedMotion?: boolean
   onLockedChange?(locked: boolean): void
   onNearbyChange?(nearby: boolean): void
-  onPositionChange?(position: PointMm): void
+  onPositionChange?(position: WalkPlayerPosition): void
 }) {
   if (!active) return null
   return <>

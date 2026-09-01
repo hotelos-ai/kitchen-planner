@@ -1,12 +1,13 @@
 import { Component, useState, type ComponentType, type ErrorInfo, type ReactNode } from 'react'
 import { useStore } from 'zustand'
-import type { EquipmentItem, KitchenProject, LayoutVariant, PointMm } from '../../domain/project'
+import type { EquipmentItem, KitchenProject, LayoutVariant } from '../../domain/project'
 import { getActiveVariant, projectStore, type ProjectStore } from '../../state/project-store'
 import { KitchenScene } from './KitchenScene'
 import { SceneCanvas, type CameraMode } from './SceneCanvas'
 import { ChefAvatar } from './agents/ChefAvatar'
 import { WalkControlsGuide } from './walk/WalkControlsGuide'
 import { WalkScene } from './walk/WalkScene'
+import type { WalkPlayerPosition } from './walk/types'
 
 export type { CameraMode } from './SceneCanvas'
 
@@ -20,7 +21,7 @@ export type SceneRendererProps = {
   wallsTransparent: boolean
   walkMode: boolean
   reducedMotion: boolean
-  playerPosition?: PointMm
+  playerPosition?: WalkPlayerPosition
   cameraMode: CameraMode
   fitSignal: number
   onClearSelection(): void
@@ -28,7 +29,7 @@ export type SceneRendererProps = {
   onContextRestored(): void
   onWalkLockedChange(locked: boolean): void
   onWalkNearbyChange(nearby: boolean): void
-  onPlayerPositionChange(position: PointMm): void
+  onPlayerPositionChange(position: WalkPlayerPosition): void
 }
 
 type Props = {
@@ -41,7 +42,7 @@ function WebGLKitchenRenderer({ project, variant, selectedIds, showClearances, w
   return <SceneCanvas architecture={project.architecture} cameraMode={cameraMode} fitSignal={fitSignal} walkMode={walkMode} onContextLost={onContextLost} onContextRestored={onContextRestored}>
     <KitchenScene project={project} variant={variant} selectedIds={selectedIds} showClearances={showClearances} wallsTransparent={wallsTransparent} onSelect={onSelect} onClearSelection={onClearSelection} />
     <WalkScene active={walkMode} architecture={project.architecture} equipment={variant.equipment} reducedMotion={reducedMotion} onLockedChange={onWalkLockedChange} onNearbyChange={onWalkNearbyChange} onPositionChange={onPlayerPositionChange} />
-    {!walkMode && playerPosition && <group position={[playerPosition.x / 1000, 0, playerPosition.y / 1000]}><ChefAvatar player reducedMotion={reducedMotion} pose={{ agentId: 'player-chef', role: 'head-chef', xMm: playerPosition.x, yMm: playerPosition.y, state: 'waiting', headingRad: 0, moving: false }} /></group>}
+    {!walkMode && playerPosition && <group position={[playerPosition.x / 1000, playerPosition.elevationMm / 1000, playerPosition.y / 1000]}><ChefAvatar player reducedMotion={reducedMotion} pose={{ agentId: 'player-chef', role: 'head-chef', xMm: playerPosition.x, yMm: playerPosition.y, state: 'waiting', headingRad: 0, moving: false }} /></group>}
   </SceneCanvas>
 }
 
@@ -64,7 +65,7 @@ export function SceneWorkspace({ store = projectStore, renderer: Renderer, compa
   const [walkMode, setWalkMode] = useState(false)
   const [walkLocked, setWalkLocked] = useState(false)
   const [walkNearby, setWalkNearby] = useState(false)
-  const [playerPosition, setPlayerPosition] = useState<PointMm>()
+  const [playerPosition, setPlayerPosition] = useState<WalkPlayerPosition>()
   const [cameraMode, setCameraMode] = useState<CameraMode>('perspective')
   const [fitSignal, setFitSignal] = useState(0)
   const [rendererKey, setRendererKey] = useState(0)
@@ -88,7 +89,14 @@ export function SceneWorkspace({ store = projectStore, renderer: Renderer, compa
           <button type="button" aria-pressed={walkMode} onClick={() => setWalkMode(true)}>Walk kitchen</button>
         </div>
       </div>
-      <div className={`scene-canvas${contextLost ? ' context-lost' : ''}${walkMode ? ' walk-pointer-lock-target' : ''}`} data-testid="kitchen-scene" data-renderer-generation={rendererKey}>
+      <div
+        className={`scene-canvas${contextLost ? ' context-lost' : ''}${walkMode ? ' walk-pointer-lock-target' : ''}`}
+        data-testid="kitchen-scene"
+        data-renderer-generation={rendererKey}
+        data-player-x-mm={playerPosition?.x}
+        data-player-y-mm={playerPosition?.y}
+        data-player-elevation-mm={playerPosition?.elevationMm}
+      >
         {contextLost ? <div role="alert" className="scene-context-message"><strong>3D rendering paused</strong><p>The browser interrupted the graphics context. Restart the renderer to restore the model without changing the plan.</p><button type="button" onClick={restartRenderer}>Restart 3D renderer</button></div> : <SceneErrorBoundary key={rendererKey}>
           <SceneRenderer key={rendererKey} items={variant.equipment} project={project} variant={variant} selectedIds={selectedIds} showClearances={showClearances} wallsTransparent={wallsTransparent} walkMode={walkMode} reducedMotion={Boolean(reducedMotion)} playerPosition={playerPosition} cameraMode={cameraMode} fitSignal={fitSignal} onSelect={select} onClearSelection={() => store.getState().clearSelection()} onContextLost={() => setContextLost(true)} onContextRestored={() => setContextLost(false)} onWalkLockedChange={setWalkLocked} onWalkNearbyChange={setWalkNearby} onPlayerPositionChange={setPlayerPosition} />
         </SceneErrorBoundary>}

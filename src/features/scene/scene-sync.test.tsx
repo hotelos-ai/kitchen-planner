@@ -96,6 +96,25 @@ describe('3D scene synchronization', () => {
     expect(screen.getByTestId('kitchen-scene')).toHaveAttribute('data-renderer-generation', '0')
   })
 
+  it('publishes live x, y, and elevation without remounting the renderer', () => {
+    let mounts = 0
+    const PoseRenderer = ({ onPlayerPositionChange }: SceneRendererProps) => {
+      useEffect(() => {
+        mounts += 1
+        onPlayerPositionChange({ x: 2100, y: 3200, elevationMm: 850 } as Parameters<typeof onPlayerPositionChange>[0])
+      }, [onPlayerPositionChange])
+      return null
+    }
+
+    render(<SceneWorkspace renderer={PoseRenderer} />)
+
+    expect(screen.getByTestId('kitchen-scene')).toHaveAttribute('data-player-x-mm', '2100')
+    expect(screen.getByTestId('kitchen-scene')).toHaveAttribute('data-player-y-mm', '3200')
+    expect(screen.getByTestId('kitchen-scene')).toHaveAttribute('data-player-elevation-mm', '850')
+    expect(mounts).toBe(1)
+    expect(screen.getByTestId('kitchen-scene')).toHaveAttribute('data-renderer-generation', '0')
+  })
+
   it('enters and exits Walk Kitchen from the regular 3D workspace without remounting', async () => {
     const user = userEvent.setup()
     const FakeWalkRenderer = ({ walkMode }: SceneRendererProps) => <output data-testid="walk-state">{String(walkMode)}</output>

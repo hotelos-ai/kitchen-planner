@@ -51,4 +51,12 @@ describe('walk collision', () => {
       colliders,
     )).toMatchObject({ id: 'tandoor', topMm: 900 })
   })
+
+  it('ignores the support under the player when targeting the next obstacle', () => {
+    expect(findJumpObstacle(
+      { positionMm: { x: 2200, y: 3000 }, radiusMm: 220 },
+      { x: 1, y: 0 },
+      colliders,
+    )).toMatchObject({ id: 'prep-fridge-counter', topMm: 850 })
+  })
 })
