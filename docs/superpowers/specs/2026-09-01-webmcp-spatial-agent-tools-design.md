@@ -1,7 +1,7 @@
 # WebMCP Spatial Agent Tools Design
 
 **Date:** 2026-09-01  
-**Status:** Revised after review; awaiting final approval
+**Status:** Approved
 
 ## Purpose
 
