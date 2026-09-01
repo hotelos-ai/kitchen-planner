@@ -8,6 +8,7 @@ export const layoutQuerySchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('list-items'), category: z.string().optional(), tag: z.string().optional() }).strict(),
   z.object({ type: z.literal('item'), id: z.string().min(1) }).strict(),
   z.object({ type: z.literal('architecture') }).strict(),
+  z.object({ type: z.literal('available-zones') }).strict(),
   z.object({ type: z.literal('diagnostics') }).strict(),
   z.object({ type: z.literal('capabilities') }).strict(),
 ])
@@ -33,10 +34,11 @@ export function executeLayoutQuery<TProject, TItem extends SpatialItem, TScenari
     case 'project-snapshot': return { ok: true, revision: envelope.revision, data: clone(project) }
     case 'active-layout': return { ok: true, revision: envelope.revision, data: clone(variant ?? null) }
     case 'architecture': return { ok: true, revision: envelope.revision, data: clone(project.architecture) }
+    case 'available-zones': return { ok: true, revision: envelope.revision, data: clone(project.architecture.storageZones) }
     case 'diagnostics': return { ok: true, revision: envelope.revision, data: clone(diagnose?.(envelope.project) ?? []) }
     case 'capabilities': return {
       ok: true, revision: envelope.revision,
-      data: { commands: [...LAYOUT_COMMAND_TYPES], queries: ['project-snapshot', 'active-layout', 'list-items', 'item', 'architecture', 'diagnostics', 'capabilities'], units: ['mm', 'cm', 'in', 'ft'] },
+      data: { commands: [...LAYOUT_COMMAND_TYPES], queries: ['project-snapshot', 'active-layout', 'list-items', 'item', 'architecture', 'available-zones', 'diagnostics', 'capabilities'], units: ['mm', 'cm', 'in', 'ft'], ...(adapter.describeCapabilities?.() ?? {}) },
     }
     case 'list-items': {
       const { category, tag } = parsed.data

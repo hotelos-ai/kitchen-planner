@@ -38,4 +38,27 @@ describe('executeLayoutCommand', () => {
       command: { type: 'remove-items', ids: ['missing'] },
     })).toMatchObject({ ok: false, code: 'missing-item' })
   })
+
+  it('duplicates variants and only updates explicitly unlocked architecture', () => {
+    const project = createSeedProject()
+    const duplicated = executeLayoutCommand({
+      envelope: { project, revision: 0 }, adapter: kitchenSpatialAdapter,
+      command: { type: 'duplicate-variant', sourceId: project.activeVariantId, duplicateId: 'agent-option', name: 'Agent option', now: '2026-09-01T00:00:00.000Z' },
+    })
+    expect(duplicated).toMatchObject({ ok: true, revision: 1, changedIds: ['agent-option'] })
+    if (duplicated.ok) expect(duplicated.project.variants.find((variant) => variant.id === 'agent-option')?.equipment).toHaveLength(project.variants[0].equipment.length)
+
+    expect(executeLayoutCommand({
+      envelope: { project, revision: 0 }, adapter: kitchenSpatialAdapter,
+      command: { type: 'update-architecture', patch: { wallHeightMm: 3000 } },
+    })).toMatchObject({ ok: false, code: 'locked-architecture' })
+
+    project.architecture.locked = false
+    const updated = executeLayoutCommand({
+      envelope: { project, revision: 0 }, adapter: kitchenSpatialAdapter,
+      command: { type: 'update-architecture', patch: { wallHeightMm: 3000 } },
+    })
+    expect(updated).toMatchObject({ ok: true, revision: 1, changedIds: ['architecture'] })
+    if (updated.ok) expect(updated.project.architecture.wallHeightMm).toBe(3000)
+  })
 })

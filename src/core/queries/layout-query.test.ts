@@ -16,6 +16,14 @@ describe('executeLayoutQuery', () => {
     const result = executeLayoutQuery(envelope, kitchenSpatialAdapter, { type: 'capabilities' })
     expect(result).toMatchObject({ ok: true, revision: 4 })
     expect(JSON.stringify(result)).toContain('move-items')
+    expect(JSON.stringify(result)).toContain('tandoor')
+    expect(JSON.stringify(result)).toContain('range-cook')
+  })
+
+  it('returns available zones without requiring a full project snapshot', () => {
+    expect(executeLayoutQuery(envelope, kitchenSpatialAdapter, { type: 'available-zones' })).toMatchObject({
+      ok: true, revision: 4, data: envelope.project.architecture.storageZones,
+    })
   })
 
   it('returns structured missing-item errors', () => {

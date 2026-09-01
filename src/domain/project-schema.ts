@@ -52,7 +52,7 @@ const variantSchema = z.object({
   updatedAt: z.string().datetime(),
 }).strict()
 
-const architectureSchema = z.object({
+export const architectureSchema = z.object({
   widthMm: z.number().positive().finite(),
   depthMm: z.number().positive().finite(),
   wallHeightMm: z.number().positive().finite(),

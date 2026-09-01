@@ -2,6 +2,7 @@ import { analyzeLayout } from '../../domain/layout-diagnostics'
 import { projectSchema, scenarioSchema } from '../../domain/project-schema'
 import { kitchenSpatialAdapter } from '../../domain/spatial-adapter'
 import type { SimulationInput, SimulationResult } from '../../simulation/types'
+import { deriveLiveServiceState } from '../../simulation/live-state'
 import { getActiveVariant, type ProjectStore } from '../../state/project-store'
 import { executeLayoutQuery } from '../queries/layout-query'
 import type { ApplicationService, ServiceResult } from './types'
@@ -15,6 +16,7 @@ export function createApplicationService(input: {
   store: ProjectStore
   runSimulation: (simulationInput: SimulationInput) => SimulationResult
 }): ApplicationService {
+  const runs = new Map<string, { revision: number; result: SimulationResult }>()
   return {
     executeLayout: ({ command, ...options }) => input.store.getState().executeCommand(command, options),
     replaceProject: ({ project, expectedRevision, dryRun = false }) => {
@@ -51,7 +53,31 @@ export function createApplicationService(input: {
       const scenario = state.project.scenarios.find((candidate) => candidate.id === scenarioId)
       if (!scenario) return { ok: false, revision: state.revision, code: 'missing-scenario', message: `Scenario ${scenarioId} does not exist.` }
       const result = input.runSimulation({ architecture: state.project.architecture, equipment: getActiveVariant(state).equipment, scenario })
+      runs.set(scenarioId, { revision: state.revision, result })
       return { ok: true, revision: state.revision, data: result, warnings: [...result.warnings], dryRun: false }
+    },
+    querySimulation: ({ scenarioId, elapsedSeconds }) => {
+      const state = input.store.getState()
+      const scenario = state.project.scenarios.find((candidate) => candidate.id === scenarioId)
+      if (!scenario) return { ok: false, revision: state.revision, code: 'missing-scenario', message: `Scenario ${scenarioId} does not exist.` }
+      const run = runs.get(scenarioId)
+      if (!run) return { ok: false, revision: state.revision, code: 'missing-run', message: `Scenario ${scenarioId} has not been run.` }
+      if (run.revision !== state.revision) return { ok: false, revision: state.revision, code: 'stale-run', message: 'The layout or scenario changed after this simulation was run.' }
+      const live = deriveLiveServiceState(run.result, elapsedSeconds)
+      return {
+        ok: true,
+        revision: state.revision,
+        data: {
+          assumptions: { id: scenario.id, name: scenario.name, covers: scenario.covers, durationMinutes: scenario.durationMinutes, arrivalPattern: scenario.arrivalPattern, cookToOrderRatio: scenario.cookToOrderRatio, seed: scenario.seed, staff: structuredClone(scenario.staff) },
+          progress: { elapsedSeconds: live.elapsedSeconds, durationSeconds: run.result.durationSeconds, fraction: live.elapsedSeconds / Math.max(1, run.result.durationSeconds), arrivedOrders: live.arrivedOrders, completedOrders: live.completedOrders, backlog: live.backlog, oldestOpenWaitSeconds: live.oldestOpenWaitSeconds },
+          orders: structuredClone(live.orders),
+          stationQueues: structuredClone(live.stationQueues),
+          metrics: structuredClone(run.result.metrics),
+          recommendations: [...run.result.warnings],
+        },
+        warnings: [...run.result.warnings],
+        dryRun: false,
+      }
     },
   }
 }

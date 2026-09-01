@@ -21,4 +21,14 @@ describe('ApplicationService', () => {
     expect(service.updateScenario({ scenarioId: 'dinner-peak', patch: { covers: 40 }, expectedRevision: 8 })).toMatchObject({ ok: false, code: 'stale-revision' })
     expect(service.updateScenario({ scenarioId: 'dinner-peak', patch: { covers: 40 }, expectedRevision: 0 })).toMatchObject({ ok: true, revision: 1 })
   })
+
+  it('exposes a JSON-safe live simulation query after a deterministic run', () => {
+    const service = createApplicationService({ store: createProjectStore(createSeedProject()), runSimulation })
+    expect(service.querySimulation({ scenarioId: 'dinner-peak', elapsedSeconds: 900 })).toMatchObject({ ok: false, code: 'missing-run' })
+    expect(service.runScenario({ scenarioId: 'dinner-peak' })).toMatchObject({ ok: true })
+    const result = service.querySimulation({ scenarioId: 'dinner-peak', elapsedSeconds: 900 })
+    expect(result).toMatchObject({ ok: true, revision: 0, data: { progress: { elapsedSeconds: 900 }, assumptions: { covers: 50 } } })
+    expect(JSON.stringify(result)).toContain('stationQueues')
+    expect(JSON.parse(JSON.stringify(result))).toEqual(result)
+  })
 })

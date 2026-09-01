@@ -2,7 +2,7 @@ import { normalizeRotation, snapMm } from '../../domain/geometry'
 import type { ProjectEnvelope, SpatialDocumentAdapter, SpatialItem, SpatialProject } from '../spatial/types'
 import { layoutCommandSchema, type LayoutCommand } from './layout-command'
 
-export type CommandErrorCode = 'invalid-command' | 'stale-revision' | 'missing-item' | 'locked-item' | 'missing-variant' | 'last-variant'
+export type CommandErrorCode = 'invalid-command' | 'stale-revision' | 'missing-item' | 'locked-item' | 'locked-architecture' | 'missing-variant' | 'last-variant'
 
 export type CommandResult<TProject> =
   | { ok: true; project: TProject; revision: number; changedIds: string[]; warnings: string[]; dryRun: boolean }
@@ -127,11 +127,27 @@ export function executeLayoutCommand<TProject, TItem extends SpatialItem, TScena
       case 'set-display-unit': project.displayUnit = value.unit; break
       case 'set-snap': project.snapMm = value.intervalMm; break
       case 'set-architecture-lock': project.architecture.locked = value.locked; break
+      case 'update-architecture': {
+        if (project.architecture.locked) return fail('locked-architecture', 'Architecture must be explicitly unlocked before it can be changed.')
+        const validated = input.adapter.validateArchitecture({ ...project.architecture, ...value.patch, locked: false })
+        if (!validated.success) return { ok: false, code: 'invalid-command', message: 'Architecture update is invalid.', revision: input.envelope.revision, issues: validated.issues }
+        project.architecture = validated.data
+        changedIds.push('architecture')
+        break
+      }
       case 'create-variant': {
         if (!variant) return fail('missing-variant', 'The active layout does not exist.')
         if (project.variants.some((candidate) => candidate.id === value.id)) return fail('invalid-command', `Layout ${value.id} already exists.`)
         project.variants.push({ ...structuredClone(variant), id: value.id, name: value.name.trim(), parentId: variant.id, createdAt: value.now, updatedAt: value.now })
         changedIds.push(value.id)
+        break
+      }
+      case 'duplicate-variant': {
+        const source = project.variants.find((candidate) => candidate.id === value.sourceId)
+        if (!source) return fail('missing-variant', `Layout ${value.sourceId} does not exist.`)
+        if (project.variants.some((candidate) => candidate.id === value.duplicateId)) return fail('invalid-command', `Layout ${value.duplicateId} already exists.`)
+        project.variants.push({ ...structuredClone(source), id: value.duplicateId, name: value.name.trim(), parentId: source.id, createdAt: value.now, updatedAt: value.now })
+        changedIds.push(value.duplicateId)
         break
       }
       case 'activate-variant':

@@ -17,7 +17,9 @@ export const layoutCommandSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('set-display-unit'), unit: z.enum(['mm', 'cm', 'in', 'ft']) }).strict(),
   z.object({ type: z.literal('set-snap'), intervalMm: z.number().positive().finite() }).strict(),
   z.object({ type: z.literal('set-architecture-lock'), locked: z.boolean() }).strict(),
+  z.object({ type: z.literal('update-architecture'), patch: jsonObjectSchema }).strict(),
   z.object({ type: z.literal('create-variant'), id: z.string().min(1), name: z.string().min(1), now: z.string().datetime() }).strict(),
+  z.object({ type: z.literal('duplicate-variant'), sourceId: z.string().min(1), duplicateId: z.string().min(1), name: z.string().min(1), now: z.string().datetime() }).strict(),
   z.object({ type: z.literal('activate-variant'), id: z.string().min(1) }).strict(),
   z.object({ type: z.literal('rename-variant'), id: z.string().min(1), name: z.string().min(1) }).strict(),
   z.object({ type: z.literal('remove-variant'), id: z.string().min(1) }).strict(),
@@ -28,6 +30,6 @@ export type LayoutCommand = z.infer<typeof layoutCommandSchema>
 export const LAYOUT_COMMAND_TYPES: LayoutCommand['type'][] = [
   'move-items', 'nudge-items', 'rotate-items', 'resize-item', 'set-dimensions-locked',
   'update-item', 'add-item', 'duplicate-item', 'remove-items', 'set-display-unit',
-  'set-snap', 'set-architecture-lock', 'create-variant', 'activate-variant',
+  'set-snap', 'set-architecture-lock', 'update-architecture', 'create-variant', 'duplicate-variant', 'activate-variant',
   'rename-variant', 'remove-variant',
 ]

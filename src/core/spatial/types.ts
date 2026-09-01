@@ -75,4 +75,6 @@ export interface SpatialDocumentAdapter<TProject, TItem extends SpatialItem, TSc
   read(project: TProject): SpatialProject<TItem, TScenario>
   write(spatial: SpatialProject<TItem, TScenario>, source: TProject): TProject
   validateItem(value: unknown): { success: true; data: TItem } | { success: false; issues: unknown }
+  validateArchitecture(value: unknown): { success: true; data: SpatialArchitecture } | { success: false; issues: unknown }
+  describeCapabilities?(): { itemPresets?: readonly string[]; domainCapabilities?: readonly string[]; catalog?: readonly unknown[] }
 }
