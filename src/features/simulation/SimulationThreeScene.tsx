@@ -6,6 +6,7 @@ import type { SimulationResult } from '../../simulation/types'
 import { KitchenScene } from '../scene/KitchenScene'
 import { SceneCanvas } from '../scene/SceneCanvas'
 import { SimulatedStaff } from '../scene/agents/SimulatedStaff'
+import { ChefAvatar } from '../scene/agents/ChefAvatar'
 import { WalkControlsGuide } from '../scene/walk/WalkControlsGuide'
 import { WalkScene } from '../scene/walk/WalkScene'
 import { CompletedOrderFlow3D } from './CompletedOrderFlow3D'
@@ -59,6 +60,7 @@ export function SimulationThreeScene({ view, project, variant, result, liveState
         <SimulatedStaff frames={result.frames} elapsedSeconds={elapsedSeconds} followRole={followRole} reducedMotion={Boolean(reducedMotion)} />
         <CompletedOrderFlow3D architecture={project.architecture} liveState={liveState} elapsedSeconds={elapsedSeconds} />
         <WalkScene active={walkMode} architecture={project.architecture} equipment={variant.equipment} staff={poses} reducedMotion={Boolean(reducedMotion)} onLockedChange={setWalkLocked} onNearbyChange={setWalkNearby} onPositionChange={setPlayerPosition} />
+        {!walkMode && playerPosition && <group position={[playerPosition.x / 1000, 0, playerPosition.y / 1000]}><ChefAvatar player reducedMotion={Boolean(reducedMotion)} pose={{ agentId: 'player-chef', role: 'head-chef', xMm: playerPosition.x, yMm: playerPosition.y, state: 'waiting', headingRad: 0, moving: false }} label="You · walkthrough position" /></group>}
       </SceneCanvas>
     </SimulationSceneBoundary>}
     <LiveSimulationOverlays liveState={liveState} className="three-overlay" />

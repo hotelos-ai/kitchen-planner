@@ -1,6 +1,6 @@
 import type { Architecture, Opening } from '../../domain/project'
 
-export const ORDER_EXIT_ANIMATION_SECONDS = 5
+export const ORDER_EXIT_ANIMATION_SECONDS = 15
 
 const cleanPass = (architecture: Architecture): Opening | undefined => architecture.openings.find((opening) => opening.kind === 'service-window' && opening.flow === 'clean-out')
 
