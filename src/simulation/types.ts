@@ -20,7 +20,7 @@ export interface SimTask {
   preferredRoles: readonly StaffRole[]
 }
 
-export interface AgentFrame extends SpatialAgentFrame<StaffRole> {}
+export type AgentFrame = SpatialAgentFrame<StaffRole>
 
 export interface SimulationFrame {
   elapsedSeconds: number
