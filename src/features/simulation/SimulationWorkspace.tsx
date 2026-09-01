@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useState, type ComponentType } from 'react'
 import { useStore } from 'zustand'
 import type { StaffRole } from '../../domain/project'
 import { runSimulation } from '../../simulation/engine'
@@ -12,18 +12,21 @@ import { PlaybackControls } from './PlaybackControls'
 import { ScenarioEditor } from './ScenarioEditor'
 import { Scorecard } from './Scorecard'
 import { SimulationScene } from './SimulationScene'
+import { SimulationThreeScene, type SimulationThreeSceneProps } from './SimulationThreeScene'
+import { SimulationViewSwitcher, type SimulationView } from './SimulationViewSwitcher'
 import { WaitTimeDistribution } from './WaitTimeDistribution'
 import { useSimulationSession } from './useSimulationSession'
 
-type Props = { store?: ProjectStore; run?: (input: SimulationInput) => SimulationResult }
+type Props = { store?: ProjectStore; run?: (input: SimulationInput) => SimulationResult; threeRenderer?: ComponentType<SimulationThreeSceneProps> }
 type Layers = { heatmap: boolean; trails: boolean; queues: boolean; clearances: boolean; flows: boolean }
 
-export function SimulationWorkspace({ store = projectStore, run = runSimulation }: Props) {
+export function SimulationWorkspace({ store = projectStore, run = runSimulation, threeRenderer: ThreeRenderer = SimulationThreeScene }: Props) {
   const project = useStore(store, (state) => state.project)
   const variant = useStore(store, getActiveVariant)
   const scenario = project.scenarios.find((value) => value.id === project.activeScenarioId) ?? project.scenarios[0]
   const [layers, setLayers] = useState<Layers>({ heatmap: true, trails: true, queues: true, clearances: false, flows: true })
   const [followRole, setFollowRole] = useState<StaffRole | 'overview'>('overview')
+  const [view, setView] = useState<SimulationView>('operations-2d')
   const staffCount = scenario.staff.reduce((sum, entry) => sum + entry.count, 0)
   const validationErrors = useMemo(() => validateSimulationInput({ architecture: project.architecture, equipment: variant.equipment, scenario }), [project.architecture, scenario, variant.equipment])
   if (staffCount < 1) validationErrors.unshift({ code: 'missing-capability', message: 'Add at least one staff member.', itemIds: [] })
@@ -50,7 +53,12 @@ export function SimulationWorkspace({ store = projectStore, run = runSimulation 
         {validationErrors.length > 0 && <div role="alert" className="simulation-validation"><strong>Resolve before simulation</strong>{validationErrors.map((error, index) => <button type="button" key={`${error.code}-${index}`} onClick={() => error.itemIds.length && store.getState().selectItems(error.itemIds)}>{error.message}{error.itemIds.length ? ' Select affected equipment, then open Plan.' : ''}</button>)}</div>}
         {result && liveState ? <>
           <LiveServiceHUD result={result} state={liveState} />
-          <SimulationScene result={result} liveState={liveState} elapsedSeconds={elapsedSeconds} architecture={project.architecture} equipment={variant.equipment} layers={layers} followRole={followRole} />
+          <div className="simulation-view-stage">
+            <SimulationViewSwitcher value={view} onChange={setView} />
+            {view === 'operations-2d'
+              ? <SimulationScene result={result} liveState={liveState} elapsedSeconds={elapsedSeconds} architecture={project.architecture} equipment={variant.equipment} layers={layers} followRole={followRole} />
+              : <ThreeRenderer view={view} project={project} variant={variant} result={result} liveState={liveState} elapsedSeconds={elapsedSeconds} layers={layers} followRole={followRole} onExitWalk={() => setView('overview-3d')} />}
+          </div>
           <PlaybackControls elapsedSeconds={elapsedSeconds} durationSeconds={result.durationSeconds} playing={playing} speed={speed} onPlaying={session.setPlaying} onElapsed={session.setElapsedSeconds} onSpeed={session.setSpeed} />
         </> : <div className="simulation-empty"><div className="service-orbit" aria-hidden="true"><span /><span /><span /><span /><span /></div><h2>Pressure-test this layout</h2><p>Run the approved five-person dinner scenario to see routes, queues, station pressure, and dirty/clean crossings.</p><button type="button" disabled={hasValidationErrors} onClick={startRun}>Start pressure test</button></div>}
       </div>

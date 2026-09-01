@@ -1,6 +1,6 @@
 import { fireEvent, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { beforeEach, describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { createSeedProject } from '../../domain/seed-project'
 import { runSimulation } from '../../simulation/engine'
 import { projectStore } from '../../state/project-store'
@@ -23,5 +23,21 @@ describe('simulation workspace', () => {
     expect(screen.getByLabelText(/Playback speed/i)).toHaveValue('25')
     fireEvent.change(screen.getByLabelText(/Simulation time/i), { target: { value: '2000' } })
     expect(screen.getAllByLabelText(/live queue/i).length).toBeGreaterThan(0)
+  })
+
+  it('switches among operations, 3D, and Walk without rerunning or resetting time', async () => {
+    const run = vi.fn(runSimulation)
+    const FakeThreeScene = ({ view }: { view: string }) => <div data-testid="simulation-3d-scene">{view}</div>
+    render(<SimulationWorkspace run={run} threeRenderer={FakeThreeScene} />)
+    await userEvent.click(screen.getByRole('button', { name: /Run 60-minute service/i }))
+    await userEvent.click(screen.getByRole('button', { name: 'Pause' }))
+    fireEvent.change(screen.getByLabelText(/Simulation time/i), { target: { value: '900' } })
+    await userEvent.click(screen.getByRole('button', { name: '3D Overview' }))
+    expect(screen.getByTestId('simulation-3d-scene')).toHaveTextContent('overview-3d')
+    await userEvent.click(screen.getByRole('button', { name: 'Walk Kitchen' }))
+    expect(screen.getByTestId('simulation-3d-scene')).toHaveTextContent('walk')
+    await userEvent.click(screen.getByRole('button', { name: '2D Operations' }))
+    expect(screen.getByLabelText(/Simulation time/i)).toHaveValue('900')
+    expect(run).toHaveBeenCalledOnce()
   })
 })
