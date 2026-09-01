@@ -14,6 +14,8 @@ Known dimensions start locked. Select an item and press **Resize** (or clear **L
 
 The **Display units** setting supports millimetres, centimetres, inches, and feet/inches. Units only affect display and parsing; internal coordinates remain millimetres. The **Snap interval** can be 10, 50, 100, or 250 mm.
 
+The selected-item **Configuration** menu offers typical variants for that equipment family—for example upright, under-counter, prep-counter, and top-opening refrigeration. Applying a configuration updates the normal label, size, height, clearance, capabilities, and matching 3D skin as one undoable change while preserving its position and rotation. All applied values remain editable. **Typical configuration · modified** means one or more values now differ from that configuration's defaults; it does not discard the configuration choice.
+
 The live geometry audit lists equipment outside the jagged boundary, footprint collisions, pillar overlaps, and obstructed front work zones. Amber dashed footprints need inspection; red errors identify physical overlaps or boundary failures. Warnings do not prevent experimental placement.
 
 ### Selection and item actions
@@ -39,8 +41,17 @@ The 3D model and plan use the same active project data. Equipment dimensions, po
 - Drag to orbit, Shift-drag to pan, and scroll to zoom.
 - **Top** and **Perspective** switch camera modes and reset the orbit target; pressing the active mode again also restores its default framing. **Fit room** recovers the complete room after orbiting, panning, or zooming.
 - **Clearances** shows work/heat zones, D2 swing, and refrigerator/freezer swing arcs.
-- Click a mesh or its visible 3D label to select the same item used by the plan inspector.
+- **Transparent walls** removes wall surfaces and their shadows while retaining precise wall borders, pass frames, ledges, pillars, and openings.
+- Click a mesh or its visible 3D label to select the same item used by the plan inspector. Selection is shown by the item's exact rotated cuboid bounds, without a circular marker.
 - Split view places the editable plan beside the synchronized model.
+
+The equipment models use self-contained procedural commercial-kitchen materials and details: brushed stainless worktops and shells, cast-iron burners, fryer wells, tandoor mouth, refrigeration doors and seals, sinks and faucets, dishwasher panels, mixer parts, shelving, and hood geometry. Changing a component or configuration updates the existing live scene rather than restarting the canvas or resetting its camera.
+
+### Walking through the kitchen
+
+Choose **Walk kitchen**, then click the kitchen to look around. W/Up and S/Down move forward and backward; A/Left move camera-relative left; D/Right move camera-relative right; Shift moves faster; Space performs an adaptive jump; and Escape releases the pointer. The control reminder remains at the lower right while walk mode is active.
+
+Jump height adapts to jumpable equipment ahead. You can land on low counters, walk across them, and clear tall appliances when there is room. Walls and pillars remain solid at every height. Your live X, Y, and elevation are shared with the synchronized scene without remounting it.
 
 The renderer caps high-density framebuffer use and releases its GPU resources when leaving 3D or Split view. If the browser still interrupts WebGL, the app removes the detached labels and shows **Restart 3D renderer**, which remounts the model without changing the plan. If WebGL cannot initialize at all, the Plan editor remains usable.
 
@@ -72,6 +83,8 @@ The app never declares a universal “best” layout. “Performs better” mean
 ## Import, export, autosave, and recovery
 
 The browser autosaves a versioned current project and last-known-good snapshot. **Export project** downloads human-readable JSON. **Import** validates the entire file before replacing current state; malformed or unsupported future schemas leave the current project untouched. Supported version-0 files migrate to schema version 1.
+
+Older schema-valid projects that predate equipment 3D presets are enriched on load: known Manta Raja items regain their distinctive registered skins, explicit custom presets are preserved, and unknown custom items safely remain generic. This compatibility step does not alter placement, dimensions, rotations, labels, variants, scenarios, or revision history.
 
 Keep exported checkpoints before major alternatives. JSON is the supported exchange format; this release does not import BIM, DWG, DXF, or IFC.
 

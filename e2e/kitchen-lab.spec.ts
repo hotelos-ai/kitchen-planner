@@ -114,6 +114,74 @@ test('keeps every 3D control usable and recovers a lost WebGL context', async ({
   expect(pageErrors).toEqual([])
 })
 
+test('applies a typical equipment configuration and reflects it in 3D', async ({ page }) => {
+  const pageErrors: string[] = []
+  page.on('pageerror', (error) => pageErrors.push(error.message))
+  await page.goto('/')
+
+  await page.getByRole('button', { name: /Select 2-door fridge, 1400 mm by 850 mm/i }).click()
+  await expect(page.getByLabel('Equipment configuration')).toHaveValue('cold-upright-double')
+  await expect(page.getByText(/Typical configuration · modified/i)).toBeVisible()
+  await page.getByLabel('Equipment configuration').selectOption('cold-chest-freezer')
+
+  await expect(page.getByLabel('Equipment label')).toHaveValue('Chest freezer')
+  await expect(page.getByLabel(/^Width \(mm\)$/i)).toHaveValue('1200')
+  await expect(page.getByLabel(/^Depth \(mm\)$/i)).toHaveValue('700')
+  await expect(page.getByLabel(/^Height \(mm\)$/i)).toHaveValue('850')
+  await expect(page.getByText(/Applies typical size, clearance, capabilities, and 3D skin/i)).toBeVisible()
+
+  await page.getByRole('button', { name: '3D', exact: true }).click()
+  await expect(page.getByTestId('kitchen-scene').locator('canvas')).toBeVisible()
+  await expect(page.getByRole('button', { name: /Select Chest freezer in 3D/i })).toBeVisible()
+  expect(pageErrors).toEqual([])
+})
+
+test('walks conventionally with keyboard aliases and publishes adaptive jump elevation', async ({ page }) => {
+  const pageErrors: string[] = []
+  page.on('pageerror', (error) => pageErrors.push(error.message))
+  await page.goto('/')
+  await page.getByRole('button', { name: '3D', exact: true }).click()
+  await page.getByRole('button', { name: 'Walk kitchen', exact: true }).click()
+
+  const scene = page.getByTestId('kitchen-scene')
+  await scene.locator('canvas').click()
+  await expect(scene).toHaveAttribute('data-player-y-mm', /\d+/)
+  await expect(page.getByLabel('Walk kitchen controls')).toContainText('A/Left · move left')
+  await expect(page.getByLabel('Walk kitchen controls')).toContainText('D/Right · move right')
+
+  const startY = Number(await scene.getAttribute('data-player-y-mm'))
+  await page.keyboard.down('a')
+  await page.waitForTimeout(320)
+  await page.keyboard.up('a')
+  await expect.poll(async () => Number(await scene.getAttribute('data-player-y-mm'))).toBeLessThan(startY)
+  const afterA = Number(await scene.getAttribute('data-player-y-mm'))
+
+  await page.keyboard.down('d')
+  await page.waitForTimeout(420)
+  await page.keyboard.up('d')
+  await expect.poll(async () => Number(await scene.getAttribute('data-player-y-mm'))).toBeGreaterThan(afterA)
+  const beforeArrowLeft = Number(await scene.getAttribute('data-player-y-mm'))
+
+  await page.keyboard.down('ArrowLeft')
+  await page.waitForTimeout(320)
+  await page.keyboard.up('ArrowLeft')
+  await expect.poll(async () => Number(await scene.getAttribute('data-player-y-mm'))).toBeLessThan(beforeArrowLeft)
+  const afterArrowLeft = Number(await scene.getAttribute('data-player-y-mm'))
+
+  await page.keyboard.down('ArrowRight')
+  await page.waitForTimeout(420)
+  await page.keyboard.up('ArrowRight')
+  await expect.poll(async () => Number(await scene.getAttribute('data-player-y-mm'))).toBeGreaterThan(afterArrowLeft)
+
+  await page.keyboard.down('Space')
+  await expect.poll(
+    async () => Number(await scene.getAttribute('data-player-elevation-mm')),
+    { timeout: 2_000, intervals: [50] },
+  ).toBeGreaterThan(0)
+  await page.keyboard.up('Space')
+  expect(pageErrors).toEqual([])
+})
+
 test('shares live service state across 2D, 3D, and first-person views', async ({ page }) => {
   const pageErrors: string[] = []
   const consoleErrors: string[] = []

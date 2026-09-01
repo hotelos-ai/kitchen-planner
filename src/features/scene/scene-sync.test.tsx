@@ -96,6 +96,22 @@ describe('3D scene synchronization', () => {
     expect(screen.getByTestId('kitchen-scene')).toHaveAttribute('data-renderer-generation', '0')
   })
 
+  it('updates an equipment configuration without remounting the renderer', () => {
+    let mounts = 0
+    const StableRenderer = ({ items }: SceneRendererProps) => {
+      useEffect(() => { mounts += 1 }, [])
+      const fridge = items.find((item) => item.id === 'two-door-fridge')
+      return <output data-testid="live-fridge-configuration">{fridge?.label}:{fridge?.widthMm}:{fridge?.visualPreset}</output>
+    }
+
+    render(<SceneWorkspace renderer={StableRenderer} />)
+    act(() => projectStore.getState().applyEquipmentConfiguration('two-door-fridge', 'cold-chest-freezer'))
+
+    expect(screen.getByTestId('live-fridge-configuration')).toHaveTextContent('Chest freezer:1200:chest-freezer')
+    expect(mounts).toBe(1)
+    expect(screen.getByTestId('kitchen-scene')).toHaveAttribute('data-renderer-generation', '0')
+  })
+
   it('publishes live x, y, and elevation without remounting the renderer', () => {
     let mounts = 0
     const PoseRenderer = ({ onPlayerPositionChange }: SceneRendererProps) => {
