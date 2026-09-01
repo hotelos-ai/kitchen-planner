@@ -24,3 +24,10 @@ export const layoutCommandSchema = z.discriminatedUnion('type', [
 ])
 
 export type LayoutCommand = z.infer<typeof layoutCommandSchema>
+
+export const LAYOUT_COMMAND_TYPES: LayoutCommand['type'][] = [
+  'move-items', 'nudge-items', 'rotate-items', 'resize-item', 'set-dimensions-locked',
+  'update-item', 'add-item', 'duplicate-item', 'remove-items', 'set-display-unit',
+  'set-snap', 'set-architecture-lock', 'create-variant', 'activate-variant',
+  'rename-variant', 'remove-variant',
+]
