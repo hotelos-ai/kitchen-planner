@@ -1,11 +1,11 @@
 # WebMCP Spatial Agent Tools Design
 
 **Date:** 2026-09-01  
-**Status:** Approved for implementation planning
+**Status:** Revised after review; awaiting final approval
 
 ## Purpose
 
-Add WebMCP site tools to the spatial-layout application so a person can give an image or other reference material to their own compatible AI agent and have that agent construct, inspect, and refine the shared canvas. The application does not ingest, upload, store, or interpret reference images. The external agent performs that work. This application supplies the live spatial document, component catalog, validated editing operations, diagnostics, 3D/first-person environment, and operational simulation.
+Add WebMCP site tools to the spatial-layout application so a person can give an image, written instruction, or other reference material to their own compatible AI agent and have that agent construct, inspect, and repeatedly refine the shared canvas. Follow-up requests such as "move the fryer beside the range," "make this counter 20 cm deeper," or "try the alternative with a wider aisle" must translate into validated changes on the live drawing. The application does not ingest, upload, store, or interpret reference images or natural-language instructions. The external agent performs that interpretation. This application supplies the live spatial document, component catalog, validated editing operations, diagnostics, 3D/first-person environment, and configurable operational simulation.
 
 The first product remains Manta Raja Kitchen Lab, but the WebMCP boundary must describe generic spatial components and capabilities. Kitchen equipment, commercial-kitchen diagnostics, and service simulation are domain modules behind that boundary rather than assumptions embedded in the protocol adapter.
 
@@ -32,7 +32,8 @@ The intended workflow is:
 5. The agent calls `preview_layout_changes` with the current revision and a complete batch.
 6. If validation succeeds, the agent calls `apply_layout_changes` with the preview token.
 7. The shared canvas updates immediately. The agent calls `analyze_layout` and inspects the page to verify the result.
-8. If operational questions matter, the agent reads `get_simulation_guide`, runs a scenario, and reports assumptions and results separately from measured geometry.
+8. Whenever the user asks for another drawing change, the agent rereads the current revision, previews the requested delta, applies it, and verifies the affected components. It does not need to reconstruct the whole project.
+9. If operational questions matter, the agent reads `get_simulation_guide`, previews and applies any requested scenario-parameter changes, runs the scenario, and reports assumptions and results separately from measured geometry.
 
 The guide tells agents not to invent exact measurements when a reference has no trustworthy scale. An agent should preserve uncertainty in component metadata and ask the user when an ambiguity materially affects the layout.
 
@@ -129,11 +130,37 @@ Project replacement is not exposed in the first WebMCP contract. An agent constr
 
 ### `get_simulation_guide`
 
-Read-only. Returns available scenarios, editable scenario fields, staff roles, station capabilities, result definitions, and a reminder that simulated values are assumptions rather than observed service data.
+Read-only. Returns available scenarios, the active scenario and current revision, editable parameter schemas, staff roles, station capabilities, result definitions, and a reminder that simulated values are assumptions rather than observed service data.
+
+Editable scenario parameters include:
+
+- name;
+- covers;
+- duration in minutes;
+- arrival pattern (`seating-wave`, `steady`, or `two-waves`);
+- cook-to-order ratio;
+- deterministic random seed;
+- staff counts by supported role;
+- collision, door-swing, and dirty/clean-crossing checks;
+- per-capability task-duration ranges;
+- per-station capacities.
+
+### `preview_simulation_changes`
+
+Read-only from the page-state perspective. Accepts a scenario ID, current expected revision, and a strict partial parameter patch. It validates the complete resulting scenario, including cross-field constraints such as task-duration minimums not exceeding maximums. A successful preview returns the normalized scenario, changed parameter names, warnings, an assumptions delta, the unchanged revision, and a short-lived preview token bound to that scenario and revision.
+
+### `apply_simulation_changes`
+
+Mutating. Accepts a valid simulation preview token. It rechecks the token and revision, then commits the normalized scenario as one history entry and one revision increment. The result includes the new revision, changed parameters, normalized assumptions, and a warning that any result from an older layout or scenario revision is stale. The token is single-use and follows the same expiry and invalidation rules as a layout preview token.
 
 ### `run_simulation`
 
-Computational but non-mutating for layout state. Accepts a scenario ID, current expected revision, and an optional elapsed-time snapshot. It returns scenario assumptions, aggregate metrics, queues, backlog, wait times, warnings, and recommendations. Results identify the layout revision used so agents cannot present stale results as current.
+Computational but non-mutating for document revision. Accepts a scenario ID, current expected revision, an optional elapsed-time snapshot, and a presentation mode:
+
+- `results-only` runs deterministically and returns the report without changing the current workspace view;
+- `open-live-simulation` also opens the shared simulation workspace, loads the run at time zero, and starts visible playback using an optional validated playback speed.
+
+The result returns scenario assumptions, aggregate metrics, queues, backlog, throughput, wait times, warnings, and recommendations. It identifies the exact layout and scenario revision used so agents cannot present stale results as current. An agent-triggered live run uses the same simulation session and chef animation as a human-triggered run; it does not create a second hidden simulation engine.
 
 ## Spatial Operations
 
@@ -198,6 +225,8 @@ Important errors include:
 
 Expected revisions make concurrent human and agent edits explicit. An agent receiving `stale-revision` must read the current layout again and recompute its intended change instead of retrying blindly.
 
+Conversational instructions never bypass this rule. The external agent translates each user request into explicit operations or parameter patches, and the application reports exactly what changed. The agent must not treat a prior natural-language instruction as authority to overwrite newer human edits.
+
 ## Security and Privacy
 
 - Reference images stay with the user's chosen agent and are never accepted by these tools.
@@ -226,6 +255,7 @@ Opened from the top bar. It renders:
 - copyable starter prompt;
 - coordinate and unit summary;
 - registered tool list with read/write labels;
+- explicit examples of conversational drawing edits and simulation-parameter changes;
 - recent activity;
 - troubleshooting guidance for unsupported browsers.
 
@@ -243,6 +273,10 @@ The panel is keyboard accessible, works without WebGL, and does not block the ex
 - Applies require a matching live token and create one revision and one undo entry.
 - Tokens are single-use, revision-bound, batch-bound, and time-limited.
 - Batch failure reports the failing index and preserves original state.
+- Follow-up drawing requests modify only the targeted components and retain unrelated stable IDs.
+- Simulation patches validate every supported parameter, preview without mutation, and apply as one undoable revision.
+- Applying scenario parameters invalidates older simulation results.
+- Agent-triggered runs use the updated scenario and can publish the same live playback session used by the simulation workspace.
 - Query results are cloned and JSON-safe.
 - Unsupported browser detection is a normal state.
 - Strict Mode registration does not leave duplicate tools.
@@ -258,8 +292,10 @@ Playwright injects a WebMCP shim before application startup and verifies:
 - all tools are discoverable on the top-level page;
 - the AI tools panel reports availability and copies usable guidance;
 - an agent can read the workspace, preview a multi-component layout, apply it, and read the new revision;
+- an agent can respond to a follow-up user instruction by moving, resizing, rotating, adding, updating, or removing exact components without rebuilding unrelated drawing state;
 - the 2D canvas updates without a reload;
 - the persistent 3D renderer and camera survive tool-driven component edits;
+- an agent can preview and apply simulation parameters, run the revised scenario, and open visible chef playback in the shared simulation workspace;
 - stale writes and replayed preview tokens fail visibly and safely;
 - a browser without WebMCP retains the complete human interface.
 
@@ -269,14 +305,14 @@ The final verification gate runs unit tests, lint, production build, and the ful
 
 1. Compatible agents can discover the WebMCP tools from the open top-level page.
 2. The app clearly tells agents and people that the external agent—not this application—processes reference images.
-3. An agent can learn the coordinate system and catalog, read the current layout, preview and apply an atomic set of component changes, and verify diagnostics.
+3. An agent can learn the coordinate system and catalog, read the current layout, translate both initial and follow-up user instructions into exact drawing changes, preview and apply those changes atomically, and verify diagnostics.
 4. Tool-driven edits update the existing live 2D, 3D, walk, and simulation environment through the shared store without page reloads or renderer resets.
 5. Every mutation is validated, revision-safe, previewed, one-step undoable, and returns enough structured information to verify the outcome.
-6. Simulation tools expose assumptions, queues, backlog, throughput, and wait-time results for the current revision.
+6. An agent can read, preview, and update validated simulation parameters; run the resulting current-revision scenario; receive assumptions, queues, backlog, throughput, and wait-time results; and optionally open the shared animated simulation for the user.
 7. Browsers without WebMCP remain fully functional and receive useful setup guidance.
 8. The browser adapter and tool schemas are domain-neutral; kitchen behavior is supplied through a replaceable capability manifest.
 9. No image-processing service, model call, API key, server-side MCP endpoint, or hidden remote control channel is introduced.
-10. Automated tests cover discovery, schemas, atomicity, concurrency, canvas synchronization, 3D persistence, simulation, fallback, and accessibility-relevant panel behavior.
+10. Automated tests cover discovery, schemas, atomicity, concurrency, conversational follow-up edits, canvas synchronization, 3D persistence, simulation parameter updates, agent-triggered live playback, fallback, and accessibility-relevant panel behavior.
 
 ## Source Guidance
 
