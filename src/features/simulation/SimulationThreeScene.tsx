@@ -1,6 +1,6 @@
 import { Component, useMemo, useState, type ErrorInfo, type ReactNode } from 'react'
 import { interpolateAgentFrames } from '../../core/agents/interpolate-agent-frame'
-import type { KitchenProject, LayoutVariant, StaffRole } from '../../domain/project'
+import type { KitchenProject, LayoutVariant, PointMm, StaffRole } from '../../domain/project'
 import type { deriveLiveServiceState } from '../../simulation/live-state'
 import type { SimulationResult } from '../../simulation/types'
 import { KitchenScene } from '../scene/KitchenScene'
@@ -42,18 +42,21 @@ export function SimulationThreeScene({ view, project, variant, result, liveState
   const [contextLost, setContextLost] = useState(false)
   const [walkLocked, setWalkLocked] = useState(false)
   const [walkNearby, setWalkNearby] = useState(false)
+  const [playerPosition, setPlayerPosition] = useState<PointMm>()
   const walkMode = view === 'walk'
   const poses = useMemo(() => interpolateAgentFrames(result.frames, elapsedSeconds), [elapsedSeconds, result.frames])
   const reducedMotion = typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
   const restartRenderer = () => { setContextLost(false); setRendererKey((key) => key + 1) }
 
-  return <div className={`simulation-three-scene${walkMode ? ' walk-active' : ''}`} data-testid="simulation-3d-scene" data-view={view} data-staff-count={poses.length}>
+  const staffPositionSignature = poses.map((pose) => `${pose.agentId}:${Math.round(pose.xMm)},${Math.round(pose.yMm)}`).join('|')
+
+  return <div className={`simulation-three-scene${walkMode ? ' walk-active walk-pointer-lock-target' : ''}`} data-testid="simulation-3d-scene" data-view={view} data-staff-count={poses.length} data-staff-positions={staffPositionSignature} data-player-position={playerPosition ? `${Math.round(playerPosition.x)},${Math.round(playerPosition.y)}` : undefined}>
     {contextLost ? <div role="alert" className="scene-context-message"><strong>Live 3D rendering paused</strong><p>The browser interrupted the graphics context. Restart it without losing this service run or playback position.</p><button type="button" onClick={restartRenderer}>Restart live 3D</button></div> : <SimulationSceneBoundary key={rendererKey}>
       <SceneCanvas architecture={project.architecture} cameraMode="perspective" fitSignal={0} walkMode={walkMode} onContextLost={() => setContextLost(true)} onContextRestored={() => setContextLost(false)}>
         <KitchenScene project={project} variant={variant} selectedIds={[]} showClearances={layers.clearances} wallsTransparent onSelect={() => undefined} onClearSelection={() => undefined} />
         <SimulatedStaff frames={result.frames} elapsedSeconds={elapsedSeconds} followRole={followRole} reducedMotion={Boolean(reducedMotion)} />
         <CompletedOrderFlow3D architecture={project.architecture} liveState={liveState} elapsedSeconds={elapsedSeconds} />
-        <WalkScene active={walkMode} architecture={project.architecture} equipment={variant.equipment} staff={poses} reducedMotion={Boolean(reducedMotion)} onLockedChange={setWalkLocked} onNearbyChange={setWalkNearby} />
+        <WalkScene active={walkMode} architecture={project.architecture} equipment={variant.equipment} staff={poses} reducedMotion={Boolean(reducedMotion)} onLockedChange={setWalkLocked} onNearbyChange={setWalkNearby} onPositionChange={setPlayerPosition} />
       </SceneCanvas>
     </SimulationSceneBoundary>}
     <LiveSimulationOverlays liveState={liveState} className="three-overlay" />

@@ -1,11 +1,11 @@
-import { PointerLockControls } from '@react-three/drei'
 import { useFrame, useThree } from '@react-three/fiber'
-import { useEffect, useMemo, useRef } from 'react'
+import { useCallback, useEffect, useMemo, useRef } from 'react'
 import * as THREE from 'three'
 import type { Architecture, EquipmentItem, PointMm } from '../../../domain/project'
 import { softenPlayerStep } from './staff-proximity'
-import { buildWalkColliders, findD2Spawn, resolveWalkStep } from './walk-collision'
+import { buildWalkColliders, cameraYawForHeading, findD2Spawn, resolveWalkStep } from './walk-collision'
 import { EMPTY_WALK_INPUT, walkActionForKeyboardEvent, walkInputReducer, type WalkInputState } from './walk-input'
+import { PointerLockLook } from './PointerLockLook'
 
 const EYE_HEIGHT_M = 1.68
 const WALK_MPS = 1.45
@@ -30,13 +30,15 @@ export function FirstPersonController({ active, architecture, equipment, staff =
   const wasActive = useRef(false)
   const lastPositionNotice = useRef(0)
   const lastNearby = useRef(false)
+  const handleLock = useCallback(() => onLockedChange?.(true), [onLockedChange])
+  const handleUnlock = useCallback(() => { input.current = { ...EMPTY_WALK_INPUT }; onLockedChange?.(false) }, [onLockedChange])
 
   useEffect(() => {
     if (active && !wasActive.current) {
       const spawn = findD2Spawn(architecture, colliders)
       const camera = getThree().camera
       camera.position.set(spawn.xMm / 1000, EYE_HEIGHT_M, spawn.yMm / 1000)
-      camera.rotation.set(0, Math.PI / 2 - spawn.headingRad, 0, 'YXZ')
+      camera.rotation.set(0, cameraYawForHeading(spawn.headingRad), 0, 'YXZ')
       velocityY.current = 0
       grounded.current = true
     }
@@ -97,5 +99,5 @@ export function FirstPersonController({ active, architecture, equipment, staff =
   })
 
   if (!active) return null
-  return <PointerLockControls onLock={() => onLockedChange?.(true)} onUnlock={() => { input.current = { ...EMPTY_WALK_INPUT }; onLockedChange?.(false) }} />
+  return <PointerLockLook active onLock={handleLock} onUnlock={handleUnlock} />
 }

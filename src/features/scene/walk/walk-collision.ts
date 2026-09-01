@@ -6,6 +6,8 @@ export type WalkColliderKind = 'wall' | 'equipment' | 'pillar' | 'pass-ledge'
 export type WalkCollider = { id: string; kind: WalkColliderKind; polygon: PointMm[] }
 export type WalkBody = { positionMm: PointMm; radiusMm: number }
 
+export const cameraYawForHeading = (headingRad: number) => -Math.PI / 2 - headingRad
+
 const rectPolygon = (rect: RectMm): PointMm[] => [
   { x: rect.xMm, y: rect.yMm }, { x: rect.xMm + rect.widthMm, y: rect.yMm },
   { x: rect.xMm + rect.widthMm, y: rect.yMm + rect.depthMm }, { x: rect.xMm, y: rect.yMm + rect.depthMm },

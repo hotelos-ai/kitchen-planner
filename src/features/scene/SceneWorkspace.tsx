@@ -88,7 +88,7 @@ export function SceneWorkspace({ store = projectStore, renderer: Renderer, compa
           <button type="button" aria-pressed={walkMode} onClick={() => setWalkMode(true)}>Walk kitchen</button>
         </div>
       </div>
-      <div className={`scene-canvas${contextLost ? ' context-lost' : ''}`} data-testid="kitchen-scene" data-renderer-generation={rendererKey}>
+      <div className={`scene-canvas${contextLost ? ' context-lost' : ''}${walkMode ? ' walk-pointer-lock-target' : ''}`} data-testid="kitchen-scene" data-renderer-generation={rendererKey}>
         {contextLost ? <div role="alert" className="scene-context-message"><strong>3D rendering paused</strong><p>The browser interrupted the graphics context. Restart the renderer to restore the model without changing the plan.</p><button type="button" onClick={restartRenderer}>Restart 3D renderer</button></div> : <SceneErrorBoundary key={rendererKey}>
           <SceneRenderer key={rendererKey} items={variant.equipment} project={project} variant={variant} selectedIds={selectedIds} showClearances={showClearances} wallsTransparent={wallsTransparent} walkMode={walkMode} reducedMotion={Boolean(reducedMotion)} playerPosition={playerPosition} cameraMode={cameraMode} fitSignal={fitSignal} onSelect={select} onClearSelection={() => store.getState().clearSelection()} onContextLost={() => setContextLost(true)} onContextRestored={() => setContextLost(false)} onWalkLockedChange={setWalkLocked} onWalkNearbyChange={setWalkNearby} onPlayerPositionChange={setPlayerPosition} />
         </SceneErrorBoundary>}

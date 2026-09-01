@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { createSeedProject } from '../../../domain/seed-project'
-import { buildWalkColliders, findD2Spawn, resolveWalkStep } from './walk-collision'
+import { buildWalkColliders, cameraYawForHeading, findD2Spawn, resolveWalkStep } from './walk-collision'
 
 describe('walk collision', () => {
   const project = createSeedProject()
@@ -9,6 +9,8 @@ describe('walk collision', () => {
   it('places the player inside D2 and builds all solid collider families', () => {
     const spawn = findD2Spawn(project.architecture, colliders)
     expect(spawn.xMm).toBeGreaterThan(0)
+    expect(spawn.headingRad).toBe(0)
+    expect(cameraYawForHeading(spawn.headingRad)).toBe(-Math.PI / 2)
     expect(colliders.map((collider) => collider.kind)).toEqual(expect.arrayContaining(['wall', 'equipment', 'pillar', 'pass-ledge']))
   })
 

@@ -19,8 +19,8 @@ export function MixerVisual({ widthM: w, depthM: d, heightM: h }: EquipmentVisua
     <BoxPart position={[0, .06, 0]} size={[w * .55, .12, d * .55]} color={DARK_STEEL} />
     <BoxPart position={[-w * .22, h * .42, 0]} size={[w * .18, h * .72, d * .3]} color="#7c8783" />
     <BoxPart position={[0, h * .79, 0]} size={[w * .58, h * .22, d * .4]} color="#9fa9a5" />
-    <mesh position={[w * .1, h * .42, 0]}><sphereGeometry args={[radius, 24, 12, 0, Math.PI * 2, 0, Math.PI / 2]} /><meshStandardMaterial color={STEEL} metalness={.78} roughness={.25} side={2} /></mesh>
-    <mesh position={[w * .1, h * .56, 0]}><cylinderGeometry args={[.012, .012, h * .35, 10]} /><meshStandardMaterial color={DARK_STEEL} metalness={.72} /></mesh>
+    <mesh position={[w * .1, h * .42, 0]}><sphereGeometry args={[radius, 24, 12, 0, Math.PI * 2, 0, Math.PI / 2]} /><meshStandardMaterial color={STEEL} metalness={.3} roughness={.38} side={2} /></mesh>
+    <mesh position={[w * .1, h * .56, 0]}><cylinderGeometry args={[.012, .012, h * .35, 10]} /><meshStandardMaterial color={DARK_STEEL} metalness={.28} /></mesh>
     <mesh position={[w * .1, h * .38, 0]}><torusGeometry args={[radius * .52, .01, 8, 20]} /><meshStandardMaterial color={DARK_STEEL} /></mesh>
   </group>
 }

@@ -1,0 +1,43 @@
+import { useThree } from '@react-three/fiber'
+import { useEffect } from 'react'
+import * as THREE from 'three'
+
+const LOOK_SENSITIVITY = .002
+const MAX_PITCH = Math.PI / 2 - .015
+
+export function PointerLockLook({ active, onLock, onUnlock }: { active: boolean; onLock(): void; onUnlock(): void }) {
+  const camera = useThree((state) => state.camera)
+  const canvas = useThree((state) => state.gl.domElement)
+
+  useEffect(() => {
+    if (!active) return
+    const documentRef = canvas.ownerDocument
+    const euler = new THREE.Euler(0, 0, 0, 'YXZ')
+    const handleClick = () => {
+      if (documentRef.pointerLockElement === canvas) return
+      try {
+        const request = canvas.requestPointerLock()
+        if (request && typeof request.catch === 'function') request.catch(() => onUnlock())
+      } catch { onUnlock() }
+    }
+    const handleLockChange = () => documentRef.pointerLockElement === canvas ? onLock() : onUnlock()
+    const handleMouseMove = (event: MouseEvent) => {
+      if (documentRef.pointerLockElement !== canvas) return
+      euler.setFromQuaternion(camera.quaternion)
+      euler.y -= event.movementX * LOOK_SENSITIVITY
+      euler.x = Math.max(-MAX_PITCH, Math.min(MAX_PITCH, euler.x - event.movementY * LOOK_SENSITIVITY))
+      camera.quaternion.setFromEuler(euler)
+    }
+    canvas.addEventListener('click', handleClick)
+    documentRef.addEventListener('pointerlockchange', handleLockChange)
+    documentRef.addEventListener('mousemove', handleMouseMove)
+    return () => {
+      canvas.removeEventListener('click', handleClick)
+      documentRef.removeEventListener('pointerlockchange', handleLockChange)
+      documentRef.removeEventListener('mousemove', handleMouseMove)
+      if (documentRef.pointerLockElement === canvas) documentRef.exitPointerLock?.()
+    }
+  }, [active, camera, canvas, onLock, onUnlock])
+
+  return null
+}

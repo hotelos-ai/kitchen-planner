@@ -13,17 +13,17 @@ export function ServiceWindowMesh({ fixture }: { fixture: ServiceWindowFixture }
     <group position={[toWorld(fixture.centerMm.x), toWorld(fixture.sillHeightMm), toWorld(fixture.centerMm.z)]} rotation={[0, fixture.rotationYRad, 0]}>
       <mesh position={[0, .03, 0]} castShadow receiveShadow>
         <boxGeometry args={[width + .14, .06, .46]} />
-        <meshStandardMaterial color="#bfc8c5" metalness={.78} roughness={.28} />
+        <meshStandardMaterial color="#d0d7d5" metalness={.3} roughness={.4} />
         <Edges color="#30403b" />
       </mesh>
       {[-1, 1].map((side) => <mesh key={side} position={[side * (width / 2 + .025), openingHeight / 2, 0]}>
         <boxGeometry args={[.05, openingHeight, .1]} />
-        <meshStandardMaterial color="#8d9995" metalness={.66} roughness={.34} />
+        <meshStandardMaterial color="#aab5b1" metalness={.25} roughness={.42} />
         <Edges color="#30403b" />
       </mesh>)}
       <mesh position={[0, openingHeight, 0]}>
         <boxGeometry args={[width + .1, .06, .1]} />
-        <meshStandardMaterial color="#8d9995" metalness={.66} roughness={.34} />
+        <meshStandardMaterial color="#aab5b1" metalness={.25} roughness={.42} />
         <Edges color="#30403b" />
       </mesh>
       <group position={[0, .09, direction * .52]} rotation={[Math.PI / 2, 0, 0]}>
