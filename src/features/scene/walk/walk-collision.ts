@@ -3,7 +3,14 @@ import type { Architecture, EquipmentItem, PointMm, RectMm } from '../../../doma
 import { buildWallPanels, serviceWindowFixtures } from '../wall-geometry'
 
 export type WalkColliderKind = 'wall' | 'equipment' | 'pillar' | 'pass-ledge'
-export type WalkCollider = { id: string; kind: WalkColliderKind; polygon: PointMm[] }
+export type WalkCollider = {
+  id: string
+  kind: WalkColliderKind
+  polygon: PointMm[]
+  topMm: number
+  jumpable: boolean
+  landable: boolean
+}
 export type WalkBody = { positionMm: PointMm; radiusMm: number }
 
 export const cameraYawForHeading = (headingRad: number) => -Math.PI / 2 - headingRad
@@ -28,11 +35,39 @@ export function buildWalkColliders(architecture: Architecture, equipment: readon
     const key = `${panel.wall}-${panel.offsetStartMm}-${panel.offsetEndMm}-${panel.openingId ?? ''}`
     if (seenWalls.has(key)) return []
     seenWalls.add(key)
-    return [{ id: panel.id, kind: 'wall', polygon: centeredRect(panel.centerMm.x, panel.centerMm.z, panel.sizeMm.width, panel.sizeMm.depth, -panel.rotationYRad) }]
+    return [{
+      id: panel.id,
+      kind: 'wall',
+      polygon: centeredRect(panel.centerMm.x, panel.centerMm.z, panel.sizeMm.width, panel.sizeMm.depth, -panel.rotationYRad),
+      topMm: architecture.wallHeightMm,
+      jumpable: false,
+      landable: false,
+    }]
   })
-  const equipmentColliders: WalkCollider[] = equipment.filter((item) => item.category !== 'hood').map((item) => ({ id: item.id, kind: 'equipment', polygon: rotatedFootprint(item) }))
-  const pillars: WalkCollider[] = architecture.pillars.map((pillar) => ({ id: pillar.id, kind: 'pillar', polygon: rectPolygon(pillar) }))
-  const ledges: WalkCollider[] = serviceWindowFixtures(architecture).map((fixture) => ({ id: `ledge-${fixture.id}`, kind: 'pass-ledge', polygon: centeredRect(fixture.centerMm.x, fixture.centerMm.z, fixture.widthMm + 140, 460, -fixture.rotationYRad) }))
+  const equipmentColliders: WalkCollider[] = equipment.filter((item) => item.category !== 'hood').map((item) => ({
+    id: item.id,
+    kind: 'equipment',
+    polygon: rotatedFootprint(item),
+    topMm: item.heightMm,
+    jumpable: true,
+    landable: true,
+  }))
+  const pillars: WalkCollider[] = architecture.pillars.map((pillar) => ({
+    id: pillar.id,
+    kind: 'pillar',
+    polygon: rectPolygon(pillar),
+    topMm: architecture.wallHeightMm,
+    jumpable: false,
+    landable: false,
+  }))
+  const ledges: WalkCollider[] = serviceWindowFixtures(architecture).map((fixture) => ({
+    id: `ledge-${fixture.id}`,
+    kind: 'pass-ledge',
+    polygon: centeredRect(fixture.centerMm.x, fixture.centerMm.z, fixture.widthMm + 140, 460, -fixture.rotationYRad),
+    topMm: fixture.sillHeightMm,
+    jumpable: true,
+    landable: true,
+  }))
   return [...walls, ...equipmentColliders, ...pillars, ...ledges]
 }
 
@@ -67,7 +102,10 @@ const overlapsAny = (position: PointMm, radiusMm: number, colliders: readonly Wa
   return pointInPolygon(position, collider.polygon) || nearest.distance < radiusMm
 })
 
-export function resolveWalkStep(body: WalkBody, intendedDeltaMm: PointMm, colliders: readonly WalkCollider[]): { positionMm: PointMm; collided: boolean; colliderIds: string[] } {
+const blocksAtFootHeight = (collider: WalkCollider, footHeightMm: number) =>
+  !collider.jumpable || footHeightMm < collider.topMm + 40
+
+export function resolveWalkStep(body: WalkBody, intendedDeltaMm: PointMm, colliders: readonly WalkCollider[], footHeightMm = 0): { positionMm: PointMm; collided: boolean; colliderIds: string[] } {
   const distance = Math.hypot(intendedDeltaMm.x, intendedDeltaMm.y)
   const steps = Math.max(1, Math.ceil(distance / 60))
   let position = { ...body.positionMm }
@@ -75,12 +113,37 @@ export function resolveWalkStep(body: WalkBody, intendedDeltaMm: PointMm, collid
   const colliderIds = new Set<string>()
   for (let step = 0; step < steps; step += 1) {
     position = { x: position.x + intendedDeltaMm.x / steps, y: position.y + intendedDeltaMm.y / steps }
-    for (let pass = 0; pass < 3; pass += 1) colliders.forEach((collider) => {
+    for (let pass = 0; pass < 3; pass += 1) colliders.filter((collider) => blocksAtFootHeight(collider, footHeightMm)).forEach((collider) => {
       const resolved = resolveCircle(position, body.radiusMm, collider)
       if (resolved.collided) { collided = true; colliderIds.add(collider.id); position = resolved.position }
     })
   }
   return { positionMm: position, collided, colliderIds: [...colliderIds] }
+}
+
+export function supportHeightAt(position: PointMm, colliders: readonly WalkCollider[]): number {
+  return colliders
+    .filter((collider) => collider.landable && pointInPolygon(position, collider.polygon))
+    .reduce((height, collider) => Math.max(height, collider.topMm), 0)
+}
+
+export function findJumpObstacle(body: WalkBody, direction: PointMm, colliders: readonly WalkCollider[]): WalkCollider | undefined {
+  const length = Math.hypot(direction.x, direction.y)
+  if (length < .001) return undefined
+  const unit = { x: direction.x / length, y: direction.y / length }
+  const jumpable = colliders.filter((collider) => collider.jumpable)
+  for (let distance = body.radiusMm; distance <= 1400; distance += 40) {
+    const sample = {
+      x: body.positionMm.x + unit.x * distance,
+      y: body.positionMm.y + unit.y * distance,
+    }
+    const hit = jumpable.find((collider) => {
+      const nearest = nearestBoundary(sample, collider.polygon)
+      return pointInPolygon(sample, collider.polygon) || nearest.distance < body.radiusMm
+    })
+    if (hit) return hit
+  }
+  return undefined
 }
 
 export function findD2Spawn(architecture: Architecture, colliders: readonly WalkCollider[]): { xMm: number; yMm: number; headingRad: number } {
