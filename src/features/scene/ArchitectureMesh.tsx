@@ -1,6 +1,9 @@
+import { Edges } from '@react-three/drei'
 import { useMemo } from 'react'
 import * as THREE from 'three'
 import type { Architecture, Opening, PointMm } from '../../domain/project'
+import { ServiceWindowMesh } from './ServiceWindowMesh'
+import { buildWallPanels, serviceWindowFixtures, type WallPanel } from './wall-geometry'
 
 // Shared by procedural scene modules and synchronization tests.
 // eslint-disable-next-line react-refresh/only-export-components
@@ -76,17 +79,12 @@ function FloorMesh({ polygon }: { polygon: PointMm[] }) {
   )
 }
 
-function WallMesh({ segment, heightM }: { segment: WallSegment; heightM: number }) {
-  const startX = toWorld(segment.start.x)
-  const startZ = toWorld(segment.start.y)
-  const endX = toWorld(segment.end.x)
-  const endZ = toWorld(segment.end.y)
-  const length = Math.hypot(endX - startX, endZ - startZ)
-  const angle = Math.atan2(endZ - startZ, endX - startX)
+function WallMesh({ panel }: { panel: WallPanel }) {
   return (
-    <mesh position={[(startX + endX) / 2, heightM / 2, (startZ + endZ) / 2]} rotation={[0, -angle, 0]} castShadow receiveShadow>
-      <boxGeometry args={[length, heightM, 0.08]} />
+    <mesh position={[toWorld(panel.centerMm.x), toWorld(panel.centerMm.y), toWorld(panel.centerMm.z)]} rotation={[0, panel.rotationYRad, 0]} castShadow receiveShadow>
+      <boxGeometry args={[toWorld(panel.sizeMm.width), toWorld(panel.sizeMm.height), toWorld(panel.sizeMm.depth)]} />
       <meshStandardMaterial color="#f3efe5" roughness={0.88} />
+      <Edges color="#34413d" threshold={15} />
     </mesh>
   )
 }
@@ -96,7 +94,8 @@ export function ArchitectureMesh({ architecture }: { architecture: Architecture 
   return (
     <group>
       <FloorMesh polygon={architecture.roomPolygon} />
-      {buildWallSegments(architecture).map((segment) => <WallMesh key={segment.id} segment={segment} heightM={heightM} />)}
+      {buildWallPanels(architecture).map((panel) => <WallMesh key={panel.id} panel={panel} />)}
+      {serviceWindowFixtures(architecture).map((fixture) => <ServiceWindowMesh key={fixture.id} fixture={fixture} />)}
       {architecture.pillars.map((pillar) => (
         <mesh key={pillar.id} position={[toWorld(pillar.xMm + pillar.widthMm / 2), heightM / 2, toWorld(pillar.yMm + pillar.depthMm / 2)]} castShadow receiveShadow>
           <boxGeometry args={[toWorld(pillar.widthMm), heightM, toWorld(pillar.depthMm)]} />
