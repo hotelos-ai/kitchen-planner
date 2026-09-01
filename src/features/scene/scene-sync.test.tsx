@@ -70,4 +70,14 @@ describe('3D scene synchronization', () => {
     await user.click(screen.getByRole('button', { name: /Restart 3D renderer/i }))
     expect(screen.queryByRole('alert')).not.toBeInTheDocument()
   })
+
+  it('toggles transparent wall surfaces without hiding their borders', async () => {
+    const user = userEvent.setup()
+    const FakeRenderer = (props: SceneRendererProps) => <output data-testid="wall-state">{String(props.wallsTransparent)}</output>
+    render(<SceneWorkspace renderer={FakeRenderer} />)
+    expect(screen.getByTestId('wall-state')).toHaveTextContent('false')
+    await user.click(screen.getByRole('button', { name: 'Transparent walls' }))
+    expect(screen.getByTestId('wall-state')).toHaveTextContent('true')
+    expect(screen.getByRole('button', { name: 'Transparent walls' })).toHaveAttribute('aria-pressed', 'true')
+  })
 })

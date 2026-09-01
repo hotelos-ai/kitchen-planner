@@ -79,22 +79,22 @@ function FloorMesh({ polygon }: { polygon: PointMm[] }) {
   )
 }
 
-function WallMesh({ panel }: { panel: WallPanel }) {
+function WallMesh({ panel, transparent }: { panel: WallPanel; transparent: boolean }) {
   return (
     <mesh position={[toWorld(panel.centerMm.x), toWorld(panel.centerMm.y), toWorld(panel.centerMm.z)]} rotation={[0, panel.rotationYRad, 0]} castShadow receiveShadow>
       <boxGeometry args={[toWorld(panel.sizeMm.width), toWorld(panel.sizeMm.height), toWorld(panel.sizeMm.depth)]} />
-      <meshStandardMaterial color="#f3efe5" roughness={0.88} />
+      <meshStandardMaterial color="#f3efe5" roughness={0.88} transparent={transparent} opacity={transparent ? .16 : 1} depthWrite={!transparent} />
       <Edges color="#34413d" threshold={15} />
     </mesh>
   )
 }
 
-export function ArchitectureMesh({ architecture }: { architecture: Architecture }) {
+export function ArchitectureMesh({ architecture, wallsTransparent = false }: { architecture: Architecture; wallsTransparent?: boolean }) {
   const heightM = toWorld(architecture.wallHeightMm)
   return (
     <group>
       <FloorMesh polygon={architecture.roomPolygon} />
-      {buildWallPanels(architecture).map((panel) => <WallMesh key={panel.id} panel={panel} />)}
+      {buildWallPanels(architecture).map((panel) => <WallMesh key={panel.id} panel={panel} transparent={wallsTransparent} />)}
       {serviceWindowFixtures(architecture).map((fixture) => <ServiceWindowMesh key={fixture.id} fixture={fixture} />)}
       {architecture.pillars.map((pillar) => (
         <mesh key={pillar.id} position={[toWorld(pillar.xMm + pillar.widthMm / 2), heightM / 2, toWorld(pillar.yMm + pillar.depthMm / 2)]} castShadow receiveShadow>

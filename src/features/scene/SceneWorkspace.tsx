@@ -15,6 +15,7 @@ export type SceneRendererProps = {
   variant: LayoutVariant
   selectedIds: string[]
   showClearances: boolean
+  wallsTransparent: boolean
   cameraMode: CameraMode
   fitSignal: number
   onClearSelection(): void
@@ -75,7 +76,7 @@ function WebGLContextGuard({ onLost, onRestored }: { onLost(): void; onRestored(
   return null
 }
 
-function WebGLKitchenRenderer({ project, variant, selectedIds, showClearances, cameraMode, fitSignal, onSelect, onClearSelection, onContextLost, onContextRestored }: SceneRendererProps) {
+function WebGLKitchenRenderer({ project, variant, selectedIds, showClearances, wallsTransparent, cameraMode, fitSignal, onSelect, onClearSelection, onContextLost, onContextRestored }: SceneRendererProps) {
   const width = project.architecture.widthMm / 1000
   const depth = project.architecture.depthMm / 1000
   const span = Math.max(width, depth)
@@ -87,7 +88,7 @@ function WebGLKitchenRenderer({ project, variant, selectedIds, showClearances, c
   >
     <WebGLContextGuard onLost={onContextLost} onRestored={onContextRestored} />
     <CameraRig mode={cameraMode} fitSignal={fitSignal} architecture={project.architecture} />
-    <KitchenScene project={project} variant={variant} selectedIds={selectedIds} showClearances={showClearances} onSelect={onSelect} onClearSelection={onClearSelection} />
+    <KitchenScene project={project} variant={variant} selectedIds={selectedIds} showClearances={showClearances} wallsTransparent={wallsTransparent} onSelect={onSelect} onClearSelection={onClearSelection} />
     <OrbitControls makeDefault target={[width / 2, .7, depth / 2]} minDistance={2.2} maxDistance={Math.max(18, span * 3)} maxPolarAngle={Math.PI / 2.02} enableDamping />
   </Canvas>
 }
@@ -107,6 +108,7 @@ export function SceneWorkspace({ store = projectStore, renderer: Renderer, compa
   const selectedIds = useStore(store, (state) => state.selectedIds)
   const variant = useStore(store, getActiveVariant)
   const [showClearances, setShowClearances] = useState(false)
+  const [wallsTransparent, setWallsTransparent] = useState(false)
   const [cameraMode, setCameraMode] = useState<CameraMode>('perspective')
   const [fitSignal, setFitSignal] = useState(0)
   const [rendererKey, setRendererKey] = useState(0)
@@ -125,11 +127,12 @@ export function SceneWorkspace({ store = projectStore, renderer: Renderer, compa
           <button type="button" aria-pressed={cameraMode === 'top'} onClick={() => activateCamera('top')}>Top</button>
           <button type="button" onClick={() => setFitSignal((value) => value + 1)}>Fit room</button>
           <button type="button" aria-pressed={showClearances} onClick={() => setShowClearances((value) => !value)}>Clearances</button>
+          <button type="button" aria-pressed={wallsTransparent} onClick={() => setWallsTransparent((value) => !value)}>Transparent walls</button>
         </div>
       </div>
       <div className={`scene-canvas${contextLost ? ' context-lost' : ''}`} data-testid="kitchen-scene">
         {contextLost ? <div role="alert" className="scene-context-message"><strong>3D rendering paused</strong><p>The browser interrupted the graphics context. Restart the renderer to restore the model without changing the plan.</p><button type="button" onClick={restartRenderer}>Restart 3D renderer</button></div> : <SceneErrorBoundary key={rendererKey}>
-          <SceneRenderer key={rendererKey} items={variant.equipment} project={project} variant={variant} selectedIds={selectedIds} showClearances={showClearances} cameraMode={cameraMode} fitSignal={fitSignal} onSelect={select} onClearSelection={() => store.getState().clearSelection()} onContextLost={() => setContextLost(true)} onContextRestored={() => setContextLost(false)} />
+          <SceneRenderer key={rendererKey} items={variant.equipment} project={project} variant={variant} selectedIds={selectedIds} showClearances={showClearances} wallsTransparent={wallsTransparent} cameraMode={cameraMode} fitSignal={fitSignal} onSelect={select} onClearSelection={() => store.getState().clearSelection()} onContextLost={() => setContextLost(true)} onContextRestored={() => setContextLost(false)} />
         </SceneErrorBoundary>}
       </div>
       <div className="scene-legend"><span><i className="cooking" /> Cooking</span><span><i className="cold" /> Cold</span><span><i className="wash" /> Washing</span><span>Drag to orbit · Shift-drag to pan · Scroll to zoom</span></div>
