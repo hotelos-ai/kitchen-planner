@@ -117,7 +117,7 @@ describe('3D scene synchronization', () => {
     const PoseRenderer = ({ onPlayerPositionChange }: SceneRendererProps) => {
       useEffect(() => {
         mounts += 1
-        onPlayerPositionChange({ x: 2100, y: 3200, elevationMm: 850 } as Parameters<typeof onPlayerPositionChange>[0])
+        onPlayerPositionChange({ x: 2100, y: 3200, elevationMm: 850, grounded: false, verticalVelocityMps: 2.4 } as Parameters<typeof onPlayerPositionChange>[0])
       }, [onPlayerPositionChange])
       return null
     }
@@ -127,6 +127,8 @@ describe('3D scene synchronization', () => {
     expect(screen.getByTestId('kitchen-scene')).toHaveAttribute('data-player-x-mm', '2100')
     expect(screen.getByTestId('kitchen-scene')).toHaveAttribute('data-player-y-mm', '3200')
     expect(screen.getByTestId('kitchen-scene')).toHaveAttribute('data-player-elevation-mm', '850')
+    expect(screen.getByTestId('kitchen-scene')).toHaveAttribute('data-player-grounded', 'false')
+    expect(screen.getByTestId('kitchen-scene')).toHaveAttribute('data-player-vertical-velocity', '2.4')
     expect(mounts).toBe(1)
     expect(screen.getByTestId('kitchen-scene')).toHaveAttribute('data-renderer-generation', '0')
   })

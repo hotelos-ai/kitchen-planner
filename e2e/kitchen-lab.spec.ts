@@ -172,12 +172,20 @@ test('walks conventionally with keyboard aliases and publishes adaptive jump ele
   await page.waitForTimeout(420)
   await page.keyboard.up('ArrowRight')
   await expect.poll(async () => Number(await scene.getAttribute('data-player-y-mm'))).toBeGreaterThan(afterArrowLeft)
+  await expect(scene).toHaveAttribute('data-player-grounded', 'true')
 
+  await page.evaluate(() => {
+    window.addEventListener('keydown', (event) => {
+      if (event.code !== 'Space') return
+      document.documentElement.dataset.walkSpaceKey = event.key
+      document.documentElement.dataset.walkSpacePrevented = String(event.defaultPrevented)
+    }, { once: true })
+  })
   await page.keyboard.down('Space')
-  await expect.poll(
-    async () => Number(await scene.getAttribute('data-player-elevation-mm')),
-    { timeout: 2_000, intervals: [50] },
-  ).toBeGreaterThan(0)
+  await expect(page.locator('html')).toHaveAttribute('data-walk-space-key', ' ')
+  await expect(page.locator('html')).toHaveAttribute('data-walk-space-prevented', 'true')
+  await page.waitForTimeout(350)
+  expect(Number(await scene.getAttribute('data-player-elevation-mm'))).toBeGreaterThan(0)
   await page.keyboard.up('Space')
   expect(pageErrors).toEqual([])
 })

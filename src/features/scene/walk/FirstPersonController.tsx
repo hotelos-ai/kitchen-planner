@@ -110,7 +110,12 @@ export function FirstPersonController({ active, architecture, equipment, staff =
     const now = performance.now()
     if (now - lastPositionNotice.current > 100) {
       lastPositionNotice.current = now
-      onPositionChange?.({ ...resolved.positionMm, elevationMm: vertical.current.footHeightMm })
+      onPositionChange?.({
+        ...resolved.positionMm,
+        elevationMm: vertical.current.footHeightMm,
+        grounded: vertical.current.grounded,
+        verticalVelocityMps: vertical.current.velocityMps,
+      })
     }
   })
 
