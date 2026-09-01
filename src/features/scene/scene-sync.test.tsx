@@ -1,4 +1,5 @@
-import { render, screen } from '@testing-library/react'
+import { act, render, screen } from '@testing-library/react'
+import { useEffect } from 'react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it } from 'vitest'
 import type { EquipmentItem } from '../../domain/project'
@@ -79,5 +80,19 @@ describe('3D scene synchronization', () => {
     await user.click(screen.getByRole('button', { name: 'Transparent walls' }))
     expect(screen.getByTestId('wall-state')).toHaveTextContent('true')
     expect(screen.getByRole('button', { name: 'Transparent walls' })).toHaveAttribute('aria-pressed', 'true')
+  })
+
+  it('updates an edited mesh without remounting the renderer', () => {
+    let mounts = 0
+    const StableRenderer = ({ items }: SceneRendererProps) => {
+      useEffect(() => { mounts += 1 }, [])
+      return <output data-testid="live-tandoor-x">{items.find((item) => item.id === 'tandoor')?.xMm}</output>
+    }
+    render(<SceneWorkspace renderer={StableRenderer} />)
+    expect(screen.getByTestId('kitchen-scene')).toHaveAttribute('data-renderer-generation', '0')
+    act(() => projectStore.getState().moveItems(['tandoor'], { x: 2300, y: 900 }))
+    expect(screen.getByTestId('live-tandoor-x')).toHaveTextContent('2300')
+    expect(mounts).toBe(1)
+    expect(screen.getByTestId('kitchen-scene')).toHaveAttribute('data-renderer-generation', '0')
   })
 })

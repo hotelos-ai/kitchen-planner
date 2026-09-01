@@ -5,6 +5,7 @@ import { useStore } from 'zustand'
 import type { Architecture, EquipmentItem, KitchenProject, LayoutVariant } from '../../domain/project'
 import { getActiveVariant, projectStore, type ProjectStore } from '../../state/project-store'
 import { KitchenScene } from './KitchenScene'
+import { cameraArchitectureKey } from './camera-policy'
 
 export type CameraMode = 'perspective' | 'top'
 
@@ -31,7 +32,7 @@ type Props = {
 
 type OrbitControlsState = { target: { set(x: number, y: number, z: number): unknown }; update(): unknown }
 
-function cameraPreset(mode: CameraMode, architecture: Architecture, aspect: number, fovDegrees = 43) {
+function cameraPreset(mode: CameraMode, architecture: Pick<Architecture, 'widthMm' | 'depthMm' | 'wallHeightMm'>, aspect: number, fovDegrees = 43) {
   const width = architecture.widthMm / 1000
   const depth = architecture.depthMm / 1000
   const wallHeight = architecture.wallHeightMm / 1000
@@ -47,8 +48,12 @@ function cameraPreset(mode: CameraMode, architecture: Architecture, aspect: numb
 
 function CameraRig({ mode, fitSignal, architecture }: { mode: CameraMode; fitSignal: number; architecture: Architecture }) {
   const { camera, controls, size } = useThree()
+  const architectureKey = cameraArchitectureKey(architecture)
+  const widthMm = architecture.widthMm
+  const depthMm = architecture.depthMm
+  const wallHeightMm = architecture.wallHeightMm
   useEffect(() => {
-    const preset = cameraPreset(mode, architecture, size.width / Math.max(1, size.height))
+    const preset = cameraPreset(mode, { widthMm, depthMm, wallHeightMm }, size.width / Math.max(1, size.height))
     camera.position.set(...preset.position)
     camera.up.set(...preset.up)
     camera.lookAt(...preset.target)
@@ -56,7 +61,7 @@ function CameraRig({ mode, fitSignal, architecture }: { mode: CameraMode; fitSig
     const orbitControls = controls as unknown as OrbitControlsState | null
     orbitControls?.target.set(...preset.target)
     orbitControls?.update()
-  }, [architecture, camera, controls, fitSignal, mode, size.height, size.width])
+  }, [architectureKey, camera, controls, depthMm, fitSignal, mode, size.height, size.width, wallHeightMm, widthMm])
   return null
 }
 
@@ -130,7 +135,7 @@ export function SceneWorkspace({ store = projectStore, renderer: Renderer, compa
           <button type="button" aria-pressed={wallsTransparent} onClick={() => setWallsTransparent((value) => !value)}>Transparent walls</button>
         </div>
       </div>
-      <div className={`scene-canvas${contextLost ? ' context-lost' : ''}`} data-testid="kitchen-scene">
+      <div className={`scene-canvas${contextLost ? ' context-lost' : ''}`} data-testid="kitchen-scene" data-renderer-generation={rendererKey}>
         {contextLost ? <div role="alert" className="scene-context-message"><strong>3D rendering paused</strong><p>The browser interrupted the graphics context. Restart the renderer to restore the model without changing the plan.</p><button type="button" onClick={restartRenderer}>Restart 3D renderer</button></div> : <SceneErrorBoundary key={rendererKey}>
           <SceneRenderer key={rendererKey} items={variant.equipment} project={project} variant={variant} selectedIds={selectedIds} showClearances={showClearances} wallsTransparent={wallsTransparent} cameraMode={cameraMode} fitSignal={fitSignal} onSelect={select} onClearSelection={() => store.getState().clearSelection()} onContextLost={() => setContextLost(true)} onContextRestored={() => setContextLost(false)} />
         </SceneErrorBoundary>}
