@@ -4,6 +4,7 @@ import type { EquipmentCategory, EquipmentItem, StationCapability } from '../../
 import { formatLengthInput, parseLength } from '../../domain/units'
 import type { ProjectStore } from '../../state/project-store'
 import { getActiveItem } from '../../state/project-store'
+import { EquipmentConfigurationField } from './EquipmentConfigurationField'
 
 type Props = { store: ProjectStore }
 
@@ -65,6 +66,7 @@ export function EquipmentInspector({ store }: Props) {
     <aside className="inspector" aria-label="Equipment inspector">
       <div className="panel-heading"><span className="eyebrow">{item.category}</span><h2>Selected equipment</h2></div>
       <label>Equipment label<input aria-label="Equipment label" value={item.label} onChange={(event) => update({ label: event.target.value })} /></label>
+      <EquipmentConfigurationField item={item} store={store} />
       <label>Category<select aria-label="Equipment category" value={item.category} onChange={(event) => update({ category: event.target.value as EquipmentCategory })}>{CATEGORIES.map((category) => <option key={category} value={category}>{category[0].toUpperCase() + category.slice(1)}</option>)}</select></label>
       <div className="field-pair">
         <LengthField key={`width-${item.id}-${item.widthMm}-${project.displayUnit}`} label="Width" valueMm={item.widthMm} unit={project.displayUnit} disabled={item.dimensionsLocked} onCommit={(widthMm) => store.getState().resizeItem(item.id, { widthMm, depthMm: item.depthMm })} />

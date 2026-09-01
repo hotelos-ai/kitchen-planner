@@ -237,6 +237,7 @@ button { cursor: pointer; }
 .empty-inspector p { max-width: 200px; font-size: 10px; line-height: 1.5; }
 .right-panel label input:disabled { color: #91897e; background: #ece9e2; }
 .field-error { color: #aa4532; font-size: 7px; font-weight: 700; letter-spacing: normal; line-height: 1.35; text-transform: none; }
+.equipment-configuration-field small { display: block; margin-top: 5px; color: #81786c; font-size: 8px; font-weight: 650; letter-spacing: normal; line-height: 1.35; text-transform: none; }
 .checkbox-row { display: flex !important; align-items: center; gap: 7px !important; min-height: 30px; color: #484f4c !important; font-size: 10px !important; letter-spacing: normal !important; text-transform: none !important; }
 .checkbox-row input { width: 15px; height: 15px; min-height: 0; margin: 0; accent-color: var(--copper); }
 .item-note { margin: 0; border-left: 3px solid #d9ad9e; padding: 8px 9px; color: #71695e; background: #f8eee9; font-size: 9px; line-height: 1.45; }

@@ -10,6 +10,7 @@ import type {
   PointMm,
   SimulationScenario,
 } from '../domain/project'
+import { applyEquipmentConfiguration as configureEquipmentItem } from '../domain/equipment-configurations'
 import { createSeedProject } from '../domain/seed-project'
 import { kitchenSpatialAdapter } from '../domain/spatial-adapter'
 import { appendHistory } from './history'
@@ -40,6 +41,7 @@ export interface ProjectState {
   resizeItem(id: string, size: ResizeInput): void
   setDimensionsLocked(id: string, locked: boolean): void
   updateItem(id: string, patch: Partial<EquipmentItem>): void
+  applyEquipmentConfiguration(id: string, configurationId: string): boolean
   addCustomItem(input: CustomItemInput): string
   duplicateItem(id: string): string
   removeItems(ids: string[]): void
@@ -127,6 +129,15 @@ export function createProjectStore(initialProject: KitchenProject): ProjectStore
       resizeItem: (id, size) => { dispatch({ type: 'resize-item', id, ...size }) },
       setDimensionsLocked: (id, locked) => { dispatch({ type: 'set-dimensions-locked', id, locked }) },
       updateItem: (id, patch) => { dispatch({ type: 'update-item', id, patch }) },
+      applyEquipmentConfiguration: (id, configurationId) => {
+        let configured: EquipmentItem
+        try {
+          configured = configureEquipmentItem(getActiveItem(get(), id), configurationId)
+        } catch {
+          return false
+        }
+        return dispatch({ type: 'update-item', id, patch: configured }).ok
+      },
       addCustomItem: (input) => {
         const id = makeId('custom')
         const item: EquipmentItem = {

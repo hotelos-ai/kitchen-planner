@@ -68,4 +68,33 @@ describe('project store', () => {
     store.getState().setDisplayUnit('mm')
     expect(getActiveItem(store.getState(), 'six-burner')).toEqual(before)
   })
+
+  it('applies a configuration as one revision while preserving placement and selection', () => {
+    const store = createProjectStore(createSeedProject())
+    store.getState().selectItems(['two-door-fridge'])
+    const before = getActiveItem(store.getState(), 'two-door-fridge')
+
+    expect(store.getState().applyEquipmentConfiguration('two-door-fridge', 'cold-chest-freezer')).toBe(true)
+    expect(getActiveItem(store.getState(), 'two-door-fridge')).toMatchObject({
+      xMm: before.xMm,
+      yMm: before.yMm,
+      rotationDeg: before.rotationDeg,
+      widthMm: 1200,
+      depthMm: 700,
+      heightMm: 850,
+      visualPreset: 'chest-freezer',
+      configurationPreset: 'cold-chest-freezer',
+    })
+    expect(store.getState()).toMatchObject({ revision: 1, selectedIds: ['two-door-fridge'] })
+    expect(store.getState().past).toHaveLength(1)
+
+    store.getState().undo()
+    expect(getActiveItem(store.getState(), 'two-door-fridge')).toEqual(before)
+  })
+
+  it('refuses incompatible configurations without creating history', () => {
+    const store = createProjectStore(createSeedProject())
+    expect(store.getState().applyEquipmentConfiguration('two-door-fridge', 'hot-tandoor')).toBe(false)
+    expect(store.getState()).toMatchObject({ revision: 0, past: [] })
+  })
 })
