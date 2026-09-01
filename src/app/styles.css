@@ -55,6 +55,11 @@ button { cursor: pointer; }
 .scene-label button { border: 1px solid rgba(31,39,36,.22); border-radius: 4px; padding: 3px 5px; color: #202724; background: rgba(255,254,249,.9); box-shadow: 0 2px 7px rgba(24,32,30,.12); font-size: 8px; font-weight: 800; line-height: 1.1; text-align: center; white-space: nowrap; }
 .scene-label.selected { color: #8c3d28; border-color: #dc7758; background: #fff2eb; }
 .scene-label.selected button { color: #8c3d28; border-color: #dc7758; background: #fff2eb; }
+.clearance-label, .pass-label { pointer-events: none; white-space: nowrap; }
+.clearance-label span { display: block; padding: 4px 7px; border: 1px solid currentColor; border-radius: 3px; color: #285d56; background: rgba(255,254,248,.93); box-shadow: 0 2px 10px rgba(20,31,27,.18); font-size: 8px; font-weight: 850; letter-spacing: .01em; }
+.clearance-label.heat span { color: #8f321f; }.clearance-label.door-swing span { color: #80520c; }
+.pass-label span { display: block; padding: 5px 8px; border: 1px solid #2f827f; border-radius: 4px; color: #155f5c; background: rgba(246,255,252,.94); box-shadow: 0 3px 12px rgba(22,42,37,.18); font-size: 9px; font-weight: 900; }
+.pass-label.dirty span { border-color: #b6842c; color: #7b5415; background: rgba(255,250,238,.95); }
 .scene-legend { min-height: 34px; display: flex; align-items: center; gap: 16px; padding: 7px 14px; border-top: 1px solid #cfc8bd; color: #68716e; background: #f7f4ed; font-size: 8px; }
 .scene-legend span:last-child { margin-left: auto; }
 .scene-legend i { width: 7px; height: 7px; display: inline-block; margin-right: 4px; border-radius: 50%; background: #718368; }

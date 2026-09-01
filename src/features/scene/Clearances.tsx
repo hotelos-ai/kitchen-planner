@@ -1,32 +1,55 @@
+import { Html, Line } from '@react-three/drei'
 import * as THREE from 'three'
-import type { Architecture, EquipmentItem } from '../../domain/project'
+import type { Architecture, DisplayUnit, EquipmentItem } from '../../domain/project'
+import { buildClearanceDescriptors, type ArcClearanceDescriptor, type RectClearanceDescriptor } from './clearance-geometry'
 import { toWorld } from './ArchitectureMesh'
 
-export function Clearances({ items, architecture, visible }: { items: EquipmentItem[]; architecture: Architecture; visible: boolean }) {
-  if (!visible) return null
+function RectClearance({ zone }: { zone: RectClearanceDescriptor }) {
+  const width = toWorld(zone.widthMm)
+  const depth = toWorld(zone.depthMm)
+  const frontOffset = toWorld(zone.frontOffsetMm)
+  const border: [number, number, number][] = [[0, .028, frontOffset], [width, .028, frontOffset], [width, .028, frontOffset + depth], [0, .028, frontOffset + depth], [0, .028, frontOffset]]
+  const hatchCount = Math.max(2, Math.floor(zone.widthMm / 180))
   return (
-    <group>
-      {items.filter((item) => item.clearance).map((item) => {
-        const clearance = item.clearance!
-        const width = toWorld(item.widthMm)
-        const depth = toWorld(clearance.frontMm)
-        return (
-          <mesh key={item.id} position={[toWorld(item.xMm + item.widthMm / 2), .018, toWorld(item.yMm + item.depthMm + clearance.frontMm / 2)]} rotation={[-Math.PI / 2, 0, 0]}>
-            <planeGeometry args={[width, depth]} />
-            <meshBasicMaterial color={clearance.kind === 'heat' ? '#df7657' : '#5f9c91'} transparent opacity={.17} side={THREE.DoubleSide} depthWrite={false} />
-          </mesh>
-        )
+    <group position={[toWorld(zone.xMm), 0, toWorld(zone.yMm)]} rotation={[0, -THREE.MathUtils.degToRad(zone.rotationDeg), 0]}>
+      <mesh position={[width / 2, .018, frontOffset + depth / 2]} rotation={[-Math.PI / 2, 0, 0]} raycast={() => null}>
+        <planeGeometry args={[width, depth]} />
+        <meshBasicMaterial color={zone.fill} transparent opacity={.28} side={THREE.DoubleSide} depthWrite={false} />
+      </mesh>
+      <Line points={border} color={zone.outline} lineWidth={2.4} transparent opacity={.98} raycast={() => null} />
+      {Array.from({ length: hatchCount }, (_, index) => {
+        const x = (index + .5) * width / hatchCount
+        const half = Math.min(.16, depth * .22)
+        return <Line key={index} points={[[x - half, .027, frontOffset + depth * .32], [x + half, .027, frontOffset + depth * .68]]} color={zone.hatch} lineWidth={1.1} transparent opacity={.7} raycast={() => null} />
       })}
-      {architecture.openings.filter((opening) => opening.kind === 'door' && opening.swingDepthMm).map((opening) => {
-        const radius = toWorld(opening.swingDepthMm!)
-        const x = opening.wall === 'right' ? toWorld(architecture.widthMm) : opening.wall === 'left' ? 0 : toWorld(opening.offsetMm)
-        const z = opening.wall === 'bottom' ? toWorld(architecture.depthMm) : opening.wall === 'top' ? 0 : toWorld(opening.offsetMm)
-        return <mesh key={opening.id} position={[x, .022, z]} rotation={[-Math.PI / 2, 0, 0]}><ringGeometry args={[radius - .025, radius, 36, 1, 0, Math.PI / 2]} /><meshBasicMaterial color="#5d8178" transparent opacity={.7} side={THREE.DoubleSide} /></mesh>
-      })}
-      {items.filter((item) => item.category === 'cold' && /fridge|freezer/i.test(item.label)).map((item) => {
-        const radius = toWorld(Math.min(item.widthMm, item.clearance?.frontMm ?? item.depthMm))
-        return <mesh key={`swing-${item.id}`} position={[toWorld(item.xMm), .025, toWorld(item.yMm + item.depthMm)]} rotation={[-Math.PI / 2, 0, -THREE.MathUtils.degToRad(item.rotationDeg)]}><ringGeometry args={[Math.max(0, radius - .025), radius, 32, 1, 0, Math.PI / 2]} /><meshBasicMaterial color="#4e8e98" transparent opacity={.65} side={THREE.DoubleSide} /></mesh>
-      })}
+      <Html position={[width / 2, .045, frontOffset + depth / 2]} center distanceFactor={8} className={`clearance-label ${zone.kind}`}>
+        <span>{zone.label}</span>
+      </Html>
     </group>
   )
+}
+
+function ArcClearance({ zone }: { zone: ArcClearanceDescriptor }) {
+  const radius = toWorld(zone.radiusMm)
+  return (
+    <group position={[toWorld(zone.xMm), 0, toWorld(zone.yMm)]} rotation={[0, -THREE.MathUtils.degToRad(zone.rotationDeg), 0]}>
+      <mesh position={[0, .02, 0]} rotation={[-Math.PI / 2, 0, 0]} raycast={() => null}>
+        <circleGeometry args={[radius, 36, 0, Math.PI / 2]} />
+        <meshBasicMaterial color={zone.fill} transparent opacity={.18} side={THREE.DoubleSide} depthWrite={false} />
+      </mesh>
+      <mesh position={[0, .029, 0]} rotation={[-Math.PI / 2, 0, 0]} raycast={() => null}>
+        <ringGeometry args={[Math.max(0, radius - .022), radius, 36, 1, 0, Math.PI / 2]} />
+        <meshBasicMaterial color={zone.outline} transparent opacity={.98} side={THREE.DoubleSide} depthWrite={false} />
+      </mesh>
+      <Line points={[[0, .03, 0], [radius, .03, 0]]} color={zone.outline} lineWidth={2} raycast={() => null} />
+      <Line points={[[0, .03, 0], [0, .03, radius]]} color={zone.outline} lineWidth={2} raycast={() => null} />
+      <mesh position={[0, .04, 0]} raycast={() => null}><cylinderGeometry args={[.045, .045, .035, 16]} /><meshBasicMaterial color={zone.outline} /></mesh>
+      <Html position={[radius * .58, .06, radius * .58]} center distanceFactor={8} className="clearance-label door-swing"><span>{zone.label}</span></Html>
+    </group>
+  )
+}
+
+export function Clearances({ items, architecture, displayUnit, visible }: { items: EquipmentItem[]; architecture: Architecture; displayUnit: DisplayUnit; visible: boolean }) {
+  if (!visible) return null
+  return <group>{buildClearanceDescriptors(items, architecture, displayUnit).map((zone) => zone.shape === 'rect' ? <RectClearance key={zone.id} zone={zone} /> : <ArcClearance key={zone.id} zone={zone} />)}</group>
 }
