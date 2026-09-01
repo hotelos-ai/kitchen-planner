@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { createSeedProject } from '../domain/seed-project'
-import { exportProject, importProject, loadProject, saveProject } from './persistence'
+import { CURRENT_PROJECT_KEY, exportProject, importProject, loadProject, saveProject } from './persistence'
 
 function memoryStorage(initial: Record<string, string> = {}): Storage {
   const values = new Map(Object.entries(initial))
@@ -49,5 +49,52 @@ describe('project persistence', () => {
     expect(migrated.schemaVersion).toBe(1)
     expect(migrated.architecture.wallHeightMm).toBe(2800)
     expect(() => importProject('{"schemaVersion":99}')).toThrow(/unsupported future schema version 99/i)
+  })
+
+  it('restores presentation presets in schema-valid projects saved before equipment skins existed', () => {
+    const legacyPresentation = createSeedProject()
+    legacyPresentation.variants.forEach((variant) => variant.equipment.forEach((item) => {
+      delete item.visualPreset
+      delete item.configurationPreset
+    }))
+    legacyPresentation.variants[0].equipment.find((item) => item.id === 'tandoor')!.xMm = 2150
+    const storage = memoryStorage({ [CURRENT_PROJECT_KEY]: JSON.stringify(legacyPresentation) })
+
+    const loaded = loadProject(storage)
+
+    expect(loaded.variants[0].equipment.find((item) => item.id === 'tandoor')).toMatchObject({
+      xMm: 2150,
+      visualPreset: 'tandoor',
+      configurationPreset: 'hot-tandoor',
+    })
+    expect(new Set(loaded.variants[0].equipment.map((item) => item.visualPreset)).size).toBeGreaterThan(8)
+  })
+
+  it('preserves explicit visual and configuration presets', () => {
+    const project = createSeedProject()
+    const item = project.variants[0].equipment[0]
+    item.visualPreset = 'custom-studio-model'
+    item.configurationPreset = 'custom-family-model'
+
+    expect(importProject(JSON.stringify(project)).variants[0].equipment[0]).toMatchObject({
+      visualPreset: 'custom-studio-model',
+      configurationPreset: 'custom-family-model',
+    })
+  })
+
+  it('uses the generic visual for unknown custom legacy equipment', () => {
+    const project = createSeedProject()
+    const custom = project.variants[0].equipment[0]
+    Object.assign(custom, {
+      id: 'custom-unknown',
+      category: 'custom',
+      capabilities: [],
+      visualPreset: undefined,
+      configurationPreset: undefined,
+    })
+
+    expect(importProject(JSON.stringify(project)).variants[0].equipment[0]).toMatchObject({
+      visualPreset: 'generic',
+    })
   })
 })

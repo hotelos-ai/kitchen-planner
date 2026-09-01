@@ -1,4 +1,5 @@
 import type { KitchenProject } from '../domain/project'
+import { EQUIPMENT_CONFIGURATIONS, inferEquipmentConfiguration } from '../domain/equipment-configurations'
 import { projectSchema } from '../domain/project-schema'
 import { createSeedProject } from '../domain/seed-project'
 
@@ -21,7 +22,20 @@ function migrate(value: unknown): unknown {
 
 function validated(value: unknown): KitchenProject | null {
   const result = projectSchema.safeParse(migrate(value))
-  return result.success ? result.data : null
+  return result.success ? hydrateEquipmentPresentation(result.data) : null
+}
+
+export function hydrateEquipmentPresentation(project: KitchenProject): KitchenProject {
+  const hydrated = structuredClone(project)
+  hydrated.variants.forEach((variant) => variant.equipment.forEach((item) => {
+    const inferred = inferEquipmentConfiguration(item)
+    const configuration = inferred
+      ? EQUIPMENT_CONFIGURATIONS.find((value) => value.id === inferred)
+      : undefined
+    item.configurationPreset ??= inferred
+    item.visualPreset ??= configuration?.visualPreset ?? 'generic'
+  }))
+  return hydrated
 }
 
 function parseStored(value: string | null): KitchenProject | null {
@@ -64,7 +78,7 @@ export function importProject(json: string): KitchenProject {
     const version = (candidate as Record<string, unknown>).schemaVersion
     if (typeof version === 'number' && version > 1) throw new Error(`Unsupported future schema version ${version}`)
   }
-  const parsed = projectSchema.safeParse(migrate(candidate))
-  if (!parsed.success) throw new Error('Import is not a valid kitchen project')
-  return parsed.data
+  const project = validated(candidate)
+  if (!project) throw new Error('Import is not a valid kitchen project')
+  return project
 }
