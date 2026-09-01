@@ -10,6 +10,7 @@ import { WalkControlsGuide } from '../scene/walk/WalkControlsGuide'
 import { WalkScene } from '../scene/walk/WalkScene'
 import { CompletedOrderFlow3D } from './CompletedOrderFlow3D'
 import { LiveSimulationOverlays } from './LiveSimulationOverlays'
+import { SimulationSpatialOverlays3D } from './SimulationSpatialOverlays3D'
 import type { SimulationView } from './SimulationViewSwitcher'
 
 type LiveState = ReturnType<typeof deriveLiveServiceState>
@@ -54,6 +55,7 @@ export function SimulationThreeScene({ view, project, variant, result, liveState
     {contextLost ? <div role="alert" className="scene-context-message"><strong>Live 3D rendering paused</strong><p>The browser interrupted the graphics context. Restart it without losing this service run or playback position.</p><button type="button" onClick={restartRenderer}>Restart live 3D</button></div> : <SimulationSceneBoundary key={rendererKey}>
       <SceneCanvas architecture={project.architecture} cameraMode="perspective" fitSignal={0} walkMode={walkMode} onContextLost={() => setContextLost(true)} onContextRestored={() => setContextLost(false)}>
         <KitchenScene project={project} variant={variant} selectedIds={[]} showClearances={layers.clearances} wallsTransparent onSelect={() => undefined} onClearSelection={() => undefined} />
+        <SimulationSpatialOverlays3D result={result} liveState={liveState} elapsedSeconds={elapsedSeconds} equipment={variant.equipment} layers={layers} followRole={followRole} />
         <SimulatedStaff frames={result.frames} elapsedSeconds={elapsedSeconds} followRole={followRole} reducedMotion={Boolean(reducedMotion)} />
         <CompletedOrderFlow3D architecture={project.architecture} liveState={liveState} elapsedSeconds={elapsedSeconds} />
         <WalkScene active={walkMode} architecture={project.architecture} equipment={variant.equipment} staff={poses} reducedMotion={Boolean(reducedMotion)} onLockedChange={setWalkLocked} onNearbyChange={setWalkNearby} onPositionChange={setPlayerPosition} />
