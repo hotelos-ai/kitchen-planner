@@ -1,8 +1,8 @@
-import { BoxPart, DARK_STEEL, Handle, STEEL, TubularLeg } from './parts'
+import { BoxPart, DARK_STEEL, Handle, KitchenSurfaceMaterial, STEEL, TubularLeg } from './parts'
 import type { EquipmentVisualProps } from './types'
 
 function Faucet({ x = 0, height, z }: { x?: number; height: number; z: number }) {
-  return <group position={[x, height, z]}><mesh><cylinderGeometry args={[.014, .014, .22, 10]} /><meshStandardMaterial color={DARK_STEEL} metalness={.75} /></mesh><mesh position={[0, .1, .07]} rotation={[Math.PI / 2, 0, 0]}><torusGeometry args={[.07, .014, 8, 18, Math.PI]} /><meshStandardMaterial color={DARK_STEEL} metalness={.75} /></mesh></group>
+  return <group position={[x, height, z]}><mesh><cylinderGeometry args={[.014, .014, .22, 12]} /><KitchenSurfaceMaterial material="brushedSteel" /></mesh><mesh position={[0, .1, .07]} rotation={[Math.PI / 2, 0, 0]}><torusGeometry args={[.07, .014, 10, 24, Math.PI]} /><KitchenSurfaceMaterial material="brushedSteel" /></mesh></group>
 }
 
 function SinkBase({ w, d, h, basins }: { w: number; d: number; h: number; basins: number }) {
@@ -21,6 +21,11 @@ export function DoubleSinkVisual({ widthM: w, depthM: d, heightM: h }: Equipment
   return <group><SinkBase w={w} d={d} h={h} basins={2} /><Faucet height={h * 1.08} z={-d * .32} /></group>
 }
 DoubleSinkVisual.displayName = 'DoubleSinkVisual'
+
+export function SingleSinkVisual({ widthM: w, depthM: d, heightM: h }: EquipmentVisualProps) {
+  return <group><SinkBase w={w} d={d} h={h} basins={1} /><Faucet height={h * 1.08} z={-d * .32} /></group>
+}
+SingleSinkVisual.displayName = 'SingleSinkVisual'
 
 export function HandwashVisual({ widthM: w, depthM: d, heightM: h }: EquipmentVisualProps) {
   return <group><SinkBase w={w} d={d} h={h} basins={1} /><Faucet height={h * 1.08} z={-d * .28} /></group>
@@ -43,3 +48,19 @@ export function DishwasherVisual({ widthM: w, depthM: d, heightM: h }: Equipment
   </group>
 }
 DishwasherVisual.displayName = 'DishwasherVisual'
+
+export function PassThroughDishwasherVisual({ widthM: w, depthM: d, heightM: h }: EquipmentVisualProps) {
+  return <group>
+    <BoxPart position={[0, h * .22, 0]} size={[w, h * .44, d]} material="brushedSteel" />
+    <BoxPart position={[0, h * .68, -d * .38]} size={[w * .9, h * .72, d * .22]} color="#aeb9b6" radius={.012} />
+    <BoxPart position={[0, h * .62, d / 2 + .028]} size={[w * .88, h * .48, .045]} material="darkSteel" radius={.012} />
+    <BoxPart position={[0, h * .62, d / 2 + .058]} size={[w * .72, h * .34, .018]} material="glass" radius={.008} />
+    <Handle x={0} y={h * .86} z={d / 2 + .082} vertical={false} length={w * .62} />
+    <BoxPart position={[0, h * .43, 0]} size={[w * .94, .055, d * .9]} material="darkSteel" radius={.006} />
+    <group position={[0, h * .47, 0]}>{Array.from({ length: 8 }, (_, index) => <mesh key={index} position={[-w * .38 + index * w * .108, 0, 0]}><boxGeometry args={[.012, .055, d * .72]} /><KitchenSurfaceMaterial material="brushedSteel" /></mesh>)}</group>
+    <BoxPart position={[0, h * .31, d / 2 + .035]} size={[w * .9, h * .12, .055]} material="blackEnamel" radius={.008} />
+    <mesh position={[w * .31, h * .31, d / 2 + .068]}><circleGeometry args={[.027, 18]} /><meshStandardMaterial color="#65b7a9" emissive="#65b7a9" emissiveIntensity={.7} /></mesh>
+    {[-.41, .41].map((x) => <mesh key={x} position={[w * x, h * .73, d * .3]}><cylinderGeometry args={[.016, .016, h * .55, 12]} /><KitchenSurfaceMaterial material="darkSteel" /></mesh>)}
+  </group>
+}
+PassThroughDishwasherVisual.displayName = 'PassThroughDishwasherVisual'
