@@ -1,4 +1,4 @@
-import { Grid } from '@react-three/drei'
+import { Environment, Grid, Lightformer } from '@react-three/drei'
 import type { KitchenProject, LayoutVariant } from '../../domain/project'
 import { ArchitectureMesh } from './ArchitectureMesh'
 import { Clearances } from './Clearances'
@@ -18,9 +18,13 @@ export function KitchenScene({ project, variant, selectedIds, showClearances, wa
   return (
     <>
       <color attach="background" args={['#e8e4da']} />
-      <hemisphereLight args={['#fffaf0', '#69736e', 1.65]} />
-      <ambientLight intensity={.72} />
-      <directionalLight position={[3, 8, 4]} intensity={2.15} castShadow shadow-mapSize={[512, 512]} shadow-camera-near={1} shadow-camera-far={18} shadow-camera-left={-7} shadow-camera-right={7} shadow-camera-top={7} shadow-camera-bottom={-7} />
+      <hemisphereLight args={['#fffaf0', '#69736e', .86]} />
+      <ambientLight intensity={.34} />
+      <directionalLight position={[3, 8, 4]} color="#fff1d4" intensity={2.45} castShadow shadow-mapSize={[1024, 1024]} shadow-camera-near={1} shadow-camera-far={18} shadow-camera-left={-7} shadow-camera-right={7} shadow-camera-top={7} shadow-camera-bottom={-7} />
+      <Environment resolution={64}>
+        <Lightformer form="rect" color="#fff6df" intensity={2.8} position={[0, 5, -4]} scale={[8, 2, 1]} />
+        <Lightformer form="rect" color="#b7d5d0" intensity={1.35} position={[-4, 2.5, 3]} rotation={[0, Math.PI / 2, 0]} scale={[5, 1.5, 1]} />
+      </Environment>
       <group onPointerMissed={onClearSelection}>
         <ArchitectureMesh architecture={project.architecture} wallsTransparent={wallsTransparent} />
         {variant.equipment.map((item) => <EquipmentMesh key={item.id} item={item} selected={selectedIds.includes(item.id)} wallHeightMm={project.architecture.wallHeightMm} onSelect={onSelect} />)}
