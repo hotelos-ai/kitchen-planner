@@ -40,6 +40,7 @@ const equipmentSchema = z.object({
   clearance: clearanceSchema.optional(),
   approximate: z.boolean().optional(),
   notes: z.string().optional(),
+  visualPreset: z.string().min(1).optional(),
 }).strict()
 
 const variantSchema = z.object({

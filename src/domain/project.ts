@@ -94,6 +94,7 @@ export interface EquipmentItem {
   clearance?: ClearanceSpec
   approximate?: boolean
   notes?: string
+  visualPreset?: string
 }
 
 export interface LayoutVariant {
