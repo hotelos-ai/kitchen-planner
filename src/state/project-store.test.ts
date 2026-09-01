@@ -3,6 +3,24 @@ import { createSeedProject } from '../domain/seed-project'
 import { createProjectStore, getActiveItem, getVariantItem } from './project-store'
 
 describe('project store', () => {
+  it('routes UI actions and direct commands through identical semantics', () => {
+    const uiStore = createProjectStore(createSeedProject())
+    const toolStore = createProjectStore(createSeedProject())
+    uiStore.getState().moveItems(['tandoor'], { x: 2300, y: 900 })
+    const result = toolStore.getState().executeCommand({ type: 'move-items', ids: ['tandoor'], anchor: { x: 2300, y: 900 } })
+    expect(result.ok).toBe(true)
+    expect(toolStore.getState().project).toEqual(uiStore.getState().project)
+    expect(toolStore.getState().revision).toBe(1)
+  })
+
+  it('does not change state for a dry run', () => {
+    const store = createProjectStore(createSeedProject())
+    const before = store.getState().project
+    const result = store.getState().executeCommand({ type: 'remove-items', ids: ['tandoor'] }, { dryRun: true })
+    expect(result).toMatchObject({ ok: true, dryRun: true, revision: 0 })
+    expect(store.getState().project).toBe(before)
+  })
+
   it('moves selected equipment on the metric grid and supports undo and redo', () => {
     const store = createProjectStore(createSeedProject())
     store.getState().selectItems(['tandoor'])

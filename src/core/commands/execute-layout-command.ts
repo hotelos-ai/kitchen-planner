@@ -109,7 +109,10 @@ export function executeLayoutCommand<TProject, TItem extends SpatialItem, TScena
         if (!requireItems([value.id]) || !variant) return fail('missing-item', `Item ${value.id} does not exist.`)
         if (variant.items.some((item) => item.id === value.duplicateId)) return fail('invalid-command', `Item ${value.duplicateId} already exists.`)
         const source = variant.items.find((item) => item.id === value.id)!
-        variant.items.push({ ...structuredClone(source), id: value.duplicateId, label: `${source.label} copy`, xMm: source.xMm + project.snapMm, yMm: source.yMm + project.snapMm })
+        const candidate = { ...structuredClone(source), ...value.patch, id: value.duplicateId, label: `${source.label} copy`, xMm: source.xMm + project.snapMm, yMm: source.yMm + project.snapMm }
+        const validated = input.adapter.validateItem(candidate)
+        if (!validated.success) return { ok: false, code: 'invalid-command', message: `Duplicate ${value.duplicateId} is invalid.`, revision: input.envelope.revision, issues: validated.issues }
+        variant.items.push(validated.data)
         changedIds.push(value.duplicateId)
         break
       }

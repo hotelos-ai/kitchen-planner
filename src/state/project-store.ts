@@ -1,6 +1,7 @@
 import { useStore } from 'zustand'
 import { createStore, type StoreApi } from 'zustand/vanilla'
-import { normalizeRotation, snapMm } from '../domain/geometry'
+import type { CommandResult } from '../core/commands/execute-layout-command'
+import { executeLayoutCommand } from '../core/commands/execute-layout-command'
 import type {
   DisplayUnit,
   EquipmentItem,
@@ -10,6 +11,7 @@ import type {
   SimulationScenario,
 } from '../domain/project'
 import { createSeedProject } from '../domain/seed-project'
+import { kitchenSpatialAdapter } from '../domain/spatial-adapter'
 import { appendHistory } from './history'
 import { loadProject, saveProject } from './persistence'
 
@@ -24,9 +26,11 @@ type ResizeInput = Pick<EquipmentItem, 'widthMm' | 'depthMm'>
 
 export interface ProjectState {
   project: KitchenProject
+  revision: number
   selectedIds: string[]
   past: KitchenProject[]
   future: KitchenProject[]
+  executeCommand(command: unknown, options?: { dryRun?: boolean; expectedRevision?: number }): CommandResult<KitchenProject>
   selectItems(ids: string[]): void
   toggleItemSelection(id: string): void
   clearSelection(): void
@@ -73,33 +77,43 @@ export function getActiveItem(state: ProjectState, itemId: string): EquipmentIte
   return getVariantItem(state, state.project.activeVariantId, itemId)
 }
 
-const mutateActiveVariant = (
-  project: KitchenProject,
-  mutation: (variant: LayoutVariant) => void,
-): KitchenProject => {
-  const next = structuredClone(project)
-  const active = next.variants.find((variant) => variant.id === next.activeVariantId)
-  if (!active) throw new Error(`Missing active variant: ${next.activeVariantId}`)
-  mutation(active)
-  active.updatedAt = new Date().toISOString()
-  return next
-}
-
 export function createProjectStore(initialProject: KitchenProject): ProjectStore {
   return createStore<ProjectState>()((set, get) => {
     const commitProject = (mutation: (project: KitchenProject) => KitchenProject) => {
       set((state) => ({
         project: mutation(state.project),
+        revision: state.revision + 1,
         past: appendHistory(state.past, state.project),
         future: [],
       }))
     }
 
+    const dispatch = (command: unknown, options: { dryRun?: boolean; expectedRevision?: number } = {}) => {
+      const state = get()
+      const result = executeLayoutCommand({
+        envelope: { project: state.project, revision: state.revision },
+        adapter: kitchenSpatialAdapter,
+        command,
+        ...options,
+      })
+      if (result.ok && !result.dryRun) {
+        set({
+          project: result.project,
+          revision: result.revision,
+          past: appendHistory(state.past, state.project),
+          future: [],
+        })
+      }
+      return result
+    }
+
     return {
       project: structuredClone(initialProject),
+      revision: 0,
       selectedIds: [],
       past: [],
       future: [],
+      executeCommand: dispatch,
       selectItems: (ids) => set({ selectedIds: [...new Set(ids)] }),
       toggleItemSelection: (id) => set((state) => ({
         selectedIds: state.selectedIds.includes(id)
@@ -107,54 +121,12 @@ export function createProjectStore(initialProject: KitchenProject): ProjectStore
           : [...state.selectedIds, id],
       })),
       clearSelection: () => set({ selectedIds: [] }),
-      moveItems: (ids, point) => {
-        const uniqueIds = [...new Set(ids)]
-        if (!uniqueIds.length) return
-        const state = get()
-        const anchor = getActiveItem(state, uniqueIds[0])
-        const snapped = { x: snapMm(point.x, state.project.snapMm), y: snapMm(point.y, state.project.snapMm) }
-        const delta = { x: snapped.x - anchor.xMm, y: snapped.y - anchor.yMm }
-        commitProject((project) => mutateActiveVariant(project, (variant) => {
-          variant.equipment = variant.equipment.map((item) => uniqueIds.includes(item.id) && item.movable
-            ? { ...item, xMm: snapMm(item.xMm + delta.x, project.snapMm), yMm: snapMm(item.yMm + delta.y, project.snapMm) }
-            : item)
-        }))
-      },
-      nudgeItems: (ids, delta) => {
-        const uniqueIds = [...new Set(ids)]
-        if (!uniqueIds.length) return
-        commitProject((project) => mutateActiveVariant(project, (variant) => {
-          variant.equipment = variant.equipment.map((item) => uniqueIds.includes(item.id) && item.movable
-            ? { ...item, xMm: item.xMm + delta.x, yMm: item.yMm + delta.y }
-            : item)
-        }))
-      },
-      rotateItems: (ids, deltaDeg = 90) => {
-        const uniqueIds = [...new Set(ids)]
-        if (!uniqueIds.length) return
-        commitProject((project) => mutateActiveVariant(project, (variant) => {
-          variant.equipment = variant.equipment.map((item) => uniqueIds.includes(item.id) && item.movable
-            ? { ...item, rotationDeg: normalizeRotation(item.rotationDeg + deltaDeg) }
-            : item)
-        }))
-      },
-      resizeItem: (id, size) => {
-        const item = getActiveItem(get(), id)
-        if (item.dimensionsLocked || size.widthMm <= 0 || size.depthMm <= 0) return
-        commitProject((project) => mutateActiveVariant(project, (variant) => {
-          variant.equipment = variant.equipment.map((value) => value.id === id ? { ...value, ...size } : value)
-        }))
-      },
-      setDimensionsLocked: (id, locked) => {
-        commitProject((project) => mutateActiveVariant(project, (variant) => {
-          variant.equipment = variant.equipment.map((item) => item.id === id ? { ...item, dimensionsLocked: locked } : item)
-        }))
-      },
-      updateItem: (id, patch) => {
-        commitProject((project) => mutateActiveVariant(project, (variant) => {
-          variant.equipment = variant.equipment.map((item) => item.id === id ? { ...item, ...patch, id: item.id } : item)
-        }))
-      },
+      moveItems: (ids, point) => { if (ids.length) dispatch({ type: 'move-items', ids, anchor: point }) },
+      nudgeItems: (ids, delta) => { if (ids.length) dispatch({ type: 'nudge-items', ids, delta }) },
+      rotateItems: (ids, deltaDeg = 90) => { if (ids.length) dispatch({ type: 'rotate-items', ids, deltaDeg }) },
+      resizeItem: (id, size) => { dispatch({ type: 'resize-item', id, ...size }) },
+      setDimensionsLocked: (id, locked) => { dispatch({ type: 'set-dimensions-locked', id, locked }) },
+      updateItem: (id, patch) => { dispatch({ type: 'update-item', id, patch }) },
       addCustomItem: (input) => {
         const id = makeId('custom')
         const item: EquipmentItem = {
@@ -172,89 +144,55 @@ export function createProjectStore(initialProject: KitchenProject): ProjectStore
           removable: true,
           capabilities: [],
         }
-        commitProject((project) => mutateActiveVariant(project, (variant) => { variant.equipment.push(item) }))
-        set({ selectedIds: [id] })
+        const result = dispatch({ type: 'add-item', item })
+        if (result.ok) set({ selectedIds: [id] })
         return id
       },
       duplicateItem: (id) => {
         const source = getActiveItem(get(), id)
         const duplicateId = makeId(source.category)
-        const duplicate: EquipmentItem = {
-          ...structuredClone(source),
-          id: duplicateId,
-          label: `${source.label} copy`,
-          xMm: source.xMm + get().project.snapMm,
-          yMm: source.yMm + get().project.snapMm,
-          approximate: false,
+        const result = dispatch({ type: 'duplicate-item', id, duplicateId, patch: { approximate: false } })
+        if (result.ok) {
+          set({ selectedIds: [duplicateId] })
         }
-        commitProject((project) => mutateActiveVariant(project, (variant) => { variant.equipment.push(duplicate) }))
-        set({ selectedIds: [duplicateId] })
         return duplicateId
       },
       removeItems: (ids) => {
-        const uniqueIds = [...new Set(ids)]
-        if (!uniqueIds.some((id) => getActiveItem(get(), id).removable)) return
-        commitProject((project) => mutateActiveVariant(project, (variant) => {
-          variant.equipment = variant.equipment.filter((item) => !uniqueIds.includes(item.id) || !item.removable)
-        }))
-        set((state) => ({ selectedIds: state.selectedIds.filter((id) => !uniqueIds.includes(id)) }))
+        const result = ids.length ? dispatch({ type: 'remove-items', ids }) : null
+        if (result?.ok) set((state) => ({ selectedIds: state.selectedIds.filter((id) => !ids.includes(id)) }))
       },
-      setDisplayUnit: (unit) => commitProject((project) => ({ ...project, displayUnit: unit })),
-      setSnapMm: (intervalMm) => {
-        if (!Number.isFinite(intervalMm) || intervalMm <= 0) return
-        commitProject((project) => ({ ...project, snapMm: intervalMm }))
-      },
-      setArchitectureLocked: (locked) => commitProject((project) => ({
-        ...project,
-        architecture: { ...project.architecture, locked },
-      })),
+      setDisplayUnit: (unit) => { dispatch({ type: 'set-display-unit', unit }) },
+      setSnapMm: (intervalMm) => { dispatch({ type: 'set-snap', intervalMm }) },
+      setArchitectureLocked: (locked) => { dispatch({ type: 'set-architecture-lock', locked }) },
       createVariant: (name) => {
-        const state = get()
-        const parent = getActiveVariant(state)
         const id = makeId('variant')
         const now = new Date().toISOString()
-        const variant: LayoutVariant = {
-          ...structuredClone(parent),
-          id,
-          name: name.trim() || 'Untitled layout',
-          parentId: parent.id,
-          createdAt: now,
-          updatedAt: now,
-        }
-        commitProject((project) => ({ ...project, variants: [...project.variants, variant] }))
+        dispatch({ type: 'create-variant', id, name: name.trim() || 'Untitled layout', now })
         return id
       },
       activateVariant: (id) => {
-        if (!get().project.variants.some((variant) => variant.id === id)) return
-        set((state) => ({ project: { ...state.project, activeVariantId: id }, selectedIds: [] }))
+        const result = dispatch({ type: 'activate-variant', id })
+        if (result.ok) set({ selectedIds: [] })
       },
-      renameVariant: (id, name) => commitProject((project) => ({
-        ...project,
-        variants: project.variants.map((variant) => variant.id === id ? { ...variant, name: name.trim() || variant.name } : variant),
-      })),
+      renameVariant: (id, name) => { dispatch({ type: 'rename-variant', id, name: name.trim() || get().project.variants.find((variant) => variant.id === id)?.name || 'Untitled layout' }) },
       deleteVariant: (id) => {
-        const state = get()
-        if (state.project.variants.length <= 1 || !state.project.variants.some((variant) => variant.id === id)) return
-        commitProject((project) => {
-          const variants = project.variants.filter((variant) => variant.id !== id)
-          return { ...project, variants, activeVariantId: project.activeVariantId === id ? variants[0].id : project.activeVariantId }
-        })
-        set({ selectedIds: [] })
+        const result = dispatch({ type: 'remove-variant', id })
+        if (result.ok) set({ selectedIds: [] })
       },
       updateScenario: (id, patch) => commitProject((project) => ({
         ...project,
         scenarios: project.scenarios.map((scenario) => scenario.id === id ? { ...scenario, ...patch, id: scenario.id } : scenario),
       })),
-      replaceProject: (project) => set({ project: structuredClone(project), selectedIds: [], past: [], future: [] }),
+      replaceProject: (project) => set({ project: structuredClone(project), revision: 0, selectedIds: [], past: [], future: [] }),
       undo: () => set((state) => {
         const previous = state.past.at(-1)
         if (!previous) return state
-        return { project: previous, past: state.past.slice(0, -1), future: [state.project, ...state.future] }
+        return { project: previous, revision: state.revision + 1, past: state.past.slice(0, -1), future: [state.project, ...state.future] }
       }),
       redo: () => set((state) => {
         const next = state.future[0]
         if (!next) return state
-        return { project: next, past: appendHistory(state.past, state.project), future: state.future.slice(1) }
+        return { project: next, revision: state.revision + 1, past: appendHistory(state.past, state.project), future: state.future.slice(1) }
       }),
     }
   })
