@@ -40,6 +40,18 @@ describe('project schema', () => {
     expect(projectSchema.safeParse(validProject).success).toBe(true)
   })
 
+  it('accepts a nonempty equipment configuration identifier', () => {
+    const configured = structuredClone(validProject)
+    Object.assign(configured.variants[0].equipment[0], { configurationPreset: 'hot-tandoor' })
+    expect(projectSchema.safeParse(configured).success).toBe(true)
+  })
+
+  it('rejects an empty equipment configuration identifier', () => {
+    const configured = structuredClone(validProject)
+    Object.assign(configured.variants[0].equipment[0], { configurationPreset: '' })
+    expect(projectSchema.safeParse(configured).success).toBe(false)
+  })
+
   it('rejects an imported item with a negative width', () => {
     const invalid = structuredClone(validProject)
     invalid.variants[0].equipment[0].widthMm = -1

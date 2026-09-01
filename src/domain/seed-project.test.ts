@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { CONFIGURATION_BY_SEED_ID } from './equipment-configurations'
 import { projectSchema } from './project-schema'
 import { createSeedProject } from './seed-project'
 
@@ -23,6 +24,12 @@ describe('Manta Raja seed project', () => {
       'prep-fridge-counter', 'mixer', 'working-table', 'double-sink', 'two-door-fridge',
       'dirty-landing', 'pre-rinse-sink', 'dishwasher', 'clean-landing', 'handwash', 'hot-line-hood',
     ]))
+  })
+
+  it('seeds complete visual and configuration metadata', () => {
+    const items = createSeedProject().variants[0].equipment
+    expect(items.every((item) => Boolean(item.visualPreset && item.configurationPreset))).toBe(true)
+    expect(Object.fromEntries(items.map((item) => [item.id, item.configurationPreset]))).toEqual(CONFIGURATION_BY_SEED_ID)
   })
 
   it('provides a valid five-person 50-cover default service', () => {

@@ -4,6 +4,7 @@ import type {
   KitchenProject,
   StationCapability,
 } from './project'
+import { CONFIGURATION_BY_SEED_ID } from './equipment-configurations'
 
 const CREATED_AT = '2026-08-31T00:00:00.000Z'
 
@@ -15,6 +16,7 @@ type EquipmentOptions = {
   clearanceFrontMm?: number
   notes?: string
   visualPreset?: string
+  configurationPreset?: string
 }
 
 function equipment(
@@ -44,6 +46,7 @@ function equipment(
     approximate: options.approximate,
     notes: options.notes,
     visualPreset: options.visualPreset,
+    configurationPreset: options.configurationPreset ?? CONFIGURATION_BY_SEED_ID[id],
     clearance: options.clearanceFrontMm === undefined ? undefined : {
       frontMm: options.clearanceFrontMm,
       kind: category === 'cooking' ? 'heat' : 'work',

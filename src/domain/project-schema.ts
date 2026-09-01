@@ -41,6 +41,7 @@ const equipmentSchema = z.object({
   approximate: z.boolean().optional(),
   notes: z.string().optional(),
   visualPreset: z.string().min(1).optional(),
+  configurationPreset: z.string().min(1).optional(),
 }).strict()
 
 const variantSchema = z.object({

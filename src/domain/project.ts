@@ -95,6 +95,7 @@ export interface EquipmentItem {
   approximate?: boolean
   notes?: string
   visualPreset?: string
+  configurationPreset?: string
 }
 
 export interface LayoutVariant {
