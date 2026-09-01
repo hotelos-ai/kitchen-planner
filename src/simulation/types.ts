@@ -44,8 +44,31 @@ export type SimulationEvent =
   | { type: 'dirty-clean-crossing' }
   | { type: 'unreachable'; taskId: string }
   | { type: 'path-metric'; kind: 'finish-to-pass' | 'dirty-to-wash'; distanceMm: number }
-  | { type: 'order-completed'; orderId: string; durationSeconds: number }
+  | { type: 'order-arrived'; orderId: string; atSeconds: number }
+  | { type: 'order-completed'; orderId: string; arrivedAtSeconds: number; completedAtSeconds: number; durationSeconds: number }
   | { type: 'traffic'; xMm: number; yMm: number; visits: number }
+
+export interface TaskTimelineEntry {
+  taskId: string
+  orderId?: string
+  dishBatchId?: string
+  stationId: string
+  capability: StationCapability
+  agentId: string
+  eligibleAtSeconds: number
+  travelStartSeconds: number
+  arrivedAtSeconds: number
+  workStartSeconds: number
+  workEndSeconds: number
+  queueSeconds: number
+}
+
+export interface OrderTimeline {
+  id: string
+  arrivedAtSeconds: number
+  completedAtSeconds?: number
+  stages: readonly TaskTimelineEntry[]
+}
 
 export interface SimulationMetrics {
   totalTravelMm: number
@@ -62,8 +85,16 @@ export interface SimulationMetrics {
   finishToPassTravelMm: number
   dirtyToWashTravelMm: number
   completedOrders: number
+  totalOrders: number
+  unfinishedOrders: number
+  averageOrderWaitSeconds: number
   orderCompletionP50Seconds: number
   orderCompletionP90Seconds: number
+  ordersWithin15MinutesPct: number
+  ordersWithin20MinutesPct: number
+  peakOrderBacklog: number
+  throughputPerHour: number
+  orderWaitSamplesSeconds: readonly number[]
   trafficCells: readonly { xMm: number; yMm: number; visits: number }[]
 }
 
@@ -72,6 +103,8 @@ export interface SimulationResult {
   durationSeconds: number
   frames: readonly SimulationFrame[]
   events: readonly SimulationEvent[]
+  taskTimeline: readonly TaskTimelineEntry[]
+  orders: readonly OrderTimeline[]
   metrics: SimulationMetrics
   warnings: readonly string[]
 }

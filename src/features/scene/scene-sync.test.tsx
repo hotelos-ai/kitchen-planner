@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, it } from 'vitest'
 import type { EquipmentItem } from '../../domain/project'
 import { createSeedProject } from '../../domain/seed-project'
 import { projectStore } from '../../state/project-store'
-import { SceneWorkspace } from './SceneWorkspace'
+import { SceneWorkspace, type SceneRendererProps } from './SceneWorkspace'
 import { buildWallSegments } from './ArchitectureMesh'
 
 describe('3D scene synchronization', () => {
@@ -40,5 +40,34 @@ describe('3D scene synchronization', () => {
 
     expect(crosses('y', 0, 2900)).toBe(true)
     expect(crosses('x', 0, 6000)).toBe(false)
+  })
+
+  it('keeps every camera and clearance control wired around the renderer', async () => {
+    const user = userEvent.setup()
+    const FakeRenderer = (props: SceneRendererProps & { cameraMode?: string; fitSignal?: number; showClearances?: boolean }) => (
+      <output data-testid="renderer-state">{props.cameraMode}:{props.fitSignal}:{String(props.showClearances)}</output>
+    )
+
+    render(<SceneWorkspace renderer={FakeRenderer} />)
+    expect(screen.getByTestId('renderer-state')).toHaveTextContent('perspective:0:false')
+    await user.click(screen.getByRole('button', { name: 'Top' }))
+    expect(screen.getByTestId('renderer-state')).toHaveTextContent('top:1:false')
+    await user.click(screen.getByRole('button', { name: 'Fit room' }))
+    expect(screen.getByTestId('renderer-state')).toHaveTextContent('top:2:false')
+    await user.click(screen.getByRole('button', { name: 'Clearances' }))
+    expect(screen.getByTestId('renderer-state')).toHaveTextContent('top:2:true')
+    await user.click(screen.getByRole('button', { name: 'Perspective' }))
+    expect(screen.getByTestId('renderer-state')).toHaveTextContent('perspective:3:true')
+  })
+
+  it('replaces detached labels with a recoverable context-loss message', async () => {
+    const user = userEvent.setup()
+    const FlakyRenderer = (props: SceneRendererProps & { onContextLost?: () => void }) => <button type="button" onClick={props.onContextLost}>Lose WebGL context</button>
+
+    render(<SceneWorkspace renderer={FlakyRenderer} />)
+    await user.click(screen.getByRole('button', { name: 'Lose WebGL context' }))
+    expect(screen.getByRole('alert')).toHaveTextContent(/3D rendering paused/i)
+    await user.click(screen.getByRole('button', { name: /Restart 3D renderer/i }))
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
   })
 })

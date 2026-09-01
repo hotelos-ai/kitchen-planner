@@ -14,10 +14,10 @@ const duration = (scenario: SimulationScenario, capability: StationCapability, r
 }
 
 function stationFor(capability: StationCapability, equipment: readonly EquipmentItem[], stage: string): string {
-  const preferredId = stage === 'pre-rinse' ? 'pre-rinse-sink' : stage === 'dirty-window' || stage === 'dirty-landing' ? 'dirty-landing' : undefined
+  const preferredId = stage === 'pre-rinse' ? 'pre-rinse-sink' : stage === 'dirty-landing' ? 'dirty-landing' : undefined
   const preferred = preferredId && equipment.find((item) => item.id === preferredId)
   if (preferred) return preferred.id
-  const direct = equipment.find((item) => item.capabilities.includes(capability))
+  const direct = equipment.find((item) => item.id === capability && item.capabilities.includes(capability)) ?? equipment.find((item) => item.capabilities.includes(capability))
   if (direct) return direct.id
   if (capability === 'clean-window') return equipment.find((item) => item.capabilities.includes('finish-plate'))?.id ?? ''
   if (capability === 'dirty-window') return equipment.find((item) => item.capabilities.includes('dirty-landing'))?.id ?? ''

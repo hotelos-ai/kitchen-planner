@@ -4,7 +4,7 @@ import { buildFindings } from './recommendations'
 import type { SimulationResult } from './types'
 
 const result = (patch: Partial<ReturnType<typeof emptyMetrics>>): SimulationResult => ({
-  seed: 1, durationSeconds: 3600, frames: [], events: [], warnings: [], metrics: { ...emptyMetrics(), ...patch },
+  seed: 1, durationSeconds: 3600, frames: [], events: [], taskTimeline: [], orders: [], warnings: [], metrics: { ...emptyMetrics(), ...patch },
 })
 
 describe('layout recommendations', () => {

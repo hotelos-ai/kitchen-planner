@@ -42,6 +42,11 @@ test('edits, simulates, compares, exports, and restores Manta Raja', async ({ pa
   await page.getByRole('button', { name: /Run 60-minute service/i }).click()
   await expect(page.getByText(/Total staff travel/i)).toBeVisible()
   await expect(page.getByLabel(/Simulation time/i)).toBeVisible()
+  await expect(page.getByLabel(/Live service status/i)).toContainText(/Live backlog/i)
+  await expect(page.getByText(/Wait-time distribution/i)).toBeVisible()
+  await expect(page.getByText(/Layout verdict/i)).toBeVisible()
+  await page.getByLabel(/Simulation time/i).fill('2000')
+  await expect(page.getByLabel(/Live station queues/i)).toBeVisible()
 
   await page.getByRole('button', { name: /Compare/i }).click()
   await expect(page.getByRole('heading', { name: /Priority findings/i })).toBeVisible()
@@ -55,4 +60,51 @@ test('edits, simulates, compares, exports, and restores Manta Raja', async ({ pa
   expect(exportedPath).toBeTruthy()
   await page.getByLabel(/Import project JSON/i).setInputFiles(exportedPath!)
   await expect(page.getByRole('status')).toContainText(/Imported/i)
+})
+
+test('keeps the full simulation readable at phone width', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 })
+  await page.goto('/')
+  await page.getByRole('button', { name: /Simulate/i }).click()
+  await page.getByRole('button', { name: /Run 60-minute service/i }).click()
+
+  const liveStatus = page.getByLabel(/Live service status/i)
+  await expect(liveStatus).toBeVisible()
+  await expect(liveStatus).toContainText(/Average served wait/i)
+  await expect(page.getByLabel(/Live order tickets/i)).toBeVisible()
+  await expect(page.getByText(/Wait-time distribution/i)).toBeVisible()
+
+  expect(await liveStatus.evaluate((element) => getComputedStyle(element).gridTemplateColumns.split(' ').length)).toBe(3)
+  expect(await page.getByLabel(/Live station queues/i).evaluate((element) => getComputedStyle(element).left)).toBe('10px')
+})
+
+test('keeps every 3D control usable and recovers a lost WebGL context', async ({ page }) => {
+  const pageErrors: string[] = []
+  page.on('pageerror', (error) => pageErrors.push(error.message))
+  await page.goto('/')
+  await page.getByRole('button', { name: '3D', exact: true }).click()
+  await expect(page.getByTestId('kitchen-scene').locator('canvas')).toBeVisible()
+
+  await page.getByRole('button', { name: 'Top', exact: true }).click()
+  await expect(page.getByRole('button', { name: 'Top', exact: true })).toHaveAttribute('aria-pressed', 'true')
+  await page.getByRole('button', { name: 'Perspective', exact: true }).click()
+  await expect(page.getByRole('button', { name: 'Perspective', exact: true })).toHaveAttribute('aria-pressed', 'true')
+  await page.getByRole('button', { name: 'Fit room', exact: true }).click()
+  await page.getByRole('button', { name: 'Clearances', exact: true }).click()
+  await expect(page.getByRole('button', { name: 'Clearances', exact: true })).toHaveAttribute('aria-pressed', 'true')
+  await page.getByRole('button', { name: /Select Tandoor in 3D/i }).click()
+
+  await page.getByTestId('kitchen-scene').locator('canvas').evaluate((node) => {
+    node.dispatchEvent(new Event('webglcontextlost', { bubbles: false, cancelable: true }))
+  })
+  await expect(page.getByRole('alert')).toContainText(/3D rendering paused/i)
+  await page.getByRole('button', { name: /Restart 3D renderer/i }).click()
+  await expect(page.getByRole('alert')).toHaveCount(0)
+  await expect(page.getByTestId('kitchen-scene').locator('canvas')).toBeVisible()
+
+  await page.getByRole('button', { name: 'Split', exact: true }).click()
+  await expect(page.getByLabel(/3D kitchen workspace/i)).toBeVisible()
+  await page.getByRole('button', { name: 'Top', exact: true }).click()
+  await page.getByRole('button', { name: 'Fit room', exact: true }).click()
+  expect(pageErrors).toEqual([])
 })

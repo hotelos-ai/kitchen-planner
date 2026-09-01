@@ -12,13 +12,17 @@ export function emptyMetrics(): SimulationMetrics {
     stationUtilization: {}, queueSeconds: {}, congestionEvents: 0, hotLineCongestionEvents: 0,
     opposingFlowEvents: 0, doorConflictEvents: 0, dirtyCleanCrossings: 0, unreachableTasks: 0,
     finishToPassTravelMm: 0, dirtyToWashTravelMm: 0, completedOrders: 0,
-    orderCompletionP50Seconds: 0, orderCompletionP90Seconds: 0, trafficCells: [],
+    totalOrders: 0, unfinishedOrders: 0, averageOrderWaitSeconds: 0,
+    orderCompletionP50Seconds: 0, orderCompletionP90Seconds: 0,
+    ordersWithin15MinutesPct: 0, ordersWithin20MinutesPct: 0, peakOrderBacklog: 0,
+    throughputPerHour: 0, orderWaitSamplesSeconds: [], trafficCells: [],
   }
 }
 
 export function aggregateMetrics(events: readonly SimulationEvent[]): SimulationMetrics {
   const metrics = emptyMetrics()
   const completions: number[] = []
+  const backlogEvents: { at: number; delta: number }[] = []
   const traffic = new Map<string, { xMm: number; yMm: number; visits: number }>()
   events.forEach((event) => {
     if (event.type === 'travel') { metrics.totalTravelMm += event.distanceMm; metrics.travelByRoleMm[event.role] += event.distanceMm }
@@ -31,7 +35,8 @@ export function aggregateMetrics(events: readonly SimulationEvent[]): Simulation
     else if (event.type === 'dirty-clean-crossing') metrics.dirtyCleanCrossings += 1
     else if (event.type === 'unreachable') metrics.unreachableTasks += 1
     else if (event.type === 'path-metric') metrics[event.kind === 'finish-to-pass' ? 'finishToPassTravelMm' : 'dirtyToWashTravelMm'] += event.distanceMm
-    else if (event.type === 'order-completed') { metrics.completedOrders += 1; completions.push(event.durationSeconds) }
+    else if (event.type === 'order-arrived') { metrics.totalOrders += 1; backlogEvents.push({ at: event.atSeconds, delta: 1 }) }
+    else if (event.type === 'order-completed') { metrics.completedOrders += 1; completions.push(event.durationSeconds); backlogEvents.push({ at: event.completedAtSeconds, delta: -1 }) }
     else if (event.type === 'traffic') {
       const key = `${event.xMm},${event.yMm}`
       const cell = traffic.get(key) ?? { xMm: event.xMm, yMm: event.yMm, visits: 0 }
@@ -41,6 +46,13 @@ export function aggregateMetrics(events: readonly SimulationEvent[]): Simulation
   })
   metrics.orderCompletionP50Seconds = percentile(completions, .5)
   metrics.orderCompletionP90Seconds = percentile(completions, .9)
+  metrics.averageOrderWaitSeconds = completions.length ? completions.reduce((sum, value) => sum + value, 0) / completions.length : 0
+  metrics.unfinishedOrders = Math.max(0, metrics.totalOrders - metrics.completedOrders)
+  metrics.ordersWithin15MinutesPct = completions.length ? completions.filter((value) => value <= 15 * 60).length / completions.length * 100 : 0
+  metrics.ordersWithin20MinutesPct = completions.length ? completions.filter((value) => value <= 20 * 60).length / completions.length * 100 : 0
+  metrics.orderWaitSamplesSeconds = [...completions].sort((a, b) => a - b)
+  let backlog = 0
+  backlogEvents.sort((left, right) => left.at - right.at || right.delta - left.delta).forEach((event) => { backlog += event.delta; metrics.peakOrderBacklog = Math.max(metrics.peakOrderBacklog, backlog) })
   metrics.trafficCells = [...traffic.values()].sort((left, right) => right.visits - left.visits || left.yMm - right.yMm || left.xMm - right.xMm)
   return metrics
 }

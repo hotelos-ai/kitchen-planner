@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react'
+import { act, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it } from 'vitest'
 import { createSeedProject } from '../../domain/seed-project'
@@ -31,6 +31,30 @@ describe('plan workspace', () => {
     await user.selectOptions(screen.getByLabelText(/Display units/i), 'ft')
     await user.selectOptions(screen.getByLabelText(/Display units/i), 'mm')
     expect(getActiveItem(projectStore.getState(), 'tandoor').widthMm).toBe(750)
+  })
+
+  it('rotates the selected item left and right with explicit controls', async () => {
+    const user = userEvent.setup()
+    render(<PlanWorkspace showCanvas={false} />)
+    await user.click(screen.getByRole('button', { name: /Select Tandoor/i }))
+
+    await user.click(screen.getByRole('button', { name: /Rotate selected left/i }))
+    expect(getActiveItem(projectStore.getState(), 'tandoor').rotationDeg).toBe(270)
+
+    await user.click(screen.getByRole('button', { name: /Rotate selected right/i }))
+    expect(getActiveItem(projectStore.getState(), 'tandoor').rotationDeg).toBe(0)
+  })
+
+  it('enables drag resize and keeps inspector dimensions synchronized', async () => {
+    const user = userEvent.setup()
+    render(<PlanWorkspace showCanvas={false} />)
+    await user.click(screen.getByRole('button', { name: /Select Tandoor/i }))
+    await user.click(screen.getByRole('button', { name: /Enable drag resize/i }))
+    expect(screen.getByLabelText(/Lock dimensions/i)).not.toBeChecked()
+
+    act(() => projectStore.getState().updateItem('tandoor', { widthMm: 900, depthMm: 800 }))
+    expect(screen.getByLabelText(/^Width/i)).toHaveValue('900')
+    expect(screen.getByLabelText(/^Depth/i)).toHaveValue('800')
   })
 
   it('adds, duplicates, removes, and restores a custom item', async () => {

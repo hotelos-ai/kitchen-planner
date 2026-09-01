@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useStore } from 'zustand'
-import { projectStore, type ProjectStore } from '../../state/project-store'
+import { getActiveVariant, projectStore, type ProjectStore } from '../../state/project-store'
 import { EquipmentInspector } from './EquipmentInspector'
 import { EquipmentLibrary } from './EquipmentLibrary'
 import { LayoutVariants } from './LayoutVariants'
@@ -21,6 +21,8 @@ export function PlanWorkspace({ store = projectStore, showCanvas = typeof Resize
   const selectedIds = useStore(store, (state) => state.selectedIds)
   const canUndo = useStore(store, (state) => state.past.length > 0)
   const canRedo = useStore(store, (state) => state.future.length > 0)
+  const selectedItem = useStore(store, (state) => getActiveVariant(state).equipment.find((item) => item.id === state.selectedIds[0]))
+  const dragResizeEnabled = Boolean(selectedItem && !selectedItem.dimensionsLocked)
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -66,7 +68,11 @@ export function PlanWorkspace({ store = projectStore, showCanvas = typeof Resize
           <button type="button" aria-label="Undo" disabled={!canUndo} onClick={() => store.getState().undo()}>↶ Undo</button>
           <button type="button" aria-label="Redo" disabled={!canRedo} onClick={() => store.getState().redo()}>↷ Redo</button>
           <button type="button" aria-pressed={showReference} onClick={() => setShowReference((value) => !value)}>Source reference</button>
-          <button type="button" onClick={() => selectedIds.length && store.getState().rotateItems(selectedIds)}>Rotate 90°</button>
+          <span className="transform-actions" role="group" aria-label="Selected item transforms">
+            <button type="button" className="icon-action" aria-label="Rotate selected left 90 degrees" title="Rotate left 90°" disabled={!selectedIds.length} onClick={() => store.getState().rotateItems(selectedIds, -90)}><b aria-hidden="true">↶</b><small>Left</small></button>
+            <button type="button" className="icon-action" aria-label="Rotate selected right 90 degrees" title="Rotate right 90°" disabled={!selectedIds.length} onClick={() => store.getState().rotateItems(selectedIds, 90)}><b aria-hidden="true">↷</b><small>Right</small></button>
+            <button type="button" className="icon-action resize-action" aria-label={dragResizeEnabled ? 'Disable drag resize' : 'Enable drag resize'} title={dragResizeEnabled ? 'Lock dimensions' : 'Enable click-and-drag resize handles'} aria-pressed={dragResizeEnabled} disabled={!selectedItem} onClick={() => selectedItem && store.getState().setDimensionsLocked(selectedItem.id, !selectedItem.dimensionsLocked)}><b aria-hidden="true">↔</b><small>{dragResizeEnabled ? 'Lock' : 'Resize'}</small></button>
+          </span>
         </div>
       </div>
       <div className="editor-layout">

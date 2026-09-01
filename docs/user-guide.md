@@ -8,9 +8,9 @@ Confirmed anchors are already modeled: storage is left of the 700 × 800 mm upri
 
 ## Correcting the plan
 
-Select any equipment footprint on the plan or its equivalent button in the Equipment list. Drag it to move on the active snap grid; a live X/Y badge shows the snapped destination. You can also edit X and Y in the inspector. Arrow keys move by the selected snap interval; Shift + arrow moves by 10 mm.
+Select any equipment footprint on the plan or its equivalent button in the Equipment list. The 100 mm grid remains visible across the complete working floor, including empty white space. Drag equipment to move it on the active snap grid; a live X/Y badge shows the snapped destination. You can also edit X and Y in the inspector. Arrow keys move by the selected snap interval; Shift + arrow moves by 10 mm.
 
-Known dimensions start locked. Clear **Lock dimensions** to reveal resize/rotation handles on the selected footprint and to edit width, depth, and height in the inspector. Handle changes snap to the active interval. The inspector also controls the label, category, rotation, front clearance, and simulation capabilities. Invalid lengths return to the last valid value and show the accepted range.
+Known dimensions start locked. Select an item and press **Resize** (or clear **Lock dimensions**) to reveal click-drag resize/rotation handles. Handle changes snap to the active interval and immediately update width and depth in the inspector. The toolbar's **Left** and **Right** buttons rotate the selected item by 90 degrees. The inspector also controls the label, category, rotation, front clearance, and simulation capabilities. Invalid lengths return to the last valid value and show the accepted range.
 
 The **Display units** setting supports millimetres, centimetres, inches, and feet/inches. Units only affect display and parsing; internal coordinates remain millimetres. The **Snap interval** can be 10, 50, 100, or 250 mm.
 
@@ -19,7 +19,8 @@ The live geometry audit lists equipment outside the jagged boundary, footprint c
 ### Selection and item actions
 
 - Click an item to select it; Shift-click list/canvas items for multiselect.
-- **Rotate 90°** rotates selected movable equipment.
+- **Left** and **Right** rotate selected movable equipment by 90° in the indicated direction.
+- **Resize** reveals click-drag transform handles and unlocks known dimensions.
 - **Duplicate** creates a separate item with the same metadata.
 - **Remove** asks for a second confirmation and remains undoable.
 - **Add custom item** accepts a label, width, and depth; finish its category, height, clearance, and capabilities in the inspector.
@@ -36,12 +37,12 @@ The source photograph can be toggled behind the vector trace for alignment check
 The 3D model and plan use the same active project data. Equipment dimensions, positions, rotations, pillar, storage zone, floor, walls, D2, service-window gaps, and sealed D6 are generated procedurally.
 
 - Drag to orbit, Shift-drag to pan, and scroll to zoom.
-- **Top**, **Perspective**, and **Fit room** change the camera.
+- **Top** and **Perspective** switch camera modes and reset the orbit target; pressing the active mode again also restores its default framing. **Fit room** recovers the complete room after orbiting, panning, or zooming.
 - **Clearances** shows work/heat zones, D2 swing, and refrigerator/freezer swing arcs.
 - Click a mesh or its visible 3D label to select the same item used by the plan inspector.
 - Split view places the editable plan beside the synchronized model.
 
-If WebGL cannot initialize, the app shows a diagnostic while leaving the Plan editor usable.
+The renderer caps high-density framebuffer use and releases its GPU resources when leaving 3D or Split view. If the browser still interrupts WebGL, the app removes the detached labels and shows **Restart 3D renderer**, which remounts the model without changing the plan. If WebGL cannot initialize at all, the Plan editor remains usable.
 
 ## Busy-service simulation
 
@@ -49,14 +50,16 @@ The default pressure test is 50 covers over 60 minutes with one head chef, one s
 
 Before running, validation requires D2, both service windows, staff, and all required station capabilities to be present and reachable. Missing or unreachable stations link back to their affected equipment selection.
 
-The engine creates cold retrieval → prep → cook → finish → clean-window chains and dirty-window → landing → pre-rinse → dishwasher → clean-landing chains. It routes agents around equipment on a 100 mm navigation grid, reserves stations, applies configured capacity, and records queues and one-second playback frames. The same seed and inputs produce the same result.
+The engine creates cold retrieval → prep → cook → finish → clean-window chains and dirty-window → landing → pre-rinse → dishwasher → clean-landing chains. Tasks are dispatched globally in service-time order so one ticket cannot reserve the whole brigade in advance. Both service windows are real routing destinations at their measured wall openings. The engine routes agents around equipment on a 100 mm navigation grid, reserves stations, applies configured capacity, and records queues and one-second playback frames. The same seed and inputs produce the same result.
 
-After **Run service**:
+After **Run service**, the Full Sim view treats service as a continuous live system:
 
-- Play, pause, restart, scrub, or choose 0.5×, 1×, 2×, or 4× playback.
+- Play, pause, restart, scrub, or choose 1×, 5×, 25×, or 100× playback.
 - Follow a role or retain the overview.
 - Toggle heatmap, recent trails, queue totals, clearance footprints, and dirty/clean flows.
-- Inspect total/per-role travel, order throughput, P90 completion, station use, congestion pressure over time, dirty/clean crossings, door conflicts, and unreachable tasks.
+- Watch each ticket arrive, progress through its current station, accumulate wait, and leave through the clean service window. Live station badges show active work and the current queue at that exact playback moment.
+- Inspect live backlog, served orders, average completed wait, oldest open ticket, final average/P50/P90 wait, the wait-time distribution, peak backlog, tickets per hour, station use, staff travel, congestion pressure, dirty/clean crossings, door conflicts, and unreachable tasks.
+- Use the layout verdict as an evidence summary for the configured scenario. It is not a universal pass/fail judgment; changing covers, staffing, timings, capacities, or the menu can change it substantially.
 
 Task durations are planning estimates. Tune them after menu and equipment trials; do not interpret output as a prediction of exact ticket times.
 

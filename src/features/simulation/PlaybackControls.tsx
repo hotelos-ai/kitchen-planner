@@ -17,7 +17,7 @@ export function PlaybackControls({ elapsedSeconds, durationSeconds, playing, spe
       <button type="button" className="play-button" onClick={() => onPlaying(!playing)}>{playing ? 'Pause' : 'Play'}</button>
       <span className="playback-time">{time(elapsedSeconds)} / {time(durationSeconds)}</span>
       <input aria-label="Simulation time" type="range" min="0" max={durationSeconds} step="1" value={elapsedSeconds} onChange={(event) => onElapsed(Number(event.target.value))} />
-      <label>Speed<select aria-label="Playback speed" value={speed} onChange={(event) => onSpeed(Number(event.target.value))}>{[.5, 1, 2, 4].map((value) => <option key={value} value={value}>{value}×</option>)}</select></label>
+      <label>Speed<select aria-label="Playback speed" value={speed} onChange={(event) => onSpeed(Number(event.target.value))}>{[1, 5, 25, 100].map((value) => <option key={value} value={value}>{value}×</option>)}</select></label>
     </div>
   )
 }

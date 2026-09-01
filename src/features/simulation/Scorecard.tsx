@@ -16,9 +16,12 @@ export function Scorecard({ result }: { result: SimulationResult }) {
       <div className="scorecard-heading"><span className="eyebrow">Measured outcome</span><h2>Service scorecard</h2></div>
       <div className="metric-grid">
         <article><strong>{number.format(metrics.totalTravelMm / 1000)} m</strong><span>Total staff travel</span></article>
-        <article><strong>{metrics.completedOrders}</strong><span>Completed orders</span></article>
+        <article><strong>{metrics.completedOrders}/{metrics.totalOrders}</strong><span>Completed tickets</span></article>
+        <article><strong>{number.format(metrics.averageOrderWaitSeconds / 60)} min</strong><span>Average completed wait</span></article>
         <article><strong>{number.format(metrics.orderCompletionP90Seconds / 60)} min</strong><span>Order P90</span></article>
-        <article><strong>{metrics.hotLineCongestionEvents}</strong><span>Hot-line congestion</span></article>
+        <article><strong>{metrics.peakOrderBacklog}</strong><span>Peak ticket backlog</span></article>
+        <article><strong>{number.format(metrics.throughputPerHour)}</strong><span>Tickets per hour</span></article>
+        <article><strong>{metrics.hotLineCongestionEvents}</strong><span>Hot-line proximity samples</span></article>
         <article><strong>{metrics.dirtyCleanCrossings}</strong><span>Dirty-clean crossings</span></article>
         <article><strong>{metrics.doorConflictEvents}</strong><span>D2 door conflicts</span></article>
         <article><strong>{metrics.unreachableTasks}</strong><span>Unreachable tasks</span></article>

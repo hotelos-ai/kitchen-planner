@@ -48,8 +48,8 @@ export function PlanCanvas({ store, showReference }: Props) {
       <Stage width={size.width} height={size.height} onMouseDown={(event) => {
         if (event.target === event.target.getStage()) store.getState().clearSelection()
       }}>
-        <GridLayer width={size.width} height={size.height} pixelsPerMm={pixelsPerMm} originX={originX} originY={originY} snapMm={project.snapMm} />
         <ArchitectureLayer architecture={project.architecture} pixelsPerMm={pixelsPerMm} originX={originX} originY={originY} />
+        <GridLayer width={size.width} height={size.height} pixelsPerMm={pixelsPerMm} originX={originX} originY={originY} snapMm={project.snapMm} />
         <EquipmentLayer
           items={variant.equipment}
           selectedIds={selectedIds}
