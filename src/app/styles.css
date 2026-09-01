@@ -60,6 +60,15 @@ button { cursor: pointer; }
 .clearance-label.heat span { color: #8f321f; }.clearance-label.door-swing span { color: #80520c; }
 .pass-label span { display: block; padding: 5px 8px; border: 1px solid #2f827f; border-radius: 4px; color: #155f5c; background: rgba(246,255,252,.94); box-shadow: 0 3px 12px rgba(22,42,37,.18); font-size: 9px; font-weight: 900; }
 .pass-label.dirty span { border-color: #b6842c; color: #7b5415; background: rgba(255,250,238,.95); }
+.chef-label { pointer-events: none; display: grid; justify-items: center; white-space: nowrap; }
+.chef-label span { padding: 3px 6px; border: 1px solid rgba(39,50,46,.28); border-radius: 4px 4px 0 0; color: #27322e; background: rgba(255,253,247,.94); font-size: 8px; font-weight: 900; }
+.chef-label small { padding: 2px 5px; border-radius: 0 0 4px 4px; color: #f8f5ed; background: rgba(39,50,46,.88); font-size: 7px; text-transform: uppercase; }
+.walk-reticle { position: absolute; z-index: 6; left: 50%; top: 50%; width: 14px; height: 14px; pointer-events: none; transform: translate(-50%,-50%); }
+.walk-reticle::before, .walk-reticle::after { content: ''; position: absolute; left: 50%; top: 50%; border-radius: 2px; background: rgba(255,255,255,.9); box-shadow: 0 0 3px rgba(20,28,25,.8); transform: translate(-50%,-50%); }.walk-reticle::before { width: 14px; height: 2px; }.walk-reticle::after { width: 2px; height: 14px; }
+.walk-controls-guide { position: absolute; z-index: 7; right: 14px; bottom: 14px; width: min(270px, calc(100% - 28px)); padding: 12px; border: 1px solid rgba(255,255,255,.2); border-radius: 8px; color: #f8f5ed; background: rgba(28,36,33,.88); box-shadow: 0 12px 32px rgba(12,18,16,.3); backdrop-filter: blur(9px); }
+.walk-controls-guide > div { display: flex; align-items: center; justify-content: space-between; gap: 8px; }.walk-controls-guide strong { font-size: 11px; }.walk-controls-guide em { color: #ffd198; font-size: 8px; font-style: normal; font-weight: 800; text-transform: uppercase; }
+.walk-controls-guide dl { display: grid; grid-template-columns: 1fr 1fr; gap: 5px 10px; margin: 9px 0; }.walk-controls-guide dl div { display: flex; justify-content: space-between; gap: 6px; border-bottom: 1px solid rgba(255,255,255,.1); padding-bottom: 3px; }.walk-controls-guide dt { color: #9eaaa5; font-size: 8px; }.walk-controls-guide dd { margin: 0; font-size: 8px; font-weight: 800; }
+.walk-controls-guide button { width: 100%; min-height: 31px; border: 1px solid rgba(255,255,255,.24); border-radius: 6px; color: white; background: #a84e39; font-size: 9px; font-weight: 850; }
 .scene-legend { min-height: 34px; display: flex; align-items: center; gap: 16px; padding: 7px 14px; border-top: 1px solid #cfc8bd; color: #68716e; background: #f7f4ed; font-size: 8px; }
 .scene-legend span:last-child { margin-left: auto; }
 .scene-legend i { width: 7px; height: 7px; display: inline-block; margin-right: 4px; border-radius: 50%; background: #718368; }

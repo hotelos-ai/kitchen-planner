@@ -95,4 +95,18 @@ describe('3D scene synchronization', () => {
     expect(mounts).toBe(1)
     expect(screen.getByTestId('kitchen-scene')).toHaveAttribute('data-renderer-generation', '0')
   })
+
+  it('enters and exits Walk Kitchen from the regular 3D workspace without remounting', async () => {
+    const user = userEvent.setup()
+    const FakeWalkRenderer = ({ walkMode }: SceneRendererProps) => <output data-testid="walk-state">{String(walkMode)}</output>
+    render(<SceneWorkspace renderer={FakeWalkRenderer} />)
+    const generation = screen.getByTestId('kitchen-scene').getAttribute('data-renderer-generation')
+    await user.click(screen.getByRole('button', { name: 'Walk kitchen' }))
+    expect(screen.getByTestId('walk-state')).toHaveTextContent('true')
+    expect(screen.getByLabelText('Walk kitchen controls')).toBeVisible()
+    await user.click(screen.getByRole('button', { name: 'Exit walk mode' }))
+    expect(screen.getByTestId('walk-state')).toHaveTextContent('false')
+    expect(screen.getByRole('button', { name: 'Perspective' })).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByTestId('kitchen-scene')).toHaveAttribute('data-renderer-generation', generation)
+  })
 })
