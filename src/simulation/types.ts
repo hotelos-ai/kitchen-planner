@@ -1,4 +1,5 @@
 import type { Architecture, EquipmentItem, PointMm, SimulationScenario, StaffRole, StationCapability } from '../domain/project'
+import type { SpatialAgentFrame } from '../core/agents/types'
 
 export interface SimulationInput {
   architecture: Architecture
@@ -19,14 +20,7 @@ export interface SimTask {
   preferredRoles: readonly StaffRole[]
 }
 
-export interface AgentFrame {
-  agentId: string
-  role: StaffRole
-  xMm: number
-  yMm: number
-  state: 'walking' | 'working' | 'waiting' | 'blocked'
-  taskId?: string
-}
+export interface AgentFrame extends SpatialAgentFrame<StaffRole> {}
 
 export interface SimulationFrame {
   elapsedSeconds: number
