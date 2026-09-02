@@ -22,7 +22,7 @@ describe('essentials checker', () => {
     expect(screen.getByRole('heading', { name: 'Blockers' })).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Professional review' })).toBeInTheDocument()
     expect(screen.getByText(/dirty landing station/i)).toBeInTheDocument()
-    expect(screen.getAllByText(/qualified professional/i)).toHaveLength(4)
+    expect(screen.getAllByText(/qualified professional/i)).toHaveLength(9)
     expect(screen.getByText(/operational guidance, not regulatory certification/i)).toBeInTheDocument()
   })
 

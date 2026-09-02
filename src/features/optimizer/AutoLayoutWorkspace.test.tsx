@@ -34,6 +34,7 @@ const candidate = (id: string, score: Partial<EvaluatedCandidate['score']> = {})
       moved: id === 'candidate-minimal' ? [] : ['tandoor'],
       rotated: id === 'candidate-travel' ? ['two-door-fridge'] : [],
       resized: [],
+      substituted: [],
       added: [],
       removed: [],
       architectureChanged: false,
@@ -81,7 +82,7 @@ describe('auto-layout workspace', () => {
     await user.type(screen.getByLabelText('Peak duration (minutes)'), '90')
     await user.clear(screen.getByLabelText('Head chef count'))
     await user.type(screen.getByLabelText('Head chef count'), '2')
-    await user.click(screen.getByRole('radio', { name: /B.*equipment redesign/i }))
+    await user.click(screen.getByRole('checkbox', { name: /B.*resize, substitute/i }))
     await user.click(screen.getByRole('checkbox', { name: /Lock Tandoor/i }))
     await user.clear(screen.getByLabelText('Minimum aisle (mm)'))
     await user.type(screen.getByLabelText('Minimum aisle (mm)'), '1100')
@@ -99,7 +100,7 @@ describe('auto-layout workspace', () => {
     const request = vi.mocked(injected.run).mock.calls[0][0]
     expect(request.scenario).toMatchObject({ covers: 180, durationMinutes: 90, staff: expect.arrayContaining([{ role: 'head-chef', count: 2 }]) })
     expect(request.manifest).toMatchObject({
-      permissionTier: 'B',
+      permissions: { placement: true, equipmentRedesign: true, architecture: false },
       lockedComponentIds: ['tandoor'],
       hardRules: { minimumAisleMm: 1100, noGoZones: [expect.objectContaining({ id: expect.any(String) })] },
       targetP90WaitSeconds: 840,
@@ -134,6 +135,12 @@ describe('auto-layout workspace', () => {
     }
     expect(screen.getByText(/best observed feasible layouts.*not universal optima/i)).toBeInTheDocument()
     expect(screen.getAllByText(/"baselineVariantId": "baseline-trace"/i).length).toBeGreaterThan(0)
+
+    await userEvent.click(screen.getByRole('button', { name: 'Inspect Fastest service' }))
+    expect(screen.getByRole('img', { name: 'Inspected finalist plan' })).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: 'Compare Least travel' }))
+    expect(screen.getByRole('img', { name: 'Baseline comparison plan' })).toBeInTheDocument()
+    expect(screen.getByRole('img', { name: 'Finalist comparison plan' })).toBeInTheDocument()
   })
 
   it('reconciles completion progress with exact search statistics from the Worker', async () => {
@@ -158,6 +165,34 @@ describe('auto-layout workspace', () => {
     expect(screen.getByText('6 pruned')).toBeInTheDocument()
     expect(screen.getByText('9 simulated')).toBeInTheDocument()
     expect(screen.getByText('20 candidates')).toBeInTheDocument()
+  })
+
+  it('explains feasibility and simulation rejection reasons when no finalist can be confirmed', async () => {
+    const injected: AutoLayoutRunner = {
+      run: vi.fn(async (request) => ({
+        manifest: request.manifest,
+        candidates: [],
+        finalists: [],
+        evaluationCount: 2,
+        termination: 'evaluation-budget' as const,
+        bestObservedDisclaimer: 'Best observed only.',
+        diagnostics: {
+          feasibilityReasonCounts: { 'no-go-overlap': 7, 'station-unreachable': 3 },
+          simulationRejectionCount: 2,
+          simulationRejectionMessages: ['route-station-unreachable: Tandoor'],
+        },
+      })),
+    }
+    render(<AutoLayoutWorkspace store={createProjectStore(createSeedProject())} runner={injected} />)
+
+    await userEvent.click(screen.getByRole('button', { name: 'Run auto-layout' }))
+
+    const diagnosis = await screen.findByRole('alert', { name: 'No feasible auto-layout finalists' })
+    expect(diagnosis).toHaveTextContent(/no confirmed feasible finalist/i)
+    expect(diagnosis).toHaveTextContent(/no-go-overlap.*7/i)
+    expect(diagnosis).toHaveTextContent(/station-unreachable.*3/i)
+    expect(diagnosis).toHaveTextContent(/2 candidates were rejected by simulation/i)
+    expect(diagnosis).toHaveTextContent(/route-station-unreachable.*Tandoor/i)
   })
 
   it('computes deltas from the candidate matching the frozen baseline hash, regardless of result order', async () => {
@@ -223,6 +258,7 @@ describe('auto-layout workspace', () => {
     await user.click(screen.getByRole('button', { name: 'Run auto-layout' }))
     await user.click(await screen.findByRole('button', { name: 'Save Fastest service as new layout' }))
 
+    expect(screen.getByRole('status')).toHaveTextContent(/saved as a new layout/i)
     expect(store.getState()).toMatchObject({ revision: 1 })
     expect(store.getState().past).toHaveLength(1)
     expect(store.getState().project.variants).toHaveLength(2)
@@ -241,5 +277,17 @@ describe('auto-layout workspace', () => {
         resultHash: 'hash-candidate-fastest',
       },
     })
+  })
+
+  it('refuses to adopt a result after the workspace revision changes', async () => {
+    const user = userEvent.setup()
+    const store = createProjectStore(createSeedProject())
+    render(<AutoLayoutWorkspace store={store} runner={runner()} />)
+    await user.click(screen.getByRole('button', { name: 'Run auto-layout' }))
+    store.getState().rotateItems(['tandoor'], 90)
+    await user.click(await screen.findByRole('button', { name: 'Save Fastest service as new layout' }))
+
+    expect(screen.getByRole('status')).toHaveTextContent(/revision/i)
+    expect(store.getState().project.variants).toHaveLength(1)
   })
 })

@@ -118,6 +118,18 @@ describe('plan workspace', () => {
     expect(screen.queryByRole('dialog', { name: 'Check essentials' })).not.toBeInTheDocument()
   })
 
+  it('uses Escape to close transient workspace UI before clearing selection', async () => {
+    const user = userEvent.setup()
+    render(<PlanWorkspace showCanvas={false} />)
+    await user.click(screen.getByRole('button', { name: /Select Tandoor/i }))
+    await user.click(screen.getByRole('button', { name: 'Check essentials' }))
+
+    await user.keyboard('{Escape}')
+
+    expect(screen.queryByRole('dialog', { name: 'Check essentials' })).not.toBeInTheDocument()
+    expect(projectStore.getState().selectedIds).toEqual(['tandoor'])
+  })
+
   it('routes architecture essentials directly to advanced room editing', async () => {
     const user = userEvent.setup()
     const project = createSeedProject()

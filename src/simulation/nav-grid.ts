@@ -1,5 +1,6 @@
 import { pointInPolygon, rotatedFootprint } from '../domain/geometry'
 import { getCatalogEntry } from '../domain/catalog/kitchen-catalog'
+import { isFloorObstacle } from '../domain/catalog/floor-obstacle'
 import type { CatalogEntry } from '../domain/catalog/types'
 import type { Architecture, EquipmentItem, LayoutConstraints, PointMm, RectMm } from '../domain/project'
 import type { NavCell, NavGrid } from './types'
@@ -78,7 +79,7 @@ export function buildNavGrid(input: GridInput, cellSizeMm = 100, clearance: Navi
   const bodyRadiusMm = Math.max(0, clearance.bodyRadiusMm ?? DEFAULT_NAVIGATION_BODY_RADIUS_MM)
   const minimumAisleMm = Math.max(0, clearance.minimumAisleMm ?? input.layoutConstraints?.minimumAisleMm ?? 0)
   const obstacleClearanceMm = Math.max(bodyRadiusMm, minimumAisleMm / 2)
-  const equipmentPolygons = input.equipment.filter((item) => item.category !== 'hood').map(rotatedFootprint)
+  const equipmentPolygons = input.equipment.filter(isFloorObstacle).map(rotatedFootprint)
   const pillarPolygons = input.architecture.pillars.map(rectPolygon)
   const noGoPolygons = (input.layoutConstraints?.noGoZones ?? []).map(rectPolygon)
   const obstaclePolygons = [...equipmentPolygons, ...pillarPolygons, ...noGoPolygons]

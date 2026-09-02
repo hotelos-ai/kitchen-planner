@@ -24,13 +24,15 @@ export interface OptimizerWorkerRuntime {
 
 const defaultSchedule = (run: () => void) => { setTimeout(run, 0) }
 
-const simulationEvaluator = (
+export const createSimulationEvaluator = (
   scenarios: readonly SimulationScenario[],
+  bodyRadiusMm?: number,
 ): ((input: SearchEvaluationInput) => OptimizerMetrics) => ({ candidate, seed }) => {
   const results = scenarios.map((scenario) => runSimulation({
     architecture: candidate.architecture,
     equipment: candidate.equipment,
     layoutConstraints: candidate.layoutConstraints,
+    navigationBodyRadiusMm: bodyRadiusMm,
     scenario: { ...scenario, seed },
     outputMode: 'metrics-only',
   }).metrics)
@@ -40,6 +42,9 @@ const simulationEvaluator = (
     peakBacklog: Math.max(...results.map((value) => value.peakOrderBacklog)),
     totalTravelMm: results.reduce((total, value) => total + value.totalTravelMm, 0),
     congestionEvents: results.reduce((total, value) => total + value.congestionEvents, 0),
+    completionPct: results.reduce((total, value) => total + value.completedOrders, 0)
+      / Math.max(1, results.reduce((total, value) => total + value.totalOrders, 0)) * 100,
+    throughputPerHour: results.reduce((total, value) => total + value.throughputPerHour, 0) / Math.max(1, results.length),
   }
 }
 
@@ -128,10 +133,19 @@ export function createOptimizerWorkerRuntime(dependencies: RuntimeDependencies):
       schedule(() => {
         let sequence = 0
         try {
+          const frozenBaseline = structuredClone(validated.baseline)
+          frozenBaseline.layoutConstraints = {
+            ...frozenBaseline.layoutConstraints,
+            minimumAisleMm: validated.manifest.hardRules.minimumAisleMm,
+            noGoZones: structuredClone(validated.manifest.hardRules.noGoZones),
+            permissions: structuredClone(validated.manifest.permissions),
+            lockedComponentIds: [...validated.manifest.lockedComponentIds],
+            lockedArchitectureElementIds: [...validated.manifest.lockedArchitectureElementIds],
+          }
           const result = runAnytimeSearch({
-            baseline: validated.baseline,
+            baseline: frozenBaseline,
             manifest: validated.manifest,
-            evaluate: dependencies.evaluate ?? simulationEvaluator(validated.scenarios),
+            evaluate: dependencies.evaluate ?? createSimulationEvaluator(validated.scenarios, validated.manifest.hardRules.bodyRadiusMm),
             isCancelled: () => state.cancelled,
             now: dependencies.now,
             onProgress: (progress) => dependencies.postMessage({

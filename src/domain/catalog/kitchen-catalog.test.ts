@@ -49,6 +49,7 @@ describe('commercial kitchen catalog', () => {
       })
       expect(entry.appearanceSkinIds.every((skinId) => skinIds.has(skinId)), entry.catalogId).toBe(true)
       expect(entry.configurationIds.length, entry.catalogId).toBeGreaterThan(0)
+      expect(entry.physicalConfigurations.map((preset) => preset.id), entry.catalogId).toEqual(entry.configurationIds)
       expect(entry.tags.length, entry.catalogId).toBeGreaterThan(0)
     })
   })
@@ -78,6 +79,7 @@ describe('commercial kitchen catalog', () => {
     expect(STORAGE_CATALOG.every((entry) => entry.category === 'storage')).toBe(true)
     expect(STORAGE_CATALOG.find((entry) => entry.catalogId === 'storage-wall-shelf')).toMatchObject({
       placementRules: { mounting: 'wall', requiresWall: true }, tags: expect.arrayContaining(['wall-mounted', 'elevated']),
+      physicalConfigurations: expect.arrayContaining([expect.objectContaining({ id: 'wall-shelf-two-tier', tierCount: 2, mounting: 'wall' })]),
     })
     expect(STORAGE_CATALOG.find((entry) => entry.catalogId === 'storage-mobile-rack')).toMatchObject({
       placementRules: { mounting: 'floor' }, tags: expect.arrayContaining(['mobile']),

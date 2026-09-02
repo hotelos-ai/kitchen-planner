@@ -29,6 +29,14 @@ const INTERACTIVE_SELECTOR = [
   '[contenteditable]:not([contenteditable="false"])',
 ].join(',')
 
+const TRANSIENT_SELECTOR = [
+  '[role="menu"]',
+  '.quick-configuration-popover',
+  '.layout-wizard',
+  '.essentials-dialog',
+  '.workspace-toast',
+].join(',')
+
 export function isWorkspaceShortcutTarget(target: EventTarget | null): boolean {
   return target instanceof Element && target.closest(INTERACTIVE_SELECTOR) !== null
 }
@@ -42,7 +50,7 @@ export function useWorkspaceShortcuts(options: WorkspaceShortcutOptions): void {
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
-      if (isWorkspaceShortcutTarget(event.target)) return
+      if (isWorkspaceShortcutTarget(event.target) && event.key !== 'Escape') return
 
       const current = optionsRef.current
       const key = event.key.toLowerCase()
@@ -75,8 +83,12 @@ export function useWorkspaceShortcuts(options: WorkspaceShortcutOptions): void {
       }
 
       if (!command && !event.altKey && event.key === 'Escape') {
+        if (current.onEscape?.() === true) {
+          event.preventDefault()
+          return
+        }
+        if (document.querySelector(TRANSIENT_SELECTOR)) return
         event.preventDefault()
-        if (current.onEscape?.() === true) return
         current.clearSelection()
         return
       }

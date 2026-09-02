@@ -86,6 +86,19 @@ describe('useWorkspaceShortcuts', () => {
     expect(order).toEqual(['transient', 'transient', 'selection'])
   })
 
+  it('leaves selection intact while a workspace menu or dialog handles Escape', () => {
+    const options = makeOptions()
+    render(<Harness options={options} />)
+    const menu = document.createElement('div')
+    menu.setAttribute('role', 'menu')
+    document.body.append(menu)
+
+    fireEvent.keyDown(window, { key: 'Escape' })
+
+    expect(options.clearSelection).not.toHaveBeenCalled()
+    menu.remove()
+  })
+
   it.each([
     ['Text input', 'textbox'],
     ['Text area', 'textbox'],

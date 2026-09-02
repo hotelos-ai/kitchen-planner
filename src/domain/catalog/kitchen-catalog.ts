@@ -1,6 +1,6 @@
 import type { EquipmentCategory, EquipmentItem, StationCapability } from '../project'
 import { STORAGE_CATALOG } from './storage-catalog'
-import { parseCatalogEntries, type CatalogCategory, type CatalogDimensions, type CatalogEntry } from './types'
+import { createPhysicalConfigurationPresets, parseCatalogEntries, type CatalogCategory, type CatalogDimensions, type CatalogEntry } from './types'
 
 type EntryOptions = {
   id: string
@@ -44,6 +44,15 @@ const categoryZones: Record<CatalogCategory, string[]> = {
 
 const entry = (options: EntryOptions) => {
   const scale = (value: number, factor: number) => Math.max(50, Math.round(value * factor))
+  const configurationIds = options.configurations ?? [`${options.id}-standard`]
+  const maximumDimensions = {
+    widthMm: scale(options.dimensions.widthMm, 2.2),
+    depthMm: scale(options.dimensions.depthMm, 1.6),
+    heightMm: scale(options.dimensions.heightMm, 1.5),
+  }
+  const capacity = { workPositions: options.workPositions ?? 1, concurrentUnits: options.concurrentUnits ?? 1, ...(options.storageLitres === undefined ? {} : { storageLitres: options.storageLitres }) }
+  const clearance = { frontMm: options.frontClearanceMm ?? 900, leftMm: 100, rightMm: 100, backMm: 50, topMm: options.requiresHood ? 1200 : 100, kind: options.clearanceKind ?? 'work' as const }
+  const mounting = options.mounting ?? 'floor'
   return {
     catalogId: options.id,
     familyId: options.familyId,
@@ -57,24 +66,21 @@ const entry = (options: EntryOptions) => {
       depthMm: scale(options.dimensions.depthMm, 0.65),
       heightMm: scale(options.dimensions.heightMm, 0.55),
     },
-    maximumDimensions: {
-      widthMm: scale(options.dimensions.widthMm, 2.2),
-      depthMm: scale(options.dimensions.depthMm, 1.6),
-      heightMm: scale(options.dimensions.heightMm, 1.5),
-    },
+    maximumDimensions,
     capabilities: options.capabilities,
-    capacity: { workPositions: options.workPositions ?? 1, concurrentUnits: options.concurrentUnits ?? 1, ...(options.storageLitres === undefined ? {} : { storageLitres: options.storageLitres }) },
-    clearance: { frontMm: options.frontClearanceMm ?? 900, leftMm: 100, rightMm: 100, backMm: 50, topMm: options.requiresHood ? 1200 : 100, kind: options.clearanceKind ?? 'work' },
+    capacity,
+    clearance,
     intendedApproachFace: options.approach ?? 'front',
     placementRules: {
-      mounting: options.mounting ?? 'floor',
+      mounting,
       requiresWall: options.requiresWall ?? false,
       requiresHood: options.requiresHood ?? false,
       utilityRequirements: options.utilities ?? [],
       allowedZones: options.zones ?? categoryZones[options.category],
       keepClearOfOpeningsMm: 600,
     },
-    configurationIds: options.configurations ?? [`${options.id}-standard`],
+    configurationIds,
+    physicalConfigurations: createPhysicalConfigurationPresets({ configurationIds, displayName: options.name, typicalDimensions: options.dimensions, maximumDimensions, capabilities: options.capabilities, capacity, clearance, mounting, tags: options.tags }),
     appearanceSkinIds: options.skins ?? ['stainless-brushed', 'stainless-polished', 'powder-black'],
     footprint: { shape: 'rectangle', cornerRadiusMm: 12 },
     tags: options.tags,

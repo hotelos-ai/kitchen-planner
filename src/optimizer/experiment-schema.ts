@@ -22,7 +22,7 @@ export const optimizerManifestSchema = z.object({
   scenarioIds: uniqueStrings.min(1),
   seeds: uniqueIntegers,
   confirmationSeeds: uniqueIntegers,
-  permissionTier: z.enum(['A', 'B', 'C']),
+  permissions: z.object({ placement: z.boolean(), equipmentRedesign: z.boolean(), architecture: z.boolean() }).strict(),
   lockedComponentIds: uniqueStrings,
   lockedArchitectureElementIds: uniqueStrings,
   hardRules: z.object({

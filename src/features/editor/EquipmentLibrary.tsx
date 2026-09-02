@@ -89,6 +89,7 @@ export function EquipmentLibrary({ store }: Props) {
       equipment: variant.equipment,
       entry,
       snapMm: project.snapMm,
+      layoutConstraints: variant.layoutConstraints,
     })
     if (!placement) {
       setPlacementError(`No clear position is available for ${entry.displayName}.`)
@@ -98,7 +99,7 @@ export function EquipmentLibrary({ store }: Props) {
       xMm: placement.xMm,
       yMm: placement.yMm,
     })
-    if (id) store.getState().selectItems([id])
+    if (id && getActiveVariant(store.getState()).equipment.some((item) => item.id === id)) store.getState().selectItems([id])
   }
 
   const addCustom = () => {

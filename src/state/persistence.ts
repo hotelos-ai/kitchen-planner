@@ -77,7 +77,10 @@ export function saveProject(storage: Storage, project: KitchenProject): void {
 }
 
 export function exportProject(project: KitchenProject): string {
-  const parsed = projectSchema.safeParse(project)
+  const candidate = structuredClone(project)
+  const activeArchitecture = candidate.variants.find((variant) => variant.id === candidate.activeVariantId)?.architecture
+  if (activeArchitecture) candidate.architecture = structuredClone(activeArchitecture)
+  const parsed = projectSchema.safeParse(candidate)
   if (!parsed.success) throw new Error('Cannot export an invalid kitchen project')
   return JSON.stringify(parsed.data, null, 2)
 }

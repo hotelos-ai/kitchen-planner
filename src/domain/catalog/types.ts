@@ -48,6 +48,19 @@ export const placementRulesSchema = z.object({
   keepClearOfOpeningsMm: nonnegativeLengthSchema,
 }).strict()
 
+export const physicalConfigurationPresetSchema = z.object({
+  id: stableIdSchema,
+  label: z.string().trim().min(1).max(200),
+  dimensions: catalogDimensionsSchema,
+  capabilities: z.array(stableIdSchema).max(100),
+  capacity: catalogCapacitySchema,
+  clearance: catalogClearanceSchema,
+  mounting: z.enum(['floor', 'wall', 'overhead', 'counter', 'architectural']),
+  mobile: z.boolean(),
+  tierCount: z.number().int().positive().max(100).optional(),
+  elevationMm: nonnegativeLengthSchema.optional(),
+}).strict()
+
 const footprintSchema = z.discriminatedUnion('shape', [
   z.object({ shape: z.literal('rectangle'), cornerRadiusMm: nonnegativeLengthSchema }).strict(),
   z.object({ shape: z.literal('circle') }).strict(),
@@ -73,6 +86,7 @@ export const catalogEntrySchema = z.object({
   intendedApproachFace: z.enum(['front', 'back', 'left', 'right', 'either-side', 'none']),
   placementRules: placementRulesSchema,
   configurationIds: z.array(stableIdSchema).min(1).max(100),
+  physicalConfigurations: z.array(physicalConfigurationPresetSchema).min(1).max(100),
   appearanceSkinIds: z.array(stableIdSchema).min(1).max(100),
   footprint: footprintSchema,
   tags: z.array(stableIdSchema).min(1).max(100),
@@ -84,6 +98,12 @@ export const catalogSchema = z.array(catalogEntrySchema).superRefine((entries, c
   entries.forEach((entry, index) => {
     if (seen.has(entry.catalogId)) context.addIssue({ code: 'custom', path: [index, 'catalogId'], message: 'Catalog IDs must be unique' })
     seen.add(entry.catalogId)
+    const configurationIds = new Set(entry.configurationIds)
+    if (configurationIds.size !== entry.configurationIds.length
+      || entry.physicalConfigurations.length !== entry.configurationIds.length
+      || entry.physicalConfigurations.some((preset) => !configurationIds.has(preset.id))) {
+      context.addIssue({ code: 'custom', path: [index, 'physicalConfigurations'], message: 'Physical presets must correspond one-to-one with configuration IDs' })
+    }
     ;(['widthMm', 'depthMm', 'heightMm'] as const).forEach((axis) => {
       if (entry.minimumDimensions[axis] > entry.typicalDimensions[axis] || entry.typicalDimensions[axis] > entry.maximumDimensions[axis]) {
         context.addIssue({ code: 'custom', path: [index, 'typicalDimensions', axis], message: 'Dimensions must satisfy minimum <= typical <= maximum' })
@@ -95,6 +115,41 @@ export const catalogSchema = z.array(catalogEntrySchema).superRefine((entries, c
 export type CatalogCategory = z.infer<typeof catalogCategorySchema>
 export type CatalogDimensions = z.infer<typeof catalogDimensionsSchema>
 export type CatalogEntry = z.infer<typeof catalogEntrySchema>
+
+const numberWords: Record<string, number> = { one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, ten: 10, twenty: 20 }
+
+export function createPhysicalConfigurationPresets(input: {
+  configurationIds: readonly string[]
+  displayName: string
+  typicalDimensions: CatalogDimensions
+  maximumDimensions: CatalogDimensions
+  capabilities: readonly string[]
+  capacity: z.infer<typeof catalogCapacitySchema>
+  clearance: z.infer<typeof catalogClearanceSchema>
+  mounting: z.infer<typeof placementRulesSchema>['mounting']
+  tags: readonly string[]
+}) {
+  return input.configurationIds.map((id, index) => {
+    const ratio = index / Math.max(1, input.configurationIds.length - 1)
+    const dimension = (axis: keyof CatalogDimensions) => Math.round(
+      (input.typicalDimensions[axis] + (input.maximumDimensions[axis] - input.typicalDimensions[axis]) * ratio) / 10,
+    ) * 10
+    const tierToken = id.split('-').find((token) => numberWords[token] !== undefined || /^\d+$/.test(token))
+    const tierCount = tierToken ? numberWords[tierToken] ?? Number(tierToken) : undefined
+    return {
+      id,
+      label: `${input.displayName} · ${id.split('-').map((part) => part.charAt(0).toUpperCase() + part.slice(1)).join(' ')}`,
+      dimensions: { widthMm: dimension('widthMm'), depthMm: dimension('depthMm'), heightMm: dimension('heightMm') },
+      capabilities: [...input.capabilities],
+      capacity: structuredClone(input.capacity),
+      clearance: structuredClone(input.clearance),
+      mounting: input.mounting,
+      mobile: input.tags.includes('mobile') || id.includes('mobile'),
+      ...(tierCount ? { tierCount } : {}),
+      ...(input.mounting === 'wall' || input.mounting === 'overhead' ? { elevationMm: input.typicalDimensions.heightMm } : {}),
+    }
+  })
+}
 
 const deepFreeze = <T,>(value: T): T => {
   if (value && typeof value === 'object' && !Object.isFrozen(value)) {

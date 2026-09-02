@@ -1,5 +1,6 @@
 import { BoxPart, Foot, KitchenSurfaceMaterial, TubularLeg } from './parts'
 import type { EquipmentVisualProps } from './types'
+import { physicalConfigurationDetails } from '../../../domain/equipment-configurations'
 
 const safe = (value: number, minimum = .04) => Math.max(minimum, value)
 const positions = (count: number) => Array.from({ length: count }, (_, index) => index)
@@ -39,10 +40,11 @@ function RackFrame({ widthM, depthM, heightM, tiers = 4, mobile = false }: {
   </group>
 }
 
-export function StorageWallShelfVisual({ widthM, depthM, heightM }: EquipmentVisualProps) {
+export function StorageWallShelfVisual({ item, widthM, depthM, heightM }: EquipmentVisualProps) {
   const shelfY = Math.max(.45, heightM - .05)
+  const tiers = physicalConfigurationDetails(item).tierCount ?? 1
   return <group>
-    <ShelfDeck widthM={widthM} depthM={depthM} y={shelfY} />
+    {positions(tiers).map((index) => <ShelfDeck key={index} widthM={widthM} depthM={depthM} y={shelfY - index * .28} />)}
     {[-1, 1].map((side) => <group key={side} position={[side * widthM * .35, shelfY - .12, -depthM / 2]}>
       <BoxPart position={[0, 0, 0]} size={[.035, .24, .035]} material="darkSteel" radius={.006} />
       <BoxPart position={[0, .1, depthM * .22]} size={[.035, .035, safe(depthM * .44)]} material="darkSteel" radius={.006} />
@@ -51,23 +53,24 @@ export function StorageWallShelfVisual({ widthM, depthM, heightM }: EquipmentVis
 }
 StorageWallShelfVisual.displayName = 'StorageWallShelfVisual'
 
-export function StorageOvershelfVisual({ widthM, depthM, heightM }: EquipmentVisualProps) {
+export function StorageOvershelfVisual({ item, widthM, depthM, heightM }: EquipmentVisualProps) {
   const shelfY = Math.max(.45, heightM - .05)
   const postHeight = Math.max(.3, shelfY)
+  const tiers = physicalConfigurationDetails(item).tierCount ?? 1
   return <group>
-    <ShelfDeck widthM={widthM} depthM={depthM} y={shelfY} />
+    {positions(tiers).map((index) => <ShelfDeck key={index} widthM={widthM} depthM={depthM} y={shelfY - index * .3} />)}
     {[-1, 1].map((side) => <TubularLeg key={side} x={side * (widthM / 2 - .05)} z={0} height={postHeight} radius={.018} />)}
   </group>
 }
 StorageOvershelfVisual.displayName = 'StorageOvershelfVisual'
 
 export function StorageRackVisual(props: EquipmentVisualProps) {
-  return <RackFrame {...props} />
+  return <RackFrame {...props} tiers={physicalConfigurationDetails(props.item).tierCount ?? 4} />
 }
 StorageRackVisual.displayName = 'StorageRackVisual'
 
 export function StorageMobileRackVisual(props: EquipmentVisualProps) {
-  return <RackFrame {...props} mobile />
+  return <RackFrame {...props} tiers={physicalConfigurationDetails(props.item).tierCount ?? 4} mobile />
 }
 StorageMobileRackVisual.displayName = 'StorageMobileRackVisual'
 

@@ -2,6 +2,8 @@ import { z } from 'zod'
 import { workspaceOperationSchema, type WorkspaceOperation } from '../core/workspace/workspace-operation'
 import type { KitchenProject } from './project'
 import { architectureSchema, operationalProfileSchema } from './project-schema'
+import { createCatalogEquipmentItem, getCatalogEntry } from './catalog/kitchen-catalog'
+import { suggestCatalogPlacement } from './catalog/suggest-placement'
 
 const idSchema = z.string()
   .min(1)
@@ -131,13 +133,21 @@ export function buildLayoutWizardOperations(
     variantId: newVariantId,
     patch: draft.profile,
   }))
-  catalogIds.forEach((catalogId, index) => operations.push(workspaceOperationSchema.parse({
-    type: 'add_component',
-    variantId: newVariantId,
-    componentId: componentIds[index],
-    catalogId,
-    position: { xMm: 500 + (index % 4) * 1_200, yMm: 500 + Math.floor(index / 4) * 1_200 },
-  })))
+  const source = context.project.variants.find((variant) => variant.id === parentVariantId)!
+  const architecture = draft.mode === 'rectangle' || draft.mode === 'polygon' ? draft.architecture : source.architecture
+  const placedEquipment = draft.mode === 'duplicate' ? structuredClone(source.equipment) : []
+  catalogIds.forEach((catalogId, index) => {
+    const entry = getCatalogEntry(catalogId)
+    if (!entry) throw new Error(`Unknown catalog component: ${catalogId}`)
+    const placement = suggestCatalogPlacement({ architecture, equipment: placedEquipment, entry, snapMm: context.project.snapMm, layoutConstraints: source.layoutConstraints })
+    if (!placement) throw new Error(`No valid placement is available for ${entry.displayName}. Adjust the room or selected essentials.`)
+    const componentId = componentIds[index]
+    operations.push(workspaceOperationSchema.parse({
+      type: 'add_component', variantId: newVariantId, componentId, catalogId,
+      position: { xMm: placement.xMm, yMm: placement.yMm }, rotationDeg: placement.rotationDeg,
+    }))
+    placedEquipment.push(createCatalogEquipmentItem({ catalogId, componentId, position: placement, rotationDeg: placement.rotationDeg }))
+  })
   operations.push(workspaceOperationSchema.parse({ type: 'activate_layout', variantId: newVariantId }))
   return operations
 }

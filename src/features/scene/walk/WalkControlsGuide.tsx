@@ -1,6 +1,8 @@
-export function WalkControlsGuide({ locked, nearby, onExit }: { locked: boolean; nearby: boolean; onExit(): void }) {
+import type { WalkViewMode } from './types'
+
+export function WalkControlsGuide({ view, locked, nearby, onExit }: { view: WalkViewMode; locked: boolean; nearby: boolean; onExit(): void }) {
   return <aside className="walk-controls-guide" aria-label="Walk kitchen controls">
-    <div><strong>{locked ? 'Walking the kitchen' : 'Click the kitchen to look'}</strong>{nearby && <em>Worker nearby</em>}</div>
+    <div><strong>{locked ? 'Walking the kitchen' : 'Click the kitchen to look'}</strong><em>{view === 'first-person' ? 'First-person view' : 'Third-person view'}{nearby ? ' · Worker nearby' : ''}</em></div>
     <dl>
       <div><dt>Move</dt><dd>WASD · Up/Down</dd></div>
       <div><dt>Strafe</dt><dd>A/D</dd></div>

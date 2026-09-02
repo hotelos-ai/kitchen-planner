@@ -7,6 +7,7 @@ import { getCatalogEntry } from '../domain/catalog/kitchen-catalog'
 import { pointInPolygon, rotatedFootprint } from '../domain/geometry'
 import type { EquipmentItem, StaffRole, StationCapability } from '../domain/project'
 import { stationApproachPoints } from './nav-grid'
+import { isFloorObstacle } from '../domain/catalog/floor-obstacle'
 import type { SimulationInput } from './types'
 
 export type SimulationValidationError = Pick<OperationalRequirementResult, 'code' | 'message' | 'itemIds'>
@@ -67,7 +68,7 @@ export function validateSimulationInput(input: SimulationInput & Pick<Operationa
   })
 
   input.equipment.filter((item) => item.capabilities.some((capability) => TASK_CAPABILITIES.has(capability))).forEach((station) => {
-    const otherFootprints = input.equipment.filter((item) => item.id !== station.id && item.category !== 'hood')
+    const otherFootprints = input.equipment.filter((item) => item.id !== station.id && isFloorObstacle(item))
       .map((item) => ({ item, footprint: rotatedFootprint(item) }))
     const approaches = stationApproachPoints(station)
     const available = approaches.some((approach) => pointInPolygon(approach, input.architecture.roomPolygon)

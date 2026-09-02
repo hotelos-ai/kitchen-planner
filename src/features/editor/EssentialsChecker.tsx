@@ -50,6 +50,7 @@ function buildRecommendedOperations({
       equipment: plannedEquipment,
       entry,
       snapMm,
+      layoutConstraints: variant.layoutConstraints,
     })
     if (!placement) return
     const id = componentId(catalogId)

@@ -1,4 +1,5 @@
 import { pointInPolygon, polygonsOverlap, rotatedFootprint } from '../domain/geometry'
+import { isFloorObstacle } from '../domain/catalog/floor-obstacle'
 import { analyzeLayout, doorSwingEnvelopes } from '../domain/layout-diagnostics'
 import type { Architecture, EquipmentItem, LayoutVariant, Opening, PointMm, RectMm, StationCapability } from '../domain/project'
 import { buildNavGrid, stationApproachPoints } from '../simulation/nav-grid'
@@ -77,7 +78,7 @@ const clearanceIssueIds = (variant: LayoutVariant, manifest: OptimizerManifest) 
 ).filter((issue) => issue.code === 'clearance-obstructed').map((issue) => issue.id))
 
 const doorOverlapIds = (variant: LayoutVariant) => new Set(doorSwingEnvelopes(variant.architecture).flatMap(({ opening, polygon }) =>
-  variant.equipment.filter((item) => item.category !== 'hood' && polygonsOverlap(rotatedFootprint(item), polygon))
+  variant.equipment.filter((item) => isFloorObstacle(item) && polygonsOverlap(rotatedFootprint(item), polygon))
     .map((item) => `${opening.id}:${item.id}`)))
 
 const reachabilityCache = new WeakMap<LayoutVariant, Map<string, Set<string>>>()
@@ -142,6 +143,7 @@ export function layoutDiff(baseline: LayoutVariant, candidate: LayoutVariant) {
     moved: common.filter((item) => { const source = baselineById.get(item.id)!; return item.xMm !== source.xMm || item.yMm !== source.yMm }).map((item) => item.id),
     rotated: common.filter((item) => item.rotationDeg !== baselineById.get(item.id)!.rotationDeg).map((item) => item.id),
     resized: common.filter((item) => dimensionsChanged(baselineById.get(item.id)!, item)).map((item) => item.id),
+    substituted: common.filter((item) => { const source = baselineById.get(item.id)!; return item.catalogId !== source.catalogId || item.configurationPreset !== source.configurationPreset }).map((item) => item.id),
     added: candidate.equipment.filter((item) => !baselineById.has(item.id)).map((item) => item.id),
     removed: baseline.equipment.filter((item) => !candidateById.has(item.id)).map((item) => item.id),
     architectureChanged: architecturePhysical(baseline) !== architecturePhysical(candidate),
@@ -181,11 +183,12 @@ export function checkCandidateFeasibility(baseline: LayoutVariant, candidate: La
     if (before.dimensionsLocked && dimensionValuesChanged(before, after)) add('locked-dimensions-changed', `${before.label} has locked dimensions.`)
   })
   if (baseline.architecture.locked && diff.architectureChanged) add('architecture-locked', 'The baseline architecture is locked.')
-  if (manifest.permissionTier === 'A' && (diff.resized.length || diff.added.length || diff.removed.length)) add('equipment-redesign-not-authorized', 'Permission A allows move and rotate only.')
-  if (manifest.permissionTier !== 'C' && diff.architectureChanged) add('architecture-change-not-authorized', 'Architecture changes require permission C.')
+  if (!manifest.permissions.placement && (diff.moved.length || diff.rotated.length)) add('placement-change-not-authorized', 'Placement changes were not authorized for this run.')
+  if (!manifest.permissions.equipmentRedesign && (diff.resized.length || diff.substituted.length || diff.added.length || diff.removed.length)) add('equipment-redesign-not-authorized', 'Equipment redesign was not authorized for this run.')
+  if (!manifest.permissions.architecture && diff.architectureChanged) add('architecture-change-not-authorized', 'Architecture changes were not authorized for this run.')
 
   const polygon = candidate.architecture.roomPolygon
-  const solids = candidate.equipment.filter((item) => item.category !== 'hood')
+  const solids = candidate.equipment.filter(isFloorObstacle)
   solids.forEach((item) => {
     const footprint = rotatedFootprint(item)
     if (footprint.some((point) => !insideOrBoundary(point, polygon))) add('outside-room', `${item.label} is outside the room boundary.`)

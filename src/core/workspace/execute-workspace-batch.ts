@@ -64,10 +64,10 @@ const requireComponents = (variant: LayoutVariant, ids: readonly string[]): Equi
 
 const operationPoint = (point: { xMm: number; yMm: number }): PointMm => ({ x: point.xMm, y: point.yMm })
 
-const architecturePatch = (patch: Extract<WorkspaceOperation, { type: 'update_architecture' }>['patch']): Partial<Architecture> => ({
-  ...patch,
-  roomPolygon: patch.roomPolygon?.map(operationPoint),
-})
+const architecturePatch = (patch: Extract<WorkspaceOperation, { type: 'update_architecture' }>['patch']): Partial<Architecture> => {
+  const { roomPolygon, ...rest } = patch
+  return { ...rest, ...(roomPolygon ? { roomPolygon: roomPolygon.map(operationPoint) } : {}) }
+}
 
 const customItem = (operation: Extract<WorkspaceOperation, { type: 'add_custom_component' }>): EquipmentItem => ({
   id: operation.componentId,
@@ -327,7 +327,19 @@ export function executeWorkspaceBatch(options: BatchOptions): WorkspaceBatchResu
   }
 
   const parsed = projectSchema.safeParse(project)
-  if (!parsed.success) return { ok: false, code: 'invalid-project', message: 'Workspace batch produced an invalid project.', revision: options.revision, issues: parsed.error.issues }
+  if (!parsed.success) {
+    const firstIssue = parsed.error.issues[0]
+    const detail = firstIssue
+      ? ` ${firstIssue.path.length ? `${firstIssue.path.join('.')}: ` : ''}${firstIssue.message}`
+      : ''
+    return {
+      ok: false,
+      code: 'invalid-project',
+      message: `Workspace batch produced an invalid project.${detail}`,
+      revision: options.revision,
+      issues: parsed.error.issues,
+    }
+  }
   return {
     ok: true,
     project: parsed.data,

@@ -18,6 +18,7 @@ type PreviewCandidate = {
   project: KitchenProject
   changedIds: string[]
   warnings: string[]
+  diagnostics: ReturnType<typeof diagnosticsDelta>
   intent?: string
 }
 
@@ -39,9 +40,22 @@ type FacadeDependencies = {
   ) => LayoutVariant
 }
 
-const diagnosticsFor = (project: KitchenProject) => {
-  const variant = project.variants.find((candidate) => candidate.id === project.activeVariantId) ?? project.variants[0]
-  return variant ? analyzeLayout(variant.architecture, variant.equipment) : []
+const diagnosticsFor = (project: KitchenProject, variantIds: readonly string[]) => variantIds.flatMap((variantId) => {
+  const variant = project.variants.find((candidate) => candidate.id === variantId)
+  return variant ? analyzeLayout(variant.architecture, variant.equipment, { layoutConstraints: variant.layoutConstraints }).map((issue) => ({ ...issue, variantId })) : []
+})
+
+const diagnosticsDelta = (before: KitchenProject, after: KitchenProject, variantIds: readonly string[]) => {
+  const previous = diagnosticsFor(before, variantIds)
+  const next = diagnosticsFor(after, variantIds)
+  const key = (issue: { variantId: string; id: string }) => `${issue.variantId}\u0000${issue.id}`
+  const previousKeys = new Set(previous.map(key))
+  const nextKeys = new Set(next.map(key))
+  return {
+    added: next.filter((issue) => !previousKeys.has(key(issue))),
+    resolved: previous.filter((issue) => !nextKeys.has(key(issue))),
+    current: next,
+  }
 }
 
 export function createWorkspaceFacade(dependencies: FacadeDependencies) {
@@ -65,10 +79,13 @@ export function createWorkspaceFacade(dependencies: FacadeDependencies) {
       issues: result.issues,
       operationIndex: result.operationIndex,
     }
+    const targetedVariantIds = [...new Set(result.normalizedOperations.map((operation) => operation.variantId))]
+    const diagnostics = diagnosticsDelta(state.project, result.project, targetedVariantIds)
     const candidate: PreviewCandidate = {
       project: result.project,
       changedIds: result.changedIds,
       warnings: result.warnings,
+      diagnostics,
       intent: input.intent,
     }
     const previewToken = previews.issue({
@@ -85,7 +102,7 @@ export function createWorkspaceFacade(dependencies: FacadeDependencies) {
       changedIds: [...result.changedIds],
       warnings: [...result.warnings],
       normalizedOperations: structuredClone(result.normalizedOperations),
-      diagnostics: diagnosticsFor(result.project),
+      diagnostics,
     }
   }
 
@@ -107,7 +124,7 @@ export function createWorkspaceFacade(dependencies: FacadeDependencies) {
       revision: committed.revision,
       changedIds: [...preview.preview.candidate.changedIds],
       warnings: [...preview.preview.candidate.warnings],
-      diagnostics: diagnosticsFor(preview.preview.candidate.project),
+      diagnostics: structuredClone(preview.preview.candidate.diagnostics),
     }
   }
 

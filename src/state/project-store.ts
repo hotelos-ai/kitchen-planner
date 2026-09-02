@@ -11,13 +11,16 @@ import type {
   PointMm,
   SimulationScenario,
 } from '../domain/project'
-import { createCatalogEquipmentItem, getCatalogEntry } from '../domain/catalog/kitchen-catalog'
+import { createCatalogEquipmentItem, filterCatalog, getCatalogEntry, searchCatalog } from '../domain/catalog/kitchen-catalog'
+import { suggestCatalogPlacement } from '../domain/catalog/suggest-placement'
 import { applyEquipmentConfiguration as configureEquipmentItem } from '../domain/equipment-configurations'
+import { evaluateOperationalRequirements } from '../domain/requirements/operational-requirements'
 import { projectSchema } from '../domain/project-schema'
 import { createSeedProject } from '../domain/seed-project'
 import { kitchenSpatialAdapter } from '../domain/spatial-adapter'
 import { appendHistory } from './history'
 import { loadProject, saveProject } from './persistence'
+import { runSimulation } from '../simulation/engine'
 
 type CustomItemInput = {
   label: string
@@ -29,6 +32,8 @@ type CustomItemInput = {
 type ResizeInput = Pick<EquipmentItem, 'widthMm' | 'depthMm'>
 
 type AdoptAutoLayoutCandidateInput = {
+  expectedDocumentId: string
+  expectedRevision: number
   runId: string
   resultId: string
   baselineVariantId: string
@@ -38,7 +43,7 @@ type AdoptAutoLayoutCandidateInput = {
 }
 
 type AdoptAutoLayoutCandidateResult = ReturnType<WorkspaceFacade['applyOperations']> |
-  { ok: false; revision: number; code: 'result-consumed'; message: string }
+  { ok: false; revision: number; code: 'result-consumed' | 'stale-revision' | 'wrong-document'; message: string }
 
 export interface ProjectState {
   project: KitchenProject
@@ -79,6 +84,9 @@ export interface ProjectState {
   undo(): void
   redo(): void
 }
+
+const facadeByStore = new WeakMap<ProjectStore, WorkspaceFacade>()
+const autoLayoutServiceByStore = new WeakMap<ProjectStore, { run(input: unknown): unknown; cancel(input: { runId: string }): unknown }>()
 
 export type ProjectStore = StoreApi<ProjectState>
 
@@ -143,6 +151,15 @@ export function createProjectStore(initialProject: KitchenProject): ProjectStore
       executeCommand: dispatch,
       applyWorkspaceOperations: (operations, intent) => applyOperations(operations, intent ?? 'Update workspace'),
       adoptAutoLayoutCandidate: (input) => {
+        const snapshot = get()
+        if (snapshot.documentId !== input.expectedDocumentId) return {
+          ok: false, revision: snapshot.revision, code: 'wrong-document',
+          message: 'This result belongs to a project document that is no longer open.',
+        }
+        if (snapshot.revision !== input.expectedRevision) return {
+          ok: false, revision: snapshot.revision, code: 'stale-revision',
+          message: `This result was created at revision ${input.expectedRevision}; the workspace is now at revision ${snapshot.revision}. Run auto-layout again.`,
+        }
         const key = adoptedCandidateKey(input.runId, input.resultId)
         if (consumedAdoptedCandidates.has(key)) return {
           ok: false,
@@ -212,6 +229,44 @@ export function createProjectStore(initialProject: KitchenProject): ProjectStore
         const entry = getCatalogEntry(catalogId)
         if (!entry) return null
         const id = makeId(entry.catalogId)
+        if (entry.category === 'architecture') {
+          const variant = getActiveVariant(get())
+          const architecture = variant.architecture
+          if (architecture.locked || catalogId === 'architecture-no-go-zone') return null
+          let patch: Record<string, unknown> | undefined
+          if (catalogId === 'architecture-door' || catalogId === 'architecture-service-window') {
+            const segments = architecture.roomPolygon.map((start, segmentIndex) => {
+              const end = architecture.roomPolygon[(segmentIndex + 1) % architecture.roomPolygon.length]
+              const dx = end.x - start.x; const dy = end.y - start.y
+              const lengthSquared = dx * dx + dy * dy || 1
+              const fraction = Math.max(0, Math.min(1, ((position.xMm - start.x) * dx + (position.yMm - start.y) * dy) / lengthSquared))
+              const projected = { x: start.x + dx * fraction, y: start.y + dy * fraction }
+              return { segmentIndex, start, end, length: Math.sqrt(lengthSquared), fraction, distance: Math.hypot(projected.x - position.xMm, projected.y - position.yMm) }
+            }).sort((left, right) => left.distance - right.distance || left.segmentIndex - right.segmentIndex)
+            const target = segments[0]
+            const widthMm = Math.min(entry.typicalDimensions.widthMm, target.length)
+            const offsetMm = Math.max(0, Math.min(target.length - widthMm, target.fraction * target.length - widthMm / 2))
+            const midpoint = { x: (target.start.x + target.end.x) / 2, y: (target.start.y + target.end.y) / 2 }
+            const edgeDistances = [
+              { wall: 'top' as const, value: midpoint.y }, { wall: 'right' as const, value: architecture.widthMm - midpoint.x },
+              { wall: 'bottom' as const, value: architecture.depthMm - midpoint.y }, { wall: 'left' as const, value: midpoint.x },
+            ].sort((left, right) => left.value - right.value)
+            const serviceWindow = catalogId === 'architecture-service-window'
+            patch = { openings: [...architecture.openings, {
+              id, label: entry.displayName, kind: serviceWindow ? 'service-window' : 'door', wall: edgeDistances[0].wall,
+              segmentIndex: target.segmentIndex, offsetMm, widthMm,
+              ...(serviceWindow ? { sillHeightMm: 900, heightMm: 900, flow: 'clean-out' as const } : { flow: 'entry' as const, swingDepthMm: widthMm }),
+            }] }
+          } else if (catalogId === 'architecture-pillar' || catalogId === 'architecture-partition') {
+            patch = { pillars: [...architecture.pillars, { id, xMm: position.xMm, yMm: position.yMm, widthMm: entry.typicalDimensions.widthMm, depthMm: entry.typicalDimensions.depthMm }] }
+          } else if (catalogId === 'architecture-service-zone') {
+            patch = { storageZones: [...architecture.storageZones, { id, label: entry.displayName, xMm: position.xMm, yMm: position.yMm, widthMm: entry.typicalDimensions.widthMm, depthMm: entry.typicalDimensions.depthMm, adjacent: false }] }
+          }
+          if (!patch) return null
+          const result = applyOperations([{ type: 'update_architecture', variantId: activeVariantId(), patch }], 'Add architectural component')
+          if (result.ok) set({ selectedIds: [] })
+          return result.ok ? id : null
+        }
         const configurationId = entry.configurationIds[0]
         const skinId = entry.appearanceSkinIds[0]
         const result = applyOperations([{
@@ -292,6 +347,33 @@ export function createProjectStore(initialProject: KitchenProject): ProjectStore
   })
   workspaceFacade.current = createWorkspaceFacade({
     store,
+    listCatalog: (filters) => {
+      const input = (filters ?? {}) as { query?: string; category?: Parameters<typeof filterCatalog>[1]['category']; capability?: string }
+      return [...filterCatalog(searchCatalog(input.query ?? ''), { ...(input.category ? { category: input.category } : {}), ...(input.capability ? { capability: input.capability } : {}) })]
+    },
+    getRequirements: ({ variantId, scenarioId }) => {
+      const project = store.getState().project
+      const variant = project.variants.find((candidate) => candidate.id === variantId)
+      const scenario = project.scenarios.find((candidate) => candidate.id === (scenarioId ?? project.activeScenarioId))
+      if (!variant || !scenario) return []
+      return evaluateOperationalRequirements({ architecture: variant.architecture, equipment: variant.equipment, scenario, layoutConstraints: variant.layoutConstraints })
+    },
+    suggestPlacement: ({ variantId, catalogId, preferredPoint }) => {
+      const project = store.getState().project
+      const variant = project.variants.find((candidate) => candidate.id === variantId)
+      const entry = getCatalogEntry(catalogId)
+      if (!variant || !entry) return null
+      return suggestCatalogPlacement({ architecture: variant.architecture, equipment: variant.equipment, entry, snapMm: project.snapMm, layoutConstraints: variant.layoutConstraints, ...(preferredPoint ? { preferredPoint } : {}) })
+    },
+    runSimulation: ({ variantId, scenarioId, seed, outputMode }) => {
+      const project = store.getState().project
+      const variant = project.variants.find((candidate) => candidate.id === variantId)
+      const scenario = project.scenarios.find((candidate) => candidate.id === scenarioId)
+      if (!variant || !scenario) throw new Error('Unknown simulation layout or scenario.')
+      return runSimulation({ architecture: variant.architecture, equipment: variant.equipment, layoutConstraints: variant.layoutConstraints, scenario: { ...scenario, seed }, outputMode })
+    },
+    runAutoLayout: (input) => autoLayoutServiceByStore.get(store)?.run(input) ?? { ok: false, revision: store.getState().revision, code: 'auto-layout-not-configured', message: 'Auto-layout service is not configured.' },
+    cancelRun: (input) => autoLayoutServiceByStore.get(store)?.cancel(input) ?? { ok: false, revision: store.getState().revision, code: 'run-not-found', message: `Run ${input.runId} is not active.` },
     resolveCatalogComponent: (operation) => createCatalogEquipmentItem({
       catalogId: operation.catalogId,
       componentId: operation.componentId,
@@ -307,7 +389,21 @@ export function createProjectStore(initialProject: KitchenProject): ProjectStore
       return structuredClone(candidate)
     },
   })
+  facadeByStore.set(store, workspaceFacade.current)
   return store
+}
+
+export function getWorkspaceFacade(store: ProjectStore = projectStore): WorkspaceFacade {
+  const facade = facadeByStore.get(store)
+  if (!facade) throw new Error('Workspace facade is unavailable for this store.')
+  return facade
+}
+
+export function configureWorkspaceAutoLayout(
+  store: ProjectStore,
+  service: { run(input: unknown): unknown; cancel(input: { runId: string }): unknown },
+): void {
+  autoLayoutServiceByStore.set(store, service)
 }
 
 const isStorage = (value: unknown): value is Storage => {

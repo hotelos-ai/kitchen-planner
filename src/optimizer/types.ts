@@ -1,6 +1,4 @@
-import type { LayoutVariant, RectMm, StationCapability } from '../domain/project'
-
-export type AutoLayoutPermissionTier = 'A' | 'B' | 'C'
+import type { AutoLayoutPermissions, LayoutVariant, RectMm, StationCapability } from '../domain/project'
 
 export interface OptimizerManifest {
   id: string
@@ -10,7 +8,7 @@ export interface OptimizerManifest {
   scenarioIds: string[]
   seeds: number[]
   confirmationSeeds: number[]
-  permissionTier: AutoLayoutPermissionTier
+  permissions: AutoLayoutPermissions
   lockedComponentIds: string[]
   lockedArchitectureElementIds: string[]
   hardRules: {
@@ -30,6 +28,8 @@ export interface OptimizerMetrics {
   peakBacklog: number
   totalTravelMm: number
   congestionEvents: number
+  completionPct?: number
+  throughputPerHour?: number
 }
 
 export interface OptimizerScore extends OptimizerMetrics { changeCost: number }
@@ -41,7 +41,7 @@ export interface EvaluatedCandidate {
   score: OptimizerScore
   evaluatedSeeds: number[]
   confirmationSeeds: number[]
-  diff: { moved: string[]; rotated: string[]; resized: string[]; added: string[]; removed: string[]; architectureChanged: boolean }
+  diff: { moved: string[]; rotated: string[]; resized: string[]; substituted: string[]; added: string[]; removed: string[]; architectureChanged: boolean }
 }
 
 export interface SearchEvaluationInput {
@@ -64,6 +64,11 @@ export interface AnytimeSearchResult {
     evaluatedCandidates: number
     evaluationCacheEntries: number
     evaluationCacheHits: number
+  }
+  diagnostics?: {
+    feasibilityReasonCounts: Record<string, number>
+    simulationRejectionCount: number
+    simulationRejectionMessages: string[]
   }
   termination: 'exhausted' | 'evaluation-budget' | 'time-budget' | 'cancelled'
   bestObservedDisclaimer: string

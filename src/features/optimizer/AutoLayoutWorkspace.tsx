@@ -1,8 +1,9 @@
 import { useMemo, useState } from 'react'
 import { useStore } from 'zustand'
-import type { LayoutVariant, RectMm, SimulationScenario, StaffAssignment, StaffRole } from '../../domain/project'
+import type { AutoLayoutPermissions, LayoutVariant, RectMm, SimulationScenario, StaffAssignment, StaffRole } from '../../domain/project'
 import { canonicalLayoutHash } from '../../optimizer/canonical-layout'
-import type { AnytimeSearchResult, AutoLayoutPermissionTier, EvaluatedCandidate, OptimizerManifest } from '../../optimizer/types'
+import { layoutDiff } from '../../optimizer/feasibility'
+import type { AnytimeSearchResult, EvaluatedCandidate, OptimizerManifest } from '../../optimizer/types'
 import { getActiveVariant, projectStore, type ProjectStore } from '../../state/project-store'
 
 export type AutoLayoutProgress = {
@@ -51,15 +52,33 @@ const roles: Array<{ role: StaffRole; label: string }> = [
 const makeId = (prefix: string) => `${prefix}-${globalThis.crypto?.randomUUID?.() ?? Math.random().toString(36).slice(2)}`
 const minutes = (seconds: number) => `${Number((seconds / 60).toFixed(1))} min`
 const signed = (value: number, unit = '') => `${value > 0 ? '+' : ''}${Number(value.toFixed(1))}${unit}`
-const permissionFlags = (tier: AutoLayoutPermissionTier) => ({
-  placement: true,
-  equipmentRedesign: tier === 'B' || tier === 'C',
-  architecture: tier === 'C',
-})
 const objectiveId = (name: string) => name.toLowerCase().replaceAll(' ', '-')
 
 const bestBy = (candidates: readonly AutoLayoutCandidate[], score: (candidate: AutoLayoutCandidate) => number) =>
   [...candidates].sort((left, right) => score(left) - score(right) || left.id.localeCompare(right.id))[0]
+
+function LayoutThumbnail({ variant, baseline, label }: { variant: LayoutVariant; baseline?: LayoutVariant; label: string }) {
+  const diff = baseline ? layoutDiff(baseline, variant) : undefined
+  const changedIds = new Set(diff ? [...diff.moved, ...diff.rotated, ...diff.resized, ...diff.substituted, ...diff.added] : [])
+  return <svg
+    role="img"
+    aria-label={label}
+    className="auto-layout-thumbnail"
+    viewBox={`0 0 ${variant.architecture.widthMm} ${variant.architecture.depthMm}`}
+    preserveAspectRatio="xMidYMid meet"
+  >
+    <polygon points={variant.architecture.roomPolygon.map((point) => `${point.x},${point.y}`).join(' ')} className="auto-layout-room" />
+    {variant.equipment.map((item) => <rect
+      key={item.id}
+      x={item.xMm}
+      y={item.yMm}
+      width={item.widthMm}
+      height={item.depthMm}
+      className={changedIds.has(item.id) ? 'changed' : undefined}
+      transform={`rotate(${item.rotationDeg} ${item.xMm + item.widthMm / 2} ${item.yMm + item.depthMm / 2})`}
+    ><title>{item.label}</title></rect>)}
+  </svg>
+}
 
 function FinalistCard({
   name,
@@ -79,9 +98,10 @@ function FinalistCard({
   onSave(): void
 }) {
   const baselineScore = baseline?.score
-  const completion = candidate.serviceMetrics?.completionPct
-  const throughput = candidate.serviceMetrics?.throughputPerHour
-  const delta = (key: keyof EvaluatedCandidate['score']) => candidate.score[key] - (baselineScore?.[key] ?? candidate.score[key])
+  const completion = candidate.serviceMetrics?.completionPct ?? candidate.score.completionPct
+  const throughput = candidate.serviceMetrics?.throughputPerHour ?? candidate.score.throughputPerHour
+  const delta = (key: 'unfinishedOrders' | 'p90WaitSeconds' | 'peakBacklog' | 'totalTravelMm' | 'congestionEvents' | 'changeCost') =>
+    candidate.score[key] - (baselineScore?.[key] ?? candidate.score[key])
   const diff = candidate.diff
   return (
     <article className="auto-layout-finalist" data-testid={`finalist-${objectiveId(name)}`}>
@@ -114,10 +134,10 @@ export function AutoLayoutWorkspace({ store = projectStore, runner, now = () => 
   const [durationMinutes, setDurationMinutes] = useState(activeScenario.durationMinutes)
   const [arrivalPattern, setArrivalPattern] = useState(activeScenario.arrivalPattern)
   const [staff, setStaff] = useState<StaffAssignment[]>(() => structuredClone(activeScenario.staff))
-  const [permissionTier, setPermissionTier] = useState<AutoLayoutPermissionTier>('A')
+  const [permissions, setPermissions] = useState<AutoLayoutPermissions>(() => structuredClone(baseline.layoutConstraints?.permissions ?? { placement: true, equipmentRedesign: false, architecture: false }))
   const [lockedComponentIds, setLockedComponentIds] = useState<string[]>(() => [...(baseline.layoutConstraints?.lockedComponentIds ?? [])])
   const [lockedArchitectureElementIds, setLockedArchitectureElementIds] = useState<string[]>(() => [...(baseline.layoutConstraints?.lockedArchitectureElementIds ?? [])])
-  const [minimumAisleMm, setMinimumAisleMm] = useState(baseline.layoutConstraints?.minimumAisleMm ?? 900)
+  const [minimumAisleMm, setMinimumAisleMm] = useState(baseline.layoutConstraints?.minimumAisleMm ?? 0)
   const [noGoZones, setNoGoZones] = useState<RectMm[]>(() => structuredClone(baseline.layoutConstraints?.noGoZones ?? []))
   const [priority, setPriority] = useState<NonNullable<OptimizerManifest['priority']>>('balanced')
   const [targetP90Minutes, setTargetP90Minutes] = useState(15)
@@ -151,7 +171,7 @@ export function AutoLayoutWorkspace({ store = projectStore, runner, now = () => 
     scenarioIds: [activeScenario.id],
     seeds: [3, 5],
     confirmationSeeds: [101],
-    permissionTier,
+    permissions,
     lockedComponentIds,
     lockedArchitectureElementIds,
     hardRules: { minimumAisleMm, noGoZones },
@@ -208,20 +228,29 @@ export function AutoLayoutWorkspace({ store = projectStore, runner, now = () => 
       ...structuredClone(candidate.variant),
       adoptedExperimentManifest: {
         id: manifest.id,
+        documentId: manifest.documentId,
+        revision: manifest.revision,
         baselineVariantId: manifest.baselineVariantId,
         finalistId: candidate.id,
         createdAt: now(),
         scenarioIds: [...manifest.scenarioIds],
         seeds: [...candidate.evaluatedSeeds],
         confirmationSeeds: [...candidate.confirmationSeeds],
-        permissions: permissionFlags(manifest.permissionTier),
+        permissions: structuredClone(manifest.permissions),
+        lockedComponentIds: [...manifest.lockedComponentIds],
+        lockedArchitectureElementIds: [...manifest.lockedArchitectureElementIds],
+        hardRules: structuredClone(manifest.hardRules),
         budget: { maxDurationMs: manifest.budget.maxDurationMs, maxEvaluations: manifest.budget.maxEvaluations },
+        ...(manifest.priority ? { priority: manifest.priority } : {}),
+        ...(manifest.targetP90WaitSeconds ? { targetP90WaitSeconds: manifest.targetP90WaitSeconds } : {}),
         objective: objectiveId(name),
         resultHash: candidate.hash,
         resultMetrics: { ...candidate.score, ...(candidate.serviceMetrics ?? {}) },
       },
     }
     const applied = store.getState().adoptAutoLayoutCandidate({
+      expectedDocumentId: manifest.documentId,
+      expectedRevision: manifest.revision,
       runId: manifest.id,
       resultId: candidate.id,
       baselineVariantId: manifest.baselineVariantId,
@@ -244,9 +273,9 @@ export function AutoLayoutWorkspace({ store = projectStore, runner, now = () => 
             {roles.map(({ role, label }) => <label key={role}>{label} count<input type="number" min="0" value={staff.find((assignment) => assignment.role === role)?.count ?? 0} onChange={(event) => setStaffCount(role, Number(event.target.value))} /></label>)}
           </fieldset>
           <fieldset><legend>Permissions</legend>
-            <label><input type="radio" name="permission" checked={permissionTier === 'A'} onChange={() => setPermissionTier('A')} />A — Move and rotate only</label>
-            <label><input type="radio" name="permission" checked={permissionTier === 'B'} onChange={() => setPermissionTier('B')} />B — Equipment redesign and substitutions</label>
-            <label><input type="radio" name="permission" checked={permissionTier === 'C'} onChange={() => setPermissionTier('C')} />C — Authorized architecture changes</label>
+            <label><input type="checkbox" checked={permissions.placement} onChange={(event) => setPermissions((value) => ({ ...value, placement: event.target.checked }))} />A — Move and rotate existing equipment</label>
+            <label><input type="checkbox" checked={permissions.equipmentRedesign} onChange={(event) => setPermissions((value) => ({ ...value, equipmentRedesign: event.target.checked }))} />B — Resize, substitute, add, or remove equipment</label>
+            <label><input type="checkbox" checked={permissions.architecture} onChange={(event) => setPermissions((value) => ({ ...value, architecture: event.target.checked }))} />C — Authorized architecture changes</label>
           </fieldset>
           <fieldset><legend>Locks and critical inventory</legend>
             {baseline.equipment.map((item) => <label key={item.id}><input type="checkbox" checked={lockedComponentIds.includes(item.id)} onChange={(event) => toggle(lockedComponentIds, setLockedComponentIds, item.id, event.target.checked)} />Lock {item.label}</label>)}
@@ -273,12 +302,23 @@ export function AutoLayoutWorkspace({ store = projectStore, runner, now = () => 
           {result && <>
             <p>{result.bestObservedDisclaimer}</p>
             <article className="auto-layout-baseline"><h3>Baseline</h3><p>{baseline.name} · {baseline.equipment.length} components · no project mutation during search</p></article>
+            {!namedFinalists.length && <section role="alert" aria-label="No feasible auto-layout finalists" className="auto-layout-diagnosis">
+              <h3>No confirmed feasible finalist</h3>
+              <p>The search ended with {result.termination.replaceAll('-', ' ')} before it could confirm a layout. Review the modeled constraints below, then adjust the rules, permissions, or budget and run again.</p>
+              {Object.keys(result.diagnostics?.feasibilityReasonCounts ?? {}).length > 0 && <ul>
+                {Object.entries(result.diagnostics!.feasibilityReasonCounts).sort(([left], [right]) => left.localeCompare(right)).map(([code, count]) => <li key={code}>{code}: {count}</li>)}
+              </ul>}
+              {(result.diagnostics?.simulationRejectionCount ?? 0) > 0 && <>
+                <p>{result.diagnostics!.simulationRejectionCount} candidates were rejected by simulation validation.</p>
+                {result.diagnostics!.simulationRejectionMessages.length > 0 && <ul>{result.diagnostics!.simulationRejectionMessages.map((reason) => <li key={reason}>{reason}</li>)}</ul>}
+              </>}
+            </section>}
             <div className="auto-layout-finalists">
               {namedFinalists.map(({ name, candidate }) => <FinalistCard key={name} name={name} candidate={candidate} baseline={baselineResult} manifest={result.manifest} onInspect={() => setInspected(candidate)} onCompare={() => setCompared(candidate)} onSave={() => adopt(name, candidate)} />)}
             </div>
           </>}
-          {inspected && <section role="region" aria-label="Inspected finalist"><h3>Inspected finalist</h3><p>{inspected.id} · {inspected.variant.equipment.length} components · read-only preview</p></section>}
-          {compared && <section role="region" aria-label="Finalist comparison"><h3>Finalist comparison</h3><p>{compared.id} against {baseline.id} · read-only comparison</p></section>}
+          {inspected && <section role="region" aria-label="Inspected finalist"><h3>Inspected finalist</h3><p>{inspected.id} · {inspected.variant.equipment.length} components · read-only spatial preview</p><LayoutThumbnail variant={inspected.variant} baseline={baseline} label="Inspected finalist plan" /></section>}
+          {compared && <section role="region" aria-label="Finalist comparison"><h3>Finalist comparison</h3><p>{compared.id} against {baseline.id} · read-only spatial comparison</p><div className="auto-layout-comparison"><div><strong>Baseline</strong><LayoutThumbnail variant={baseline} label="Baseline comparison plan" /></div><div><strong>Finalist</strong><LayoutThumbnail variant={compared.variant} baseline={baseline} label="Finalist comparison plan" /></div></div></section>}
         </div>
       </div>
     </section>

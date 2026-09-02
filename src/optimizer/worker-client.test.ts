@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import { createSeedProject } from '../domain/seed-project'
-import { createOptimizerWorkerRuntime } from './optimizer.worker'
+import { createOptimizerWorkerRuntime, createSimulationEvaluator } from './optimizer.worker'
 import { createOptimizerWorkerClient, OptimizerWorkerClientError, type WorkerLike } from './worker-client'
 import type {
   OptimizerWorkerInput,
@@ -22,7 +22,7 @@ const manifest = (overrides: Partial<OptimizerManifest> = {}): OptimizerManifest
   scenarioIds: [scenario.id],
   seeds: [3, 5],
   confirmationSeeds: [101],
-  permissionTier: 'A',
+  permissions: { placement: true, equipmentRedesign: false, architecture: false },
   lockedComponentIds: [],
   lockedArchitectureElementIds: [],
   hardRules: { minimumAisleMm: 700, noGoZones: [] },
@@ -82,6 +82,34 @@ describe('optimizer Worker protocol', () => {
     expect(firstTrace.map((entry) => entry.phase)).toContain('feasibility')
     expect(first.candidates.map((entry) => entry.hash)).toEqual(second.candidates.map((entry) => entry.hash))
     expect(first.evaluationCount).toBe(second.evaluationCount)
+  })
+
+  it('injects frozen hard circulation rules into every simulated candidate', async () => {
+    const evaluated: SearchEvaluationInput[] = []
+    const client = createOptimizerWorkerClient({
+      createWorker: () => runtimeWorker({ evaluate: (input) => { evaluated.push(input); return metrics(input) } }),
+      getSnapshot: () => ({ documentId: 'document-1', revision: 4 }),
+    })
+    await client.start(request('hard-rules', manifest({
+      hardRules: { minimumAisleMm: 1200, bodyRadiusMm: 275, noGoZones: [{ id: 'gas', xMm: 20, yMm: 20, widthMm: 50, depthMm: 50 }] },
+    })))
+    expect(evaluated.length).toBeGreaterThan(0)
+    expect(evaluated.every(({ candidate }) => candidate.layoutConstraints?.minimumAisleMm === 1200
+      && candidate.layoutConstraints.noGoZones?.[0]?.id === 'gas')).toBe(true)
+  })
+
+  it('reports production completion and throughput metrics from metrics-only simulations', () => {
+    const evaluate = createSimulationEvaluator([scenario])
+    const result = evaluate({
+      candidate: { ...structuredClone(baseline), layoutConstraints: { minimumAisleMm: 0 } },
+      candidateHash: 'baseline',
+      seed: 3,
+      confirmation: false,
+    })
+
+    expect(result.completionPct).toBeGreaterThan(0)
+    expect(result.completionPct).toBeLessThanOrEqual(100)
+    expect(result.throughputPerHour).toBeGreaterThan(0)
   })
 
   it('strictly rejects unknown manifest fields with a stable error code', async () => {

@@ -64,4 +64,16 @@ describe('navigation grid', () => {
     expect(stationApproachPoints(item, 'left')).toEqual([{ x: 550, y: 1850 }])
     expect(stationApproachPoints(item, 'either-side')).toEqual([{ x: 550, y: 1850 }, { x: 550, y: 3350 }])
   })
+
+  it('does not treat wall and overhead storage as floor navigation obstacles', () => {
+    const elevated = (catalogId: string): EquipmentItem => ({
+      id: catalogId, catalogId, label: catalogId, category: 'storage', widthMm: 1800, depthMm: 1800,
+      heightMm: 500, xMm: 100, yMm: 100, rotationDeg: 0, dimensionsLocked: false,
+      movable: true, removable: true, capabilities: [],
+    })
+    const grid = buildNavGrid({ ...room, architecture: { ...room.architecture, pillars: [] }, equipment: [
+      elevated('storage-wall-shelf'), elevated('storage-overhead-rack'),
+    ] }, 100, { bodyRadiusMm: 0 })
+    expect(grid.isWalkable({ x: 500, y: 500 })).toBe(true)
+  })
 })

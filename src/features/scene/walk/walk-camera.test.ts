@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import type { PointMm } from '../../../domain/project'
 import type { WalkCollider } from './walk-collision'
 import { createWalkPlayerPose } from './player-motion'
-import { cameraTransformForPose, updateObstacleAwareChaseCamera } from './walk-camera'
+import { avatarYawForHeading, cameraTransformForPose, updateObstacleAwareChaseCamera } from './walk-camera'
 
 const polygon = (left: number, top: number, right: number, bottom: number): PointMm[] => [
   { x: left, y: top }, { x: right, y: top }, { x: right, y: bottom }, { x: left, y: bottom },
@@ -25,6 +25,9 @@ describe('walk camera', () => {
     expect(first.position).toEqual({ xMm: 2000, heightMm: 2530, yMm: 3000 })
     expect(third.position).not.toEqual(first.position)
     expect(third.target.heightMm).toBeGreaterThan(pose.elevationMm)
+    expect(third.target.heightMm).toBeLessThan(cameraTransformForPose({ ...pose, pitchRad: .2 }, 'third-person', 2600).target.heightMm)
+    expect(avatarYawForHeading(0)).toBeCloseTo(Math.PI / 2)
+    expect(avatarYawForHeading(Math.PI / 2)).toBeCloseTo(0)
     expect(pose).toEqual(snapshot)
   })
 

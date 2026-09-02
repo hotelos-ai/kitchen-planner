@@ -99,13 +99,15 @@ export const autoLayoutPermissionsSchema = z.object({
 export const layoutConstraintsSchema = z.object({
   lockedComponentIds: z.array(z.string().min(1)).optional(),
   lockedArchitectureElementIds: z.array(z.string().min(1)).optional(),
-  minimumAisleMm: z.number().positive().finite().optional(),
+  minimumAisleMm: z.number().nonnegative().finite().optional(),
   noGoZones: z.array(rectSchema).optional(),
   permissions: autoLayoutPermissionsSchema.optional(),
 }).strict()
 
 export const adoptedExperimentManifestSchema = z.object({
   id: z.string().min(1),
+  documentId: z.string().min(1).optional(),
+  revision: z.number().int().nonnegative().optional(),
   baselineVariantId: z.string().min(1),
   finalistId: z.string().min(1),
   createdAt: z.string().datetime(),
@@ -113,11 +115,21 @@ export const adoptedExperimentManifestSchema = z.object({
   seeds: z.array(z.number().int()).min(1),
   confirmationSeeds: z.array(z.number().int()),
   permissions: autoLayoutPermissionsSchema,
+  lockedComponentIds: z.array(z.string().min(1)).optional(),
+  lockedArchitectureElementIds: z.array(z.string().min(1)).optional(),
+  hardRules: z.object({
+    minimumAisleMm: z.number().nonnegative().finite(),
+    bodyRadiusMm: z.number().nonnegative().finite().optional(),
+    noGoZones: z.array(rectSchema),
+    requiredCapacityByCapability: z.partialRecord(capabilitySchema, z.number().int().positive()).optional(),
+  }).strict().optional(),
   budget: z.object({
     maxDurationMs: z.number().int().positive().optional(),
     maxEvaluations: z.number().int().positive().optional(),
   }).strict().refine((budget) => Object.keys(budget).length > 0, 'At least one search budget is required'),
   objective: z.string().min(1),
+  priority: z.enum(['balanced', 'service', 'travel', 'minimal-change']).optional(),
+  targetP90WaitSeconds: z.number().positive().finite().optional(),
   resultHash: z.string().min(1).optional(),
   resultMetrics: z.record(z.string(), z.number().finite()).optional(),
 }).strict()
@@ -161,6 +173,47 @@ export const projectSchema = z.object({
   activeVariantId: z.string().min(1),
   activeScenarioId: z.string().min(1),
 }).strict().superRefine((project, context) => {
+  const duplicateIndexes = (values: readonly string[]) => values.flatMap((value, index) => values.indexOf(value) === index ? [] : [index])
+  duplicateIndexes(project.variants.map((variant) => variant.id)).forEach((index) => context.addIssue({ code: 'custom', path: ['variants', index, 'id'], message: 'Layout variant IDs must be unique' }))
+  duplicateIndexes(project.scenarios.map((scenario) => scenario.id)).forEach((index) => context.addIssue({ code: 'custom', path: ['scenarios', index, 'id'], message: 'Scenario IDs must be unique' }))
+  const variantIds = new Set(project.variants.map((variant) => variant.id))
+  const scenarioIds = new Set(project.scenarios.map((scenario) => scenario.id))
+  project.variants.forEach((variant, variantIndex) => {
+    duplicateIndexes(variant.equipment.map((item) => item.id)).forEach((index) => context.addIssue({ code: 'custom', path: ['variants', variantIndex, 'equipment', index, 'id'], message: 'Component IDs must be unique within a layout' }))
+    if (variant.parentId && (!variantIds.has(variant.parentId) || variant.parentId === variant.id)) context.addIssue({ code: 'custom', path: ['variants', variantIndex, 'parentId'], message: 'Parent layout must reference a different existing variant' })
+    const architectureElements = [
+      ...variant.architecture.openings.map((element, index) => ({ id: element.id, collection: 'openings', index })),
+      ...variant.architecture.pillars.map((element, index) => ({ id: element.id, collection: 'pillars', index })),
+      ...variant.architecture.storageZones.map((element, index) => ({ id: element.id, collection: 'storageZones', index })),
+    ]
+    duplicateIndexes(architectureElements.map((element) => element.id)).forEach((duplicateIndex) => {
+      const element = architectureElements[duplicateIndex]
+      context.addIssue({
+        code: 'custom',
+        path: ['variants', variantIndex, 'architecture', element.collection, element.index, 'id'],
+        message: 'Architecture element IDs must be unique within a layout',
+      })
+    })
+    const componentIds = new Set(variant.equipment.map((item) => item.id))
+    variant.layoutConstraints?.lockedComponentIds?.forEach((id, index) => {
+      if (!componentIds.has(id)) context.addIssue({ code: 'custom', path: ['variants', variantIndex, 'layoutConstraints', 'lockedComponentIds', index], message: 'Locked component does not exist in this layout' })
+    })
+    const architectureIds = new Set(['room', ...variant.architecture.openings.map((value) => value.id), ...variant.architecture.pillars.map((value) => value.id), ...variant.architecture.storageZones.map((value) => value.id)])
+    variant.layoutConstraints?.lockedArchitectureElementIds?.forEach((id, index) => {
+      if (!architectureIds.has(id)) context.addIssue({ code: 'custom', path: ['variants', variantIndex, 'layoutConstraints', 'lockedArchitectureElementIds', index], message: 'Locked architecture element does not exist in this layout' })
+    })
+    variant.adoptedExperimentManifest?.scenarioIds.forEach((id, index) => {
+      if (!scenarioIds.has(id)) context.addIssue({ code: 'custom', path: ['variants', variantIndex, 'adoptedExperimentManifest', 'scenarioIds', index], message: 'Experiment scenario does not exist in this project' })
+    })
+    const baselineVariantId = variant.adoptedExperimentManifest?.baselineVariantId
+    if (baselineVariantId && (!variantIds.has(baselineVariantId) || baselineVariantId === variant.id)) {
+      context.addIssue({
+        code: 'custom',
+        path: ['variants', variantIndex, 'adoptedExperimentManifest', 'baselineVariantId'],
+        message: 'Experiment baseline must reference a different existing layout variant',
+      })
+    }
+  })
   if (!project.variants.some((variant) => variant.id === project.activeVariantId)) {
     context.addIssue({ code: 'custom', path: ['activeVariantId'], message: 'Active layout variant does not exist' })
   }

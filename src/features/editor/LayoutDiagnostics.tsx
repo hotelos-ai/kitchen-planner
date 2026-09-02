@@ -3,9 +3,8 @@ import { analyzeLayout } from '../../domain/layout-diagnostics'
 import { getActiveVariant, type ProjectStore } from '../../state/project-store'
 
 export function LayoutDiagnostics({ store }: { store: ProjectStore }) {
-  const project = useStore(store, (state) => state.project)
   const variant = useStore(store, getActiveVariant)
-  const issues = analyzeLayout(project.architecture, variant.equipment)
+  const issues = analyzeLayout(variant.architecture, variant.equipment, { layoutConstraints: variant.layoutConstraints })
   return (
     <section className="layout-diagnostics" aria-label="Layout checks">
       <div><span className="eyebrow">Live geometry audit</span><strong>{issues.length ? `${issues.length} items to inspect` : 'No geometry conflicts'}</strong></div>

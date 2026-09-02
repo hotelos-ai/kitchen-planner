@@ -29,6 +29,25 @@ export type EquipmentConfiguration = {
   notes?: string
 }
 
+export type PhysicalConfigurationDetails = {
+  configurationId?: string
+  tierCount?: number
+  mounting: 'floor' | 'wall' | 'overhead' | 'counter' | 'architectural'
+  mobile: boolean
+}
+
+export function physicalConfigurationDetails(item: EquipmentItem): PhysicalConfigurationDetails {
+  const entry = item.catalogId ? getCatalogEntry(item.catalogId) : undefined
+  const configurationId = item.configurationPreset
+  const preset = entry?.physicalConfigurations.find((candidate) => candidate.id === configurationId)
+  return {
+    ...(configurationId ? { configurationId } : {}),
+    ...(preset?.tierCount ? { tierCount: preset.tierCount } : {}),
+    mounting: preset?.mounting ?? entry?.placementRules.mounting ?? 'floor',
+    mobile: preset?.mobile ?? false,
+  }
+}
+
 const configuration = (
   id: string,
   family: EquipmentConfigurationFamily,
@@ -136,23 +155,21 @@ const titleCaseId = (value: string) => value.split('-').map((part) => part.charA
 function catalogConfigurations(item: EquipmentItem): EquipmentConfiguration[] {
   const entry = item.catalogId ? getCatalogEntry(item.catalogId) : undefined
   if (!entry) return []
-  return entry.configurationIds.map((id, index) => {
-    const denominator = Math.max(1, entry.configurationIds.length - 1)
-    const ratio = index === 0 ? 0 : index / denominator
-    const dimension = (axis: 'widthMm' | 'depthMm' | 'heightMm') => Math.round(
-      (entry.typicalDimensions[axis] + (entry.maximumDimensions[axis] - entry.typicalDimensions[axis]) * ratio) / 10,
-    ) * 10
+  return entry.physicalConfigurations.map((preset) => {
+    const clearanceKind = ['door-swing', 'heat', 'service'].includes(preset.clearance.kind)
+      ? preset.clearance.kind as ClearanceSpec['kind']
+      : 'work'
     return {
-      id,
+      id: preset.id,
       family: 'catalog',
-      label: `${entry.displayName} · ${titleCaseId(id)}`,
-      description: `${titleCaseId(id)} physical configuration for ${entry.displayName}.`,
+      label: preset.label,
+      description: `${titleCaseId(preset.id)} physical configuration for ${entry.displayName}.`,
       category: item.category,
-      widthMm: dimension('widthMm'),
-      depthMm: dimension('depthMm'),
-      heightMm: dimension('heightMm'),
-      capabilities: [...item.capabilities],
-      clearance: structuredClone(item.clearance ?? { kind: 'work', frontMm: entry.clearance.frontMm }),
+      widthMm: preset.dimensions.widthMm,
+      depthMm: preset.dimensions.depthMm,
+      heightMm: preset.dimensions.heightMm,
+      capabilities: [...preset.capabilities] as StationCapability[],
+      clearance: { kind: clearanceKind, frontMm: preset.clearance.frontMm, leftMm: preset.clearance.leftMm, rightMm: preset.clearance.rightMm, backMm: preset.clearance.backMm },
       visualPreset: entry.constructorKey,
     }
   })

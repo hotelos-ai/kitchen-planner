@@ -36,10 +36,10 @@ export function CompareWorkspace({ store = projectStore }: { store?: ProjectStor
   const baseline = project.variants.find((variant) => variant.id === baselineId) ?? project.variants[0]
   const candidate = project.variants.find((variant) => variant.id === candidateId) ?? project.variants[0]
   const scenario = project.scenarios.find((value) => value.id === project.activeScenarioId) ?? project.scenarios[0]
-  const baselineResult = useMemo(() => runSimulation({ architecture: project.architecture, equipment: baseline.equipment, scenario }), [baseline, project.architecture, scenario])
-  const candidateResult = useMemo(() => runSimulation({ architecture: project.architecture, equipment: candidate.equipment, scenario }), [candidate, project.architecture, scenario])
+  const baselineResult = useMemo(() => runSimulation({ architecture: baseline.architecture, equipment: baseline.equipment, layoutConstraints: baseline.layoutConstraints, scenario }), [baseline, scenario])
+  const candidateResult = useMemo(() => runSimulation({ architecture: candidate.architecture, equipment: candidate.equipment, layoutConstraints: candidate.layoutConstraints, scenario }), [candidate, scenario])
   const deltas = useMemo(() => compareResults(baselineResult, candidateResult), [baselineResult, candidateResult])
-  const findings = useMemo(() => buildFindings({ baseline: baselineResult, candidate: candidateResult, candidateEquipment: candidate.equipment }), [baselineResult, candidateResult, candidate.equipment])
+  const findings = useMemo(() => buildFindings({ baseline: baselineResult, candidate: candidateResult, candidateEquipment: candidate.equipment, candidateArchitecture: candidate.architecture }), [baselineResult, candidateResult, candidate.architecture, candidate.equipment])
   const affectedIds = selectedFinding?.affectedItemIds ?? []
   if (showReport) return <ReportView project={project} baseline={baseline} candidate={candidate} scenario={scenario} deltas={deltas} findings={findings} onClose={() => setShowReport(false)} />
   return (
@@ -53,7 +53,7 @@ export function CompareWorkspace({ store = projectStore }: { store?: ProjectStor
         <button type="button" onClick={() => setShowReport(true)}>Report</button>
       </div>
       <div className="compare-body">
-        <div><p className="compare-assumptions">{scenario.covers} covers over {scenario.durationMinutes} minutes · same staff, timings, and seed for both layouts</p><section className="compare-grid"><VariantPreview variant={baseline} architecture={project.architecture} mode={mode} deltas={deltas} side="baseline" affectedIds={affectedIds} /><VariantPreview variant={candidate} architecture={project.architecture} mode={mode} deltas={deltas} side="candidate" affectedIds={affectedIds} /></section></div>
+        <div><p className="compare-assumptions">{scenario.covers} covers over {scenario.durationMinutes} minutes · same staff, timings, and seed for both layouts</p><section className="compare-grid"><VariantPreview variant={baseline} architecture={baseline.architecture} mode={mode} deltas={deltas} side="baseline" affectedIds={affectedIds} /><VariantPreview variant={candidate} architecture={candidate.architecture} mode={mode} deltas={deltas} side="candidate" affectedIds={affectedIds} /></section></div>
         <aside className="priority-findings"><span className="eyebrow">Evidence, not guesswork</span><h2>Priority findings</h2><p>Select a finding to highlight the affected equipment in both layouts.</p>{findings.map((finding) => <button type="button" key={finding.ruleId} className={`${finding.severity}${selectedFinding?.ruleId === finding.ruleId ? ' selected' : ''}`} onClick={() => setSelectedFinding(finding)}><span>{finding.severity === 'positive' ? 'Preserve' : finding.severity}</span><strong>{finding.title}</strong><small>{finding.explanation}</small>{finding.evidence.map((evidence) => <em key={evidence}>{evidence}</em>)}</button>)}</aside>
       </div>
       <p className="compare-disclaimer">Comparative planning aid — “better” means better under this exact scenario, not universal approval. Verify the final design with qualified local professionals.</p>

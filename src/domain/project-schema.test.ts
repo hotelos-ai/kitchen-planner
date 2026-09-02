@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import type { KitchenProject } from './project'
 import { projectSchema } from './project-schema'
 
 const validProject = {
@@ -46,6 +47,13 @@ const validProject = {
 }
 
 describe('project schema', () => {
+  it('accepts zero to explicitly disable the optional minimum-aisle rule', () => {
+    const candidate = structuredClone(validProject)
+    Object.assign(candidate.variants[0], { layoutConstraints: { minimumAisleMm: 0 } })
+
+    expect(projectSchema.safeParse(candidate).success).toBe(true)
+  })
+
   it('accepts a complete metric project', () => {
     expect(projectSchema.safeParse(validProject).success).toBe(true)
   })
@@ -109,7 +117,7 @@ describe('project schema', () => {
   })
 
   it('accepts variant-owned architecture and reproducible layout metadata', () => {
-    const enriched = structuredClone(validProject)
+    const enriched = structuredClone(validProject) as unknown as KitchenProject
     Object.assign(enriched.variants[0], {
       operationalProfile: {
         covers: 80,
@@ -122,7 +130,7 @@ describe('project schema', () => {
       },
       layoutConstraints: {
         lockedComponentIds: ['tandoor'],
-        lockedArchitectureElementIds: ['pillar'],
+        lockedArchitectureElementIds: ['room'],
         minimumAisleMm: 1100,
         permissions: { placement: true, equipmentRedesign: false, architecture: false },
         noGoZones: [{ id: 'gas-riser', xMm: 300, yMm: 400, widthMm: 500, depthMm: 600 }],
@@ -143,6 +151,11 @@ describe('project schema', () => {
       },
     })
     Object.assign(enriched.variants[0].equipment[0], { appearanceSkinId: 'stainless-brushed' })
+    const adopted = structuredClone(enriched.variants[0])
+    adopted.id = 'adopted-option'
+    adopted.parentId = 'baseline'
+    delete enriched.variants[0].adoptedExperimentManifest
+    enriched.variants.push(adopted)
 
     expect(projectSchema.safeParse(enriched).success).toBe(true)
   })
@@ -151,5 +164,66 @@ describe('project schema', () => {
     const invalid = structuredClone(validProject)
     delete (invalid.variants[0] as Partial<(typeof invalid.variants)[number]>).architecture
     expect(projectSchema.safeParse(invalid).success).toBe(false)
+  })
+
+  it('rejects duplicate IDs and broken variant-owned references', () => {
+    const duplicateVariant = structuredClone(validProject)
+    duplicateVariant.variants.push(structuredClone(duplicateVariant.variants[0]))
+    expect(projectSchema.safeParse(duplicateVariant).success).toBe(false)
+
+    const duplicateEquipment = structuredClone(validProject)
+    duplicateEquipment.variants[0].equipment.push(structuredClone(duplicateEquipment.variants[0].equipment[0]))
+    expect(projectSchema.safeParse(duplicateEquipment).success).toBe(false)
+
+    const broken = structuredClone(validProject)
+    Object.assign(broken.variants[0], {
+      parentId: 'missing-parent',
+      layoutConstraints: { lockedComponentIds: ['missing-component'], lockedArchitectureElementIds: ['missing-opening'] },
+    })
+    expect(projectSchema.safeParse(broken).success).toBe(false)
+  })
+
+  it('rejects adopted experiment manifests with a missing or self-referencing baseline', () => {
+    const missingBaseline = structuredClone(validProject) as unknown as KitchenProject
+    Object.assign(missingBaseline.variants[0], {
+      adoptedExperimentManifest: {
+        id: 'experiment-missing-baseline',
+        baselineVariantId: 'missing-layout',
+        finalistId: 'fastest-service',
+        createdAt: '2026-09-02T00:00:00.000Z',
+        scenarioIds: ['dinner-peak'],
+        seeds: [7],
+        confirmationSeeds: [17],
+        permissions: { placement: true, equipmentRedesign: false, architecture: false },
+        budget: { maxEvaluations: 20 },
+        objective: 'fastest-service',
+      },
+    })
+    expect(projectSchema.safeParse(missingBaseline).success).toBe(false)
+
+    const selfBaseline = structuredClone(missingBaseline)
+    selfBaseline.variants[0].adoptedExperimentManifest!.baselineVariantId = selfBaseline.variants[0].id
+    expect(projectSchema.safeParse(selfBaseline).success).toBe(false)
+  })
+
+  it('rejects duplicate architecture element IDs across openings, pillars, and storage zones', () => {
+    const duplicateArchitectureId = structuredClone(validProject) as unknown as KitchenProject
+    duplicateArchitectureId.variants[0].architecture.openings.push({
+      id: 'shared-architecture-id',
+      label: 'Entry',
+      kind: 'door',
+      wall: 'top',
+      offsetMm: 500,
+      widthMm: 900,
+    })
+    duplicateArchitectureId.variants[0].architecture.pillars.push({
+      id: 'shared-architecture-id',
+      xMm: 1200,
+      yMm: 1200,
+      widthMm: 400,
+      depthMm: 400,
+    })
+
+    expect(projectSchema.safeParse(duplicateArchitectureId).success).toBe(false)
   })
 })

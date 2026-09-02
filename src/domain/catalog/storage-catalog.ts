@@ -1,4 +1,4 @@
-import { parseCatalogEntries, type CatalogDimensions } from './types'
+import { createPhysicalConfigurationPresets, parseCatalogEntries, type CatalogDimensions } from './types'
 
 type StorageOptions = {
   id: string
@@ -18,7 +18,9 @@ type StorageOptions = {
   constructorKey: string
 }
 
-const storageEntry = (options: StorageOptions) => ({
+const storageEntry = (options: StorageOptions) => {
+  const clearance = { frontMm: options.clearanceFrontMm, leftMm: 0, rightMm: 0, backMm: 0, topMm: 100, kind: 'storage' as const }
+  return {
   catalogId: options.id,
   familyId: options.familyId,
   displayName: options.name,
@@ -30,7 +32,7 @@ const storageEntry = (options: StorageOptions) => ({
   maximumDimensions: options.maximum,
   capabilities: options.capabilities,
   capacity: options.capacity,
-  clearance: { frontMm: options.clearanceFrontMm, leftMm: 0, rightMm: 0, backMm: 0, topMm: 100, kind: 'storage' },
+  clearance,
   intendedApproachFace: options.mounting === 'overhead' ? 'none' : 'front',
   placementRules: {
     mounting: options.mounting,
@@ -41,11 +43,13 @@ const storageEntry = (options: StorageOptions) => ({
     keepClearOfOpeningsMm: 600,
   },
   configurationIds: options.configurationIds,
+  physicalConfigurations: createPhysicalConfigurationPresets({ configurationIds: options.configurationIds, displayName: options.name, typicalDimensions: options.dimensions, maximumDimensions: options.maximum, capabilities: options.capabilities, capacity: options.capacity, clearance, mounting: options.mounting, tags: options.tags }),
   appearanceSkinIds: ['stainless-brushed', 'powder-black', 'galvanized'],
   footprint: { shape: 'rectangle', cornerRadiusMm: 12 },
   tags: options.tags,
   constructorKey: options.constructorKey,
-})
+  }
+}
 
 const rawStorageCatalog = [
   storageEntry({ id: 'storage-wall-shelf', familyId: 'shelving-wall', name: 'Wall shelf', description: 'Elevated wall-mounted shelf for ingredients, utensils, or small equipment without blocking the floor.', synonyms: ['wall rack', 'floating shelf', 'ingredient shelf'], dimensions: { widthMm: 1200, depthMm: 350, heightMm: 300 }, minimum: { widthMm: 600, depthMm: 250, heightMm: 150 }, maximum: { widthMm: 2400, depthMm: 500, heightMm: 900 }, capabilities: ['elevated-storage'], capacity: { workPositions: 0, concurrentUnits: 12, storageLitres: 180 }, mounting: 'wall', clearanceFrontMm: 500, configurationIds: ['wall-shelf-one-tier', 'wall-shelf-two-tier', 'wall-shelf-three-tier'], tags: ['wall-mounted', 'elevated', 'shelving'], constructorKey: 'storage-wall-shelf' }),

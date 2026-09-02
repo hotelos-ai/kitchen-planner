@@ -1,4 +1,5 @@
-import { polygonsOverlap, rotatedFootprint } from '../geometry'
+import { pointInPolygon, polygonsOverlap, rotatedFootprint } from '../geometry'
+import { isFloorObstacle } from '../catalog/floor-obstacle'
 import { analyzeLayout } from '../layout-diagnostics'
 import type {
   Architecture,
@@ -9,7 +10,7 @@ import type {
   StaffRole,
   StationCapability,
 } from '../project'
-import { buildNavGrid, findRoute } from '../../simulation/nav-grid'
+import { buildNavGrid, findRoute, stationApproachPoints } from '../../simulation/nav-grid'
 
 export type OperationalRequirementSeverity = 'blocker' | 'warning' | 'professional-review'
 
@@ -147,17 +148,20 @@ const staffDefinition = (code: string, roles: readonly StaffRole[], reason: stri
   },
 })
 
-const stationGoal = (item: EquipmentItem): PointMm => {
-  const radians = item.rotationDeg * Math.PI / 180
-  const x = item.widthMm / 2
-  const y = item.depthMm + 150
-  return {
-    x: item.xMm + x * Math.cos(radians) - y * Math.sin(radians),
-    y: item.yMm + x * Math.sin(radians) + y * Math.cos(radians),
-  }
-}
-
 const openingPoint = (architecture: Architecture, opening: Architecture['openings'][number]): PointMm => {
+  if (opening.segmentIndex !== undefined) {
+    const start = architecture.roomPolygon[opening.segmentIndex]
+    const end = architecture.roomPolygon[(opening.segmentIndex + 1) % architecture.roomPolygon.length]
+    if (start && end) {
+      const length = Math.hypot(end.x - start.x, end.y - start.y) || 1
+      const unit = { x: (end.x - start.x) / length, y: (end.y - start.y) / length }
+      const edge = { x: start.x + unit.x * (opening.offsetMm + opening.widthMm / 2), y: start.y + unit.y * (opening.offsetMm + opening.widthMm / 2) }
+      const normals = [{ x: -unit.y, y: unit.x }, { x: unit.y, y: -unit.x }]
+      const inside = normals.map((normal) => ({ x: edge.x + normal.x * 150, y: edge.y + normal.y * 150 }))
+        .find((point) => pointInPolygon(point, architecture.roomPolygon))
+      if (inside) return inside
+    }
+  }
   const middle = opening.offsetMm + opening.widthMm / 2
   if (opening.wall === 'left') return { x: 150, y: middle }
   if (opening.wall === 'right') return { x: architecture.widthMm - 150, y: middle }
@@ -190,7 +194,10 @@ const routeDefinition: OperationalRequirementDefinition = {
       const start = openingPoint(input.architecture, entry)
       const evidence: RequirementEvidence[] = []
       stations.forEach((station) => {
-        try { findRoute(grid, start, stationGoal(station)) }
+        try {
+          const goals = stationApproachPoints(station)
+          if (!goals.some((goal) => { try { findRoute(grid, start, goal); return true } catch { return false } })) throw new Error('unreachable')
+        }
         catch { evidence.push({ reason: `${station.label} cannot be reached from the staff entry on the modeled circulation grid.`, itemIds: [station.id] }) }
       })
       openings.forEach((opening) => {
@@ -262,7 +269,7 @@ export const OPERATIONAL_REQUIREMENTS: readonly OperationalRequirementDefinition
     source: 'modeled-clearance',
     scope: 'layout',
     recommendedCatalogIds: [],
-    evaluate: (input) => analyzeLayout(input.architecture, input.equipment)
+    evaluate: (input) => analyzeLayout(input.architecture, input.equipment, { layoutConstraints: input.layoutConstraints })
       .filter((issue) => issue.code === 'clearance-obstructed')
       .map((issue) => ({ reason: issue.message, itemIds: issue.itemIds })),
   },
@@ -274,13 +281,18 @@ export const OPERATIONAL_REQUIREMENTS: readonly OperationalRequirementDefinition
     scope: 'layout',
     recommendedCatalogIds: [],
     evaluate: (input) => (input.layoutConstraints?.noGoZones ?? []).flatMap((zone) => input.equipment
-      .filter((item) => item.category !== 'hood' && polygonsOverlap(rotatedFootprint(item), rectPolygon(zone)))
+      .filter((item) => isFloorObstacle(item) && polygonsOverlap(rotatedFootprint(item), rectPolygon(zone)))
       .map((item) => ({ reason: `${item.label} overlaps the ${zone.id} no-go zone.`, itemIds: [item.id] }))),
   },
   professionalDefinition('professional-fire-review', 'Fire suppression, fuel, and life-safety details require review by a qualified professional.', ['utility-canopy-hood']),
   professionalDefinition('professional-ventilation-review', 'Exhaust, make-up air, and ventilation details require review by a qualified professional.', ['utility-canopy-hood']),
   professionalDefinition('professional-hygiene-review', 'Hygiene, food-safety, and sanitation details require review by a qualified professional.', ['sanitation-hand-sink']),
   professionalDefinition('professional-accessibility-review', 'Accessibility, egress, and workplace accommodation details require review by a qualified professional.'),
+  professionalDefinition('professional-gas-review', 'Gas supply, isolation, combustion, and appliance connections require review by a qualified professional.'),
+  professionalDefinition('professional-electrical-review', 'Electrical loads, protection, isolation, and connection details require review by a qualified professional.'),
+  professionalDefinition('professional-drainage-review', 'Water supply, drainage falls, backflow protection, and floor waste details require review by a qualified professional.'),
+  professionalDefinition('professional-grease-review', 'Grease interception and waste handling details require review by a qualified professional.'),
+  professionalDefinition('professional-local-authority-review', 'Local planning, building, health, fire, and workplace requirements require qualified professional and authority review.'),
 ])
 
 export function evaluateOperationalRequirements(input: OperationalRequirementInput): OperationalRequirementResult[] {

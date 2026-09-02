@@ -19,7 +19,7 @@ export type WalkSpawnResolution =
 
 const PLAYER_RADIUS_MM = 260
 const SPAWN_SEARCH_STEP_MM = 100
-const ELEVATED_STORAGE_PRESETS = new Set(['storage-wall-shelf', 'storage-overshelf', 'storage-overhead'])
+const ELEVATED_STORAGE_PRESETS = new Set(['storage-wall-shelf', 'storage-overshelf', 'storage-overhead', 'storage-overhead-rack'])
 
 export type WalkCollisionPolicy = 'floor-obstacle' | 'elevated-pass-through'
 
@@ -128,6 +128,25 @@ const entryGeometry = (architecture: Architecture) => {
   const door = architecture.openings.find((opening) => opening.kind === 'door' && opening.flow === 'entry')
   if (!door) return undefined
   const middle = door.offsetMm + door.widthMm / 2
+  if (door.segmentIndex !== undefined) {
+    const start = architecture.roomPolygon[door.segmentIndex]
+    const end = architecture.roomPolygon[(door.segmentIndex + 1) % architecture.roomPolygon.length]
+    if (start && end) {
+      const dx = end.x - start.x
+      const dy = end.y - start.y
+      const length = Math.hypot(dx, dy)
+      if (length > 0) {
+        const signedArea = architecture.roomPolygon.reduce((area, point, index) => {
+          const next = architecture.roomPolygon[(index + 1) % architecture.roomPolygon.length]
+          return area + point.x * next.y - next.x * point.y
+        }, 0)
+        const side = signedArea >= 0 ? 1 : -1
+        const inward = { x: -dy / length * side, y: dx / length * side }
+        const edge = { x: start.x + dx * middle / length, y: start.y + dy * middle / length }
+        return { edge, inward, headingRad: Math.atan2(inward.y, inward.x) }
+      }
+    }
+  }
   const inward = door.wall === 'left' ? { x: 1, y: 0 } : door.wall === 'right' ? { x: -1, y: 0 } : door.wall === 'top' ? { x: 0, y: 1 } : { x: 0, y: -1 }
   const edge = door.wall === 'left' ? { x: 0, y: middle } : door.wall === 'right' ? { x: architecture.widthMm, y: middle } : door.wall === 'top' ? { x: middle, y: 0 } : { x: middle, y: architecture.depthMm }
   return { edge, inward, headingRad: Math.atan2(inward.y, inward.x) }

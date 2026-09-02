@@ -1,4 +1,5 @@
 import { pointInPolygon, polygonsOverlap, rotatedFootprint } from './geometry'
+import { isFloorObstacle } from './catalog/floor-obstacle'
 import type { Architecture, EquipmentItem, LayoutConstraints, Opening, PointMm, RectMm } from './project'
 
 export type LayoutIssue = {
@@ -110,7 +111,7 @@ export function doorSwingEnvelopes(architecture: Architecture): readonly { openi
 
 export function analyzeLayout(architecture: Architecture, equipment: readonly EquipmentItem[], options: LayoutDiagnosticOptions = {}): LayoutIssue[] {
   const issues: LayoutIssue[] = []
-  const floorItems = equipment.filter((item) => item.category !== 'hood')
+  const floorItems = equipment.filter(isFloorObstacle)
   const footprints = new Map(floorItems.map((item) => [item.id, rotatedFootprint(item)]))
   const pillarPolygons = architecture.pillars.map((pillar) => ({ pillar, polygon: rectPolygon(pillar) }))
   const doorPolygons = doorSwingEnvelopes(architecture)

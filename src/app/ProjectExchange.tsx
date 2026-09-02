@@ -34,7 +34,7 @@ export function ProjectExchange({ store = projectStore }: { store?: ProjectStore
       <button type="button" onClick={onExport}>Export all layouts</button>
       <label className="import-project">Import<input type="file" accept="application/json,.json" aria-label="Import project JSON" onChange={onImport} /></label>
       <button type="button" aria-expanded={showHelp} onClick={() => setShowHelp((value) => !value)} aria-label="Keyboard help">?</button>
-      {showHelp && <div className="shortcut-popover" role="dialog" aria-label="Keyboard shortcuts"><strong>Keyboard shortcuts</strong><span>Arrow keys · move by snap</span><span>Shift + arrows · move 10 mm</span><span>⌘/Ctrl Z · undo</span><span>⌘/Ctrl D · duplicate</span><span>Delete · remove</span><span>Escape · clear selection</span></div>}
+      {showHelp && <div className="shortcut-popover" role="dialog" aria-label="Keyboard shortcuts"><strong>Keyboard shortcuts</strong><span>Arrow keys · move by snap</span><span>Shift + arrows · move by 5× snap</span><span>⌘/Ctrl Z · undo</span><span>⌘/Ctrl Shift Z or Ctrl Y · redo</span><span>⌘/Ctrl D · duplicate</span><span>[ / ] · rotate left / right</span><span>Delete · remove</span><span>Escape · close transient UI, then clear selection</span></div>}
       {message && <div className={`exchange-message ${message.kind}`} role={message.kind === 'error' ? 'alert' : 'status'}>{message.text}<button type="button" aria-label="Dismiss message" onClick={() => setMessage(null)}>×</button></div>}
     </div>
   )

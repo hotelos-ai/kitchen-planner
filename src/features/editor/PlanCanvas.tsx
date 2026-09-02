@@ -33,7 +33,7 @@ export function PlanCanvas({ store, showReference, onInspectComponentIn3D, onCom
   const project = useStore(store, (state) => state.project)
   const selectedIds = useStore(store, (state) => state.selectedIds)
   const variant = useStore(store, getActiveVariant)
-  const warningIds = [...new Set(analyzeLayout(project.architecture, variant.equipment).flatMap((issue) => issue.itemIds))]
+  const warningIds = [...new Set(analyzeLayout(variant.architecture, variant.equipment, { layoutConstraints: variant.layoutConstraints }).flatMap((issue) => issue.itemIds))]
   const contextItem = contextRequest ? variant.equipment.find((item) => item.id === contextRequest.itemId) : undefined
   const quickItem = quickRequest ? variant.equipment.find((item) => item.id === quickRequest.itemId) : undefined
 
@@ -49,11 +49,11 @@ export function PlanCanvas({ store, showReference, onInspectComponentIn3D, onCom
 
   const margin = 44
   const pixelsPerMm = Math.min(
-    (size.width - margin * 2) / project.architecture.widthMm,
-    (size.height - margin * 2) / project.architecture.depthMm,
+    (size.width - margin * 2) / variant.architecture.widthMm,
+    (size.height - margin * 2) / variant.architecture.depthMm,
   )
-  const planWidth = project.architecture.widthMm * pixelsPerMm
-  const planHeight = project.architecture.depthMm * pixelsPerMm
+  const planWidth = variant.architecture.widthMm * pixelsPerMm
+  const planHeight = variant.architecture.depthMm * pixelsPerMm
   const originX = (size.width - planWidth) / 2
   const originY = (size.height - planHeight) / 2
 
@@ -68,6 +68,7 @@ export function PlanCanvas({ store, showReference, onInspectComponentIn3D, onCom
       equipment: variant.equipment,
       entry,
       snapMm: project.snapMm,
+      layoutConstraints: variant.layoutConstraints,
       preferredPoint: {
         xMm: (event.clientX - bounds.left - originX) / pixelsPerMm,
         yMm: (event.clientY - bounds.top - originY) / pixelsPerMm,
@@ -116,7 +117,7 @@ export function PlanCanvas({ store, showReference, onInspectComponentIn3D, onCom
           setQuickRequest(undefined)
         }
       }}>
-        <ArchitectureLayer architecture={project.architecture} pixelsPerMm={pixelsPerMm} originX={originX} originY={originY} />
+        <ArchitectureLayer architecture={variant.architecture} pixelsPerMm={pixelsPerMm} originX={originX} originY={originY} />
         <GridLayer width={size.width} height={size.height} pixelsPerMm={pixelsPerMm} originX={originX} originY={originY} snapMm={project.snapMm} />
         <EquipmentLayer
           items={variant.equipment}
@@ -133,7 +134,7 @@ export function PlanCanvas({ store, showReference, onInspectComponentIn3D, onCom
           onMove={(id, point) => store.getState().moveItems([id], point)}
           onTransform={(id, patch) => store.getState().updateItem(id, patch)}
         />
-        <OpeningOverlayLayer architecture={project.architecture} pixelsPerMm={pixelsPerMm} originX={originX} originY={originY} />
+        <OpeningOverlayLayer architecture={variant.architecture} pixelsPerMm={pixelsPerMm} originX={originX} originY={originY} />
       </Stage>
       {contextRequest && contextItem && <ComponentContextMenu
         item={contextItem}

@@ -16,6 +16,7 @@ export type WalkCameraPoint = { xMm: number; heightMm: number; yMm: number }
 export type WalkCameraTransform = { position: WalkCameraPoint; target: WalkCameraPoint }
 
 const forwardFor = (headingRad: number) => ({ x: Math.cos(headingRad), y: Math.sin(headingRad) })
+export const avatarYawForHeading = (headingRad: number) => Math.PI / 2 - headingRad
 
 export function cameraTransformForPose(pose: WalkPlayerPose, view: WalkViewMode, boomMm = DEFAULT_CHASE_BOOM_MM): WalkCameraTransform {
   const forward = forwardFor(pose.headingRad)
@@ -33,6 +34,7 @@ export function cameraTransformForPose(pose: WalkPlayerPose, view: WalkViewMode,
   }
 
   const right = { x: -forward.y, y: forward.x }
+  const pitchOffsetMm = Math.sin(pose.pitchRad) * 900
   return {
     position: {
       xMm: pose.x - forward.x * boomMm + right.x * CHASE_SHOULDER_OFFSET_MM,
@@ -41,7 +43,7 @@ export function cameraTransformForPose(pose: WalkPlayerPose, view: WalkViewMode,
     },
     target: {
       xMm: pose.x + forward.x * CHASE_TARGET_FORWARD_MM,
-      heightMm: pose.elevationMm + CHASE_TARGET_HEIGHT_MM,
+      heightMm: pose.elevationMm + CHASE_TARGET_HEIGHT_MM + pitchOffsetMm,
       yMm: pose.y + forward.y * CHASE_TARGET_FORWARD_MM,
     },
   }

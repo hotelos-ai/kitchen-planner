@@ -85,6 +85,30 @@ describe('project persistence', () => {
     expect(importProject(exported)).toEqual(project)
   })
 
+  it('normalizes the exported compatibility architecture to the active layout without mutating the project', () => {
+    const project = createSeedProject()
+    const alternative = structuredClone(project.variants[0])
+    alternative.id = 'active-jagged-layout'
+    alternative.name = 'Active jagged layout'
+    alternative.parentId = project.variants[0].id
+    alternative.architecture.widthMm = 4800
+    alternative.architecture.roomPolygon = [
+      { x: 0, y: 0 },
+      { x: 4800, y: 0 },
+      { x: 4800, y: 5000 },
+      { x: 3200, y: 6200 },
+      { x: 0, y: 6200 },
+    ]
+    project.variants.push(alternative)
+    project.activeVariantId = alternative.id
+    const originalMirror = structuredClone(project.architecture)
+
+    const decoded = JSON.parse(exportProject(project))
+
+    expect(decoded.architecture).toEqual(alternative.architecture)
+    expect(project.architecture).toEqual(originalMirror)
+  })
+
   it('falls back to the last good snapshot when current JSON is corrupt', () => {
     const project = createSeedProject()
     const storage = memoryStorage({

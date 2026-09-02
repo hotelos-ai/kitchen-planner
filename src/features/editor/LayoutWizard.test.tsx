@@ -52,6 +52,9 @@ describe('layout wizard', () => {
     expect(screen.getByText('Jagged dinner service')).toBeInTheDocument()
     expect(screen.getByText(/180 covers.*two waves/i)).toBeInTheDocument()
     expect(screen.getByText(/1 service window.*1 pillar.*1 storage zone/i)).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Unresolved blockers' })).toBeInTheDocument()
+    expect(screen.getByText(/staff entry/i)).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Professional review' })).toBeInTheDocument()
     expect(screen.getByText(/does not certify regulatory compliance/i)).toBeInTheDocument()
   })
 

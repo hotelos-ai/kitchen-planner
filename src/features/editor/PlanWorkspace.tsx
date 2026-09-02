@@ -15,15 +15,17 @@ type Props = {
   store?: ProjectStore
   showCanvas?: boolean
   compact?: boolean
+  onInspectComponentIn3D?(itemId: string): void
 }
 
-export function PlanWorkspace({ store = projectStore, showCanvas = typeof ResizeObserver !== 'undefined', compact = false }: Props) {
+export function PlanWorkspace({ store = projectStore, showCanvas = typeof ResizeObserver !== 'undefined', compact = false, onInspectComponentIn3D }: Props) {
   const [showReference, setShowReference] = useState(false)
   const [catalogOpen, setCatalogOpen] = useState(true)
   const [inspectorOpen, setInspectorOpen] = useState(true)
   const [wizardOpen, setWizardOpen] = useState(false)
   const [wizardStartsAtRoom, setWizardStartsAtRoom] = useState(false)
   const [essentialsOpen, setEssentialsOpen] = useState(false)
+  const [closedLayout, setClosedLayout] = useState<{ name: string; undo(): void } | null>(null)
   const selectedIds = useStore(store, (state) => state.selectedIds)
   const canUndo = useStore(store, (state) => state.past.length > 0)
   const canRedo = useStore(store, (state) => state.future.length > 0)
@@ -40,13 +42,19 @@ export function PlanWorkspace({ store = projectStore, showCanvas = typeof Resize
     nudge: (ids, delta) => store.getState().nudgeItems(ids, delta),
     rotate: (ids, deltaDeg) => store.getState().rotateItems(ids, deltaDeg),
     clearSelection: () => store.getState().clearSelection(),
+    onEscape: () => {
+      if (essentialsOpen) { setEssentialsOpen(false); return true }
+      if (wizardOpen) { setWizardOpen(false); setWizardStartsAtRoom(false); return true }
+      if (closedLayout) { setClosedLayout(null); return true }
+      return false
+    },
   })
 
   return (
     <>
     <section className={`plan-workspace${compact ? ' compact' : ''}`} aria-label="2D plan workspace">
       {!compact && <div key="toolbar" className="workspace-toolbar">
-        <LayoutVariants store={store} onAdd={() => { setWizardStartsAtRoom(false); setWizardOpen(true) }} />
+        <LayoutVariants store={store} onAdd={() => { setWizardStartsAtRoom(false); setWizardOpen(true) }} onClosed={(closed) => setClosedLayout(closed)} />
         <div className="toolbar-actions">
           <button type="button" aria-label="Toggle equipment catalog" aria-pressed={catalogOpen} onClick={() => setCatalogOpen((open) => !open)}>Catalog</button>
           <button type="button" aria-label="Toggle inspector" aria-pressed={inspectorOpen} onClick={() => setInspectorOpen((open) => !open)}>Inspector</button>
@@ -69,11 +77,12 @@ export function PlanWorkspace({ store = projectStore, showCanvas = typeof Resize
             {!compact && <span>Architecture locked by default</span>}
             <span>{selectedIds.length ? `${selectedIds.length} selected` : compact ? 'Select equipment' : 'Select equipment to edit'}</span>
           </div>
-          {showCanvas ? <PlanCanvas store={store} showReference={compact ? false : showReference} /> : <div className="test-canvas-placeholder" />}
+          {showCanvas ? <PlanCanvas store={store} showReference={compact ? false : showReference} onInspectComponentIn3D={onInspectComponentIn3D} /> : <div className="test-canvas-placeholder" />}
         </div>
         {!compact && <div key="inspector" className="editor-drawer right-panel inspector-drawer" data-editor-drawer="inspector" aria-hidden={!inspectorOpen}><EquipmentInspector store={store} /><LayoutDiagnostics store={store} /><ProjectSettings store={store} /></div>}
       </div>
     </section>
+    {!compact && closedLayout && <div className="workspace-toast" role="status"><span>{closedLayout.name} closed.</span><button type="button" aria-label={`Undo close ${closedLayout.name}`} onClick={() => { closedLayout.undo(); setClosedLayout(null) }}>Undo</button><button type="button" aria-label="Dismiss closed layout message" onClick={() => setClosedLayout(null)}>×</button></div>}
     {!compact && wizardOpen && <LayoutWizard
       store={store}
       initialStep={wizardStartsAtRoom ? 1 : 0}

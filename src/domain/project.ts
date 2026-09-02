@@ -128,6 +128,8 @@ export interface LayoutConstraints {
 
 export interface AdoptedExperimentManifest {
   id: string
+  documentId?: string
+  revision?: number
   baselineVariantId: string
   finalistId: string
   createdAt: string
@@ -135,7 +137,17 @@ export interface AdoptedExperimentManifest {
   seeds: number[]
   confirmationSeeds: number[]
   permissions: AutoLayoutPermissions
+  lockedComponentIds?: string[]
+  lockedArchitectureElementIds?: string[]
+  hardRules?: {
+    minimumAisleMm: number
+    bodyRadiusMm?: number
+    noGoZones: RectMm[]
+    requiredCapacityByCapability?: Partial<Record<StationCapability, number>>
+  }
   budget: { maxDurationMs?: number; maxEvaluations?: number }
+  priority?: 'balanced' | 'service' | 'travel' | 'minimal-change'
+  targetP90WaitSeconds?: number
   objective: string
   resultHash?: string
   resultMetrics?: Record<string, number>

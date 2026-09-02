@@ -21,6 +21,8 @@ describe('operational requirement registry', () => {
     const professional = results.filter((result) => result.severity === 'professional-review')
     expect(professional.map((result) => result.code)).toEqual(expect.arrayContaining([
       'professional-fire-review', 'professional-ventilation-review', 'professional-hygiene-review', 'professional-accessibility-review',
+      'professional-gas-review', 'professional-electrical-review', 'professional-drainage-review',
+      'professional-grease-review', 'professional-local-authority-review',
     ]))
     professional.forEach((result) => {
       expect(result.source).toBe('professional-judgment')

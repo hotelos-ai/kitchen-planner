@@ -125,9 +125,11 @@ describe('layout wizard operation builder', () => {
       'activate_layout',
     ])
     expect(operations.slice(3, 5)).toMatchObject([
-      { variantId: 'wizard-layout', componentId: 'wizard-layout-essential-1', catalogId: 'sanitation-hand-sink', position: { xMm: 500, yMm: 500 } },
-      { variantId: 'wizard-layout', componentId: 'wizard-layout-essential-2', catalogId: 'prep-work-table', position: { xMm: 1700, yMm: 500 } },
+      { variantId: 'wizard-layout', componentId: 'wizard-layout-essential-1', catalogId: 'sanitation-hand-sink', position: { xMm: expect.any(Number), yMm: expect.any(Number) } },
+      { variantId: 'wizard-layout', componentId: 'wizard-layout-essential-2', catalogId: 'prep-work-table', position: { xMm: expect.any(Number), yMm: expect.any(Number) } },
     ])
+    const additions = operations.filter((operation) => operation.type === 'add_component')
+    expect(additions[0].position).not.toEqual(additions[1].position)
   })
 
   it('submits the complete batch as one revision and one undo checkpoint', () => {

@@ -3,6 +3,7 @@ import type { Architecture, EquipmentItem } from '../../../domain/project'
 import { ChefAvatar } from '../agents/ChefAvatar'
 import { FirstPersonController } from './FirstPersonController'
 import { FirstPersonHands } from './FirstPersonHands'
+import { avatarYawForHeading } from './walk-camera'
 import { buildWalkColliders, resolveWalkSpawn, type WalkSpawnResolution } from './walk-collision'
 import type { WalkPlayerPose, WalkPlayerPosition, WalkViewMode } from './types'
 
@@ -42,7 +43,7 @@ export function WalkScene({ active, view = 'first-person', architecture, equipme
   return <>
     <FirstPersonController active view={view} architecture={architecture} equipment={equipment} spawn={resolution.spawn} staff={staff} onLockedChange={onLockedChange} onNearbyChange={onNearbyChange} onPoseChange={handlePoseChange} />
     {view === 'first-person' && <FirstPersonHands pose={playerPose} reducedMotion={reducedMotion} />}
-    {view === 'third-person' && playerPose && <group position={[playerPose.x / 1000, playerPose.elevationMm / 1000, playerPose.y / 1000]}>
+    {view === 'third-person' && playerPose && <group position={[playerPose.x / 1000, playerPose.elevationMm / 1000, playerPose.y / 1000]} rotation={[0, avatarYawForHeading(playerPose.headingRad), 0]}>
       <ChefAvatar player reducedMotion={Boolean(reducedMotion)} pose={{ agentId: 'player-chef', role: 'head-chef', xMm: playerPose.x, yMm: playerPose.y, state: playerPose.locomotion === 'idle' ? 'waiting' : 'walking', headingRad: playerPose.headingRad, moving: playerPose.locomotion === 'walking' || playerPose.locomotion === 'running' }} />
     </group>}
   </>

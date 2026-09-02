@@ -60,6 +60,25 @@ describe('catalog placement suggestion', () => {
     expect(suggestCatalogPlacement({ architecture, equipment, entry, snapMm: 100 })).toBeNull()
   })
 
+  it('keeps new floor equipment out of no-go zones and opening clearances', () => {
+    const constrained: Architecture = {
+      ...architecture,
+      openings: [{ id: 'entry', label: 'Entry', kind: 'door', wall: 'top', offsetMm: 0, widthMm: 200, flow: 'entry' }],
+    }
+    const constrainedEntry = {
+      ...entry,
+      placementRules: { mounting: 'floor' as const, requiresWall: false, keepClearOfOpeningsMm: 100 },
+    }
+
+    expect(suggestCatalogPlacement({
+      architecture: constrained,
+      equipment: [],
+      entry: constrainedEntry,
+      snapMm: 100,
+      layoutConstraints: { noGoZones: [{ id: 'protected', xMm: 200, yMm: 0, widthMm: 100, depthMm: 200 }] },
+    })).toEqual({ xMm: 300, yMm: 0, rotationDeg: 0 })
+  })
+
   it('rejects malformed dimensions or snap intervals without throwing', () => {
     expect(suggestCatalogPlacement({ architecture, equipment: [], entry: { typicalDimensions: { widthMm: -1, depthMm: 200, heightMm: 850 } }, snapMm: 100 })).toBeNull()
     expect(suggestCatalogPlacement({ architecture, equipment: [], entry, snapMm: 0 })).toBeNull()

@@ -1,8 +1,29 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { createSeedProject } from '../domain/seed-project'
-import { createProjectStore, getActiveItem, getVariantItem } from './project-store'
+import { configureWorkspaceAutoLayout, createProjectStore, getActiveItem, getActiveVariant, getVariantItem, getWorkspaceFacade } from './project-store'
 
 describe('project store', () => {
+  it('exposes the same domain-backed catalog, placement, requirements, and simulation facade used by the UI', () => {
+    const store = createProjectStore(createSeedProject())
+    const facade = getWorkspaceFacade(store)
+
+    expect(facade.getComponentCatalog({ category: 'storage' }).length).toBeGreaterThan(5)
+    expect(facade.suggestPlacement({ variantId: 'baseline-trace', catalogId: 'storage-wall-shelf' })).not.toBeNull()
+    expect(facade.getLayoutRequirements({ variantId: 'baseline-trace', scenarioId: 'dinner-peak' }).length).toBeGreaterThan(0)
+    expect(facade.runSimulation({ variantId: 'baseline-trace', scenarioId: 'dinner-peak', seed: 7, outputMode: 'metrics-only' })).toMatchObject({ seed: 7 })
+  })
+  it('routes UI and future-agent auto-layout calls through the store-bound public facade', async () => {
+    const store = createProjectStore(createSeedProject())
+    const run = vi.fn(async (input) => input)
+    const cancel = vi.fn((input) => input)
+    configureWorkspaceAutoLayout(store, { run, cancel })
+    const facade = getWorkspaceFacade(store)
+
+    await expect(facade.runAutoLayout({ variantId: 'baseline-trace', experiment: { seeds: [3, 5] } })).resolves.toEqual({ variantId: 'baseline-trace', experiment: { seeds: [3, 5] } })
+    expect(facade.cancelRun({ runId: 'run-1' })).toEqual({ runId: 'run-1' })
+    expect(run).toHaveBeenCalledOnce()
+    expect(cancel).toHaveBeenCalledWith({ runId: 'run-1' })
+  })
   it('routes UI actions and direct commands through identical semantics', () => {
     const uiStore = createProjectStore(createSeedProject())
     const toolStore = createProjectStore(createSeedProject())
@@ -51,6 +72,22 @@ describe('project store', () => {
     expect(getActiveItem(store.getState(), 'tandoor').appearanceSkinId).toBe('stainless-worn')
     expect(store.getState()).toMatchObject({ revision: 2 })
     expect(store.getState().past).toHaveLength(2)
+  })
+
+  it('adds architectural catalog entries to variant architecture rather than equipment', () => {
+    const project = createSeedProject()
+    project.variants[0].architecture.locked = false
+    project.architecture.locked = false
+    const store = createProjectStore(project)
+    const beforeEquipment = store.getState().project.variants[0].equipment.length
+
+    expect(store.getState().addCatalogItem('architecture-service-window', { xMm: 1200, yMm: 0 })).toMatch(/^architecture-service-window-/)
+    expect(store.getState().addCatalogItem('architecture-pillar', { xMm: 1800, yMm: 2200 })).toMatch(/^architecture-pillar-/)
+
+    const variant = getActiveVariant(store.getState())
+    expect(variant.equipment).toHaveLength(beforeEquipment)
+    expect(variant.architecture.openings.at(-1)).toMatchObject({ kind: 'service-window', segmentIndex: 0, flow: 'clean-out' })
+    expect(variant.architecture.pillars.at(-1)).toMatchObject({ xMm: 1800, yMm: 2200 })
   })
 
   it('adds, duplicates, removes, and restores equipment', () => {
@@ -187,6 +224,8 @@ describe('project store', () => {
     }
 
     const result = store.getState().adoptAutoLayoutCandidate({
+      expectedDocumentId: store.getState().documentId,
+      expectedRevision: 0,
       runId: 'experiment-1',
       resultId: 'fastest',
       baselineVariantId: 'baseline-trace',
@@ -207,6 +246,8 @@ describe('project store', () => {
     })
 
     const duplicateAdoption = store.getState().adoptAutoLayoutCandidate({
+      expectedDocumentId: store.getState().documentId,
+      expectedRevision: 1,
       runId: 'experiment-1',
       resultId: 'fastest',
       baselineVariantId: 'baseline-trace',
@@ -227,5 +268,29 @@ describe('project store', () => {
     expect(replay).toMatchObject({ ok: false, code: 'batch-operation-failed' })
     expect(store.getState()).toMatchObject({ revision: 1 })
     expect(store.getState().project.variants).toHaveLength(2)
+  })
+
+  it('rejects adopting an optimizer result after its bound document or revision changes', () => {
+    const store = createProjectStore(createSeedProject())
+    const candidate = structuredClone(store.getState().project.variants[0])
+    const documentId = store.getState().documentId
+    store.getState().rotateItems(['tandoor'], 90)
+
+    expect(store.getState().adoptAutoLayoutCandidate({
+      expectedDocumentId: documentId,
+      expectedRevision: 0,
+      runId: 'stale-run', resultId: 'result', baselineVariantId: candidate.id,
+      newVariantId: 'stale-layout', name: 'Stale', candidate,
+    })).toMatchObject({ ok: false, code: 'stale-revision', revision: 1 })
+    expect(store.getState().project.variants).toHaveLength(1)
+
+    store.getState().replaceProject(createSeedProject())
+    expect(store.getState().adoptAutoLayoutCandidate({
+      expectedDocumentId: documentId,
+      expectedRevision: 0,
+      runId: 'wrong-document', resultId: 'result', baselineVariantId: candidate.id,
+      newVariantId: 'wrong-layout', name: 'Wrong', candidate,
+    })).toMatchObject({ ok: false, code: 'wrong-document' })
+    expect(store.getState().project.variants).toHaveLength(1)
   })
 })

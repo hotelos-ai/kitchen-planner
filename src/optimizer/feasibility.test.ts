@@ -6,7 +6,7 @@ import type { OptimizerManifest } from './types'
 
 const manifest = (tier: 'A' | 'B' | 'C', lockedComponentIds: string[] = []): OptimizerManifest => ({
   id: 'experiment', documentId: 'document', revision: 2, baselineVariantId: 'baseline', scenarioIds: ['dinner-peak'],
-  seeds: [11, 12], confirmationSeeds: [91], permissionTier: tier, lockedComponentIds, lockedArchitectureElementIds: [],
+  seeds: [11, 12], confirmationSeeds: [91], permissions: { placement: true, equipmentRedesign: tier !== 'A', architecture: tier === 'C' }, lockedComponentIds, lockedArchitectureElementIds: [],
   hardRules: { minimumAisleMm: 800, noGoZones: [] }, budget: { maxEvaluations: 20, maxDurationMs: 10_000 },
 })
 

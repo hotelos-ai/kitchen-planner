@@ -21,7 +21,7 @@ const makeRequest = (store: ReturnType<typeof createProjectStore>): AutoLayoutRu
     scenarioIds: [scenario.id],
     seeds: [3],
     confirmationSeeds: [101],
-    permissionTier: 'A',
+    permissions: { placement: true, equipmentRedesign: false, architecture: false },
     lockedComponentIds: [],
     lockedArchitectureElementIds: [],
     hardRules: { minimumAisleMm: 900, noGoZones: [] },

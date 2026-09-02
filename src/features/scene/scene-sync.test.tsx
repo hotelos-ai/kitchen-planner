@@ -62,15 +62,23 @@ describe('3D scene synchronization', () => {
     expect(screen.getByTestId('renderer-state')).toHaveTextContent('perspective:3:true')
   })
 
-  it('replaces detached labels with a recoverable context-loss message', async () => {
+  it('keeps the canvas mounted through native context restoration and repeated loss', async () => {
     const user = userEvent.setup()
-    const FlakyRenderer = (props: SceneRendererProps & { onContextLost?: () => void }) => <button type="button" onClick={props.onContextLost}>Lose WebGL context</button>
+    let mounts = 0
+    const FlakyRenderer = (props: SceneRendererProps) => {
+      useEffect(() => { mounts += 1 }, [])
+      return <div><button type="button" onClick={props.onContextLost}>Lose WebGL context</button><button type="button" onClick={props.onContextRestored}>Restore WebGL context</button></div>
+    }
 
     render(<SceneWorkspace renderer={FlakyRenderer} />)
     await user.click(screen.getByRole('button', { name: 'Lose WebGL context' }))
     expect(screen.getByRole('alert')).toHaveTextContent(/3D rendering paused/i)
-    await user.click(screen.getByRole('button', { name: /Restart 3D renderer/i }))
+    expect(screen.getByRole('button', { name: 'Restore WebGL context' })).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Restore WebGL context' }))
     expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Lose WebGL context' }))
+    await user.click(screen.getByRole('button', { name: /Restart 3D renderer/i }))
+    expect(mounts).toBe(2)
   })
 
   it('reports unsupported WebGL without mounting a renderer', () => {

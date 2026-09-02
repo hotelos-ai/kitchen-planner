@@ -1,8 +1,10 @@
 import { useMemo, useState } from 'react'
 import { useStore } from 'zustand'
-import { KITCHEN_CATALOG } from '../../domain/catalog/kitchen-catalog'
+import { createCatalogEquipmentItem, KITCHEN_CATALOG } from '../../domain/catalog/kitchen-catalog'
+import { suggestCatalogPlacement } from '../../domain/catalog/suggest-placement'
 import { buildLayoutWizardOperations, type LayoutWizardDraft as DomainLayoutWizardDraft } from '../../domain/layout-wizard'
-import type { Architecture, ArrivalPattern, OperationalProfile, StaffAssignment, StaffRole } from '../../domain/project'
+import type { Architecture, ArrivalPattern, EquipmentItem, OperationalProfile, SimulationScenario, StaffAssignment, StaffRole } from '../../domain/project'
+import { evaluateOperationalRequirements } from '../../domain/requirements/operational-requirements'
 import type { ProjectStore } from '../../state/project-store'
 import { PolygonRoomEditor } from './PolygonRoomEditor'
 
@@ -72,14 +74,40 @@ export function LayoutWizard({ store, onClose, initialStep = 0, initialMode = 'd
     essentialCatalogIds: [],
   }))
 
-  const recommended = useMemo(() => {
-    const required = new Set(['food-prep', 'cold-retrieval', 'finish-plate', 'hand-wash', 'dirty-landing', 'dish-wash', 'clean-landing'])
-    return KITCHEN_CATALOG.filter((entry) => entry.capabilities.some((capability) => required.has(capability)))
-      .filter((entry, index, entries) => entry.capabilities.some((capability) => entries.findIndex((candidate) => candidate.capabilities.includes(capability)) === index))
-      .slice(0, 8)
-  }, [])
-
   const source = project.variants.find((variant) => variant.id === draft.sourceVariantId) ?? active
+  const draftPreview = useMemo(() => {
+    const equipment: EquipmentItem[] = draft.mode === 'duplicate' ? clone(source.equipment) : []
+    const unplaced: string[] = []
+    draft.essentialCatalogIds.forEach((catalogId, index) => {
+      try {
+        const entry = KITCHEN_CATALOG.find((candidate) => candidate.catalogId === catalogId)
+        if (!entry) { unplaced.push(catalogId); return }
+        const placement = suggestCatalogPlacement({ architecture: draft.architecture, equipment, entry, snapMm: project.snapMm, layoutConstraints: source.layoutConstraints })
+        if (!placement) { unplaced.push(entry.displayName); return }
+        equipment.push(createCatalogEquipmentItem({ catalogId, componentId: `wizard-preview-${index + 1}`, position: placement, rotationDeg: placement.rotationDeg }))
+      } catch { unplaced.push(catalogId) }
+    })
+    return { equipment, unplaced }
+  }, [draft.architecture, draft.mode, draft.essentialCatalogIds, project.snapMm, source.equipment, source.layoutConstraints])
+  const draftScenario = useMemo<SimulationScenario>(() => ({
+    ...clone(project.scenarios.find((scenario) => scenario.id === project.activeScenarioId) ?? project.scenarios[0]),
+    covers: draft.profile.covers ?? 1,
+    durationMinutes: draft.profile.peakDurationMinutes ?? 1,
+    arrivalPattern: draft.profile.arrivalPattern ?? 'steady',
+    staff: clone(draft.profile.staff ?? []),
+  }), [draft.profile, project.activeScenarioId, project.scenarios])
+  const draftRequirements = useMemo(() => evaluateOperationalRequirements({
+    architecture: draft.architecture,
+    equipment: draftPreview.equipment,
+    scenario: draftScenario,
+  }), [draft.architecture, draftPreview.equipment, draftScenario])
+  const recommended = useMemo(() => {
+    const ids = [...new Set([
+      ...draft.essentialCatalogIds,
+      ...draftRequirements.filter((requirement) => requirement.severity === 'blocker').flatMap((requirement) => requirement.recommendedCatalogIds),
+    ])]
+    return ids.map((id) => KITCHEN_CATALOG.find((entry) => entry.catalogId === id)).filter((entry) => entry !== undefined).slice(0, 12)
+  }, [draft.essentialCatalogIds, draftRequirements])
   const setMode = (mode: WizardMode) => setDraft((current) => ({
     ...current,
     mode,
@@ -257,6 +285,17 @@ export function LayoutWizard({ store, onClose, initialStep = 0, initialMode = 'd
               <dt>Capacity</dt><dd>{draft.profile.targetCapacityPerHour} covers per hour</dd>
               <dt>Equipment</dt><dd>{draft.mode === 'duplicate' ? `${source.equipment.length} duplicated` : `${draft.essentialCatalogIds.length} selected essentials`}</dd>
             </dl>
+            <section><h3>Unresolved blockers</h3>{draftRequirements.filter((requirement) => requirement.severity === 'blocker').length
+              ? <ul>{draftRequirements.filter((requirement) => requirement.severity === 'blocker').map((requirement, index) => <li key={`${requirement.code}-${requirement.itemIds.join('-')}-${index}`}>{requirement.reason}</li>)}</ul>
+              : <p>No modeled operational blockers.</p>}</section>
+            <section><h3>Placement warnings</h3>{draftRequirements.filter((requirement) => requirement.severity === 'warning').length
+              || draftPreview.unplaced.length
+              ? <ul>
+                {draftPreview.unplaced.map((label) => <li key={`unplaced-${label}`}>{label} has no valid automatic placement in this room.</li>)}
+                {draftRequirements.filter((requirement) => requirement.severity === 'warning').map((requirement) => <li key={`${requirement.code}-${requirement.itemIds.join('-')}`}>{requirement.reason}</li>)}
+              </ul>
+              : <p>No modeled placement warnings.</p>}</section>
+            <section><h3>Professional review</h3><p>{draftRequirements.filter((requirement) => requirement.severity === 'professional-review').length} unmodeled professional matters remain for qualified review.</p></section>
             <p>Planning checks describe modeled operational assumptions. Kitchen Planner does not certify regulatory compliance; engage qualified professionals for local requirements.</p>
           </div>
         )}

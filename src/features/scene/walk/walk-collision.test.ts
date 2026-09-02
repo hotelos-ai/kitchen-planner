@@ -49,7 +49,7 @@ describe('walk collision', () => {
       'storage-rack', 'storage-mobile-rack', 'storage-dunnage', 'storage-bin',
       'storage-pot-rack', 'storage-dish-rack', 'storage-tray-rack',
     ]
-    const elevatedPresets = ['storage-wall-shelf', 'storage-overshelf', 'storage-overhead']
+    const elevatedPresets = ['storage-wall-shelf', 'storage-overshelf', 'storage-overhead', 'storage-overhead-rack']
     const storage = [...floorPresets, ...elevatedPresets].map((visualPreset, index): EquipmentItem => ({
       ...base,
       id: visualPreset,
@@ -126,6 +126,29 @@ describe('walk collision', () => {
     const point = { x: first.spawn.xMm, y: first.spawn.yMm }
     expect(pointInPolygon(point, architecture.roomPolygon)).toBe(true)
     expect(boundaryDistance(point, architecture.roomPolygon)).toBeGreaterThanOrEqual(260)
+  })
+
+  it('prefers a declared staff entry on its actual polygon wall segment', () => {
+    const architecture: Architecture = {
+      ...project.architecture,
+      widthMm: 3000,
+      depthMm: 2400,
+      roomPolygon: [{ x: 0, y: 0 }, { x: 3000, y: 0 }, { x: 3000, y: 2400 }, { x: 0, y: 2400 }],
+      openings: [{
+        id: 'polygon-entry', label: 'Polygon staff entry', kind: 'door', flow: 'entry',
+        wall: 'top', segmentIndex: 1, offsetMm: 700, widthMm: 900,
+      }],
+      pillars: [],
+      storageZones: [],
+    }
+
+    const resolution = resolveWalkSpawn(architecture, buildWalkColliders(architecture, []))
+
+    expect(resolution).toMatchObject({ status: 'ready', source: 'entry' })
+    if (resolution.status !== 'ready') throw new Error('Expected polygon entry spawn')
+    expect(resolution.spawn.xMm).toBeLessThan(3000)
+    expect(resolution.spawn.yMm).toBe(1150)
+    expect(Math.abs(resolution.spawn.headingRad)).toBeCloseTo(Math.PI)
   })
 
   it('resolves a horizontal step without crossing a solid wall', () => {

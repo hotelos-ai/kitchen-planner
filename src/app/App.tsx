@@ -1,6 +1,6 @@
 import { lazy, Suspense, useMemo, useState } from 'react'
 import { createBrowserAutoLayoutRunner } from '../features/optimizer/browser-auto-layout-runner'
-import { projectStore } from '../state/project-store'
+import { configureWorkspaceAutoLayout, getWorkspaceFacade, projectStore } from '../state/project-store'
 import { ErrorBoundary } from './ErrorBoundary'
 import { ProjectExchange } from './ProjectExchange'
 import './styles.css'
@@ -24,7 +24,21 @@ const VIEW_LABELS: Record<WorkspaceView, string> = {
 
 export function App() {
   const [view, setView] = useState<WorkspaceView>('plan')
-  const autoLayoutRunner = useMemo(() => createBrowserAutoLayoutRunner(projectStore), [])
+  const autoLayoutRunner = useMemo(() => {
+    const browserRunner = createBrowserAutoLayoutRunner(projectStore)
+    configureWorkspaceAutoLayout(projectStore, {
+      run: (input) => {
+        const envelope = input as { request: Parameters<typeof browserRunner.run>[0]; onProgress?: Parameters<typeof browserRunner.run>[1] }
+        return browserRunner.run(envelope.request, envelope.onProgress ?? (() => undefined))
+      },
+      cancel: () => { browserRunner.cancel?.(); return { ok: true } },
+    })
+    const facade = getWorkspaceFacade(projectStore)
+    return {
+      run: (request: Parameters<typeof browserRunner.run>[0], onProgress: Parameters<typeof browserRunner.run>[1]) => facade.runAutoLayout({ request, onProgress }) as ReturnType<typeof browserRunner.run>,
+      cancel: () => facade.cancelRun({ runId: 'active-auto-layout' }),
+    }
+  }, [])
 
   return (
     <main className="app-shell">
@@ -58,7 +72,7 @@ export function App() {
               data-workspace-surface="plan"
               aria-hidden={view !== 'plan' && view !== 'split'}
             >
-              <PlanWorkspace compact={view === 'split'} />
+              <PlanWorkspace compact={view === 'split'} onInspectComponentIn3D={() => setView('scene')} />
             </div>
             <div
               className={`workspace-surface scene-surface${view === 'scene' || view === 'split' ? ' active' : ''}`}

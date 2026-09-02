@@ -66,6 +66,21 @@ describe('workspace facade', () => {
     expect(facade.previewLayoutChanges({ expectedRevision: 0, operations: [{ ...operations[0], surprise: true }] })).toMatchObject({ ok: false, code: 'invalid-operation', revision: 0 })
   })
 
+  it('returns a diagnostics delta for the explicitly targeted inactive layout', () => {
+    const project = createSeedProject()
+    const inactive = structuredClone(project.variants[0])
+    inactive.id = 'inactive-layout'
+    inactive.name = 'Inactive layout'
+    project.variants.push(inactive)
+    const facade = createWorkspaceFacade({ store: createProjectStore(project) })
+
+    const preview = facade.previewLayoutChanges({ expectedRevision: 0, operations: [{
+      type: 'move_components', variantId: inactive.id, componentIds: ['tandoor'], anchor: { xMm: -1000, yMm: -1000 },
+    }] })
+
+    expect(preview).toMatchObject({ ok: true, diagnostics: { added: [expect.objectContaining({ variantId: inactive.id, code: 'outside-room' })] } })
+  })
+
   it('defaults workspace simulations to full output while allowing optimizer metrics-only requests', () => {
     const runSimulation = vi.fn((input) => input)
     const facade = createWorkspaceFacade({ store: createProjectStore(createSeedProject()), runSimulation })

@@ -39,7 +39,7 @@ test('edits, simulates, compares, exports, and restores Manta Raja', async ({ pa
   await page.getByRole('button', { name: 'Next' }).click()
   await page.getByRole('button', { name: 'Next' }).click()
   await page.getByRole('button', { name: 'Create layout' }).click()
-  await expect(page.getByLabel(/Active layout variant/i)).toHaveValue(/variant-/)
+  await expect(page.getByLabel(/Active layout variant/i)).toHaveValue(/layout-/)
   await page.getByRole('button', { name: /Select Tandoor/i }).click()
   await page.getByLabel(/^X position \(mm\)$/i).fill('2300')
   await page.getByLabel(/^X position \(mm\)$/i).press('Tab')
@@ -59,13 +59,15 @@ test('edits, simulates, compares, exports, and restores Manta Raja', async ({ pa
   await expect(page.getByText(/50 covers over 60 minutes/i)).toBeVisible()
   await expect(page.getByText(/Comparative planning aid/i)).toBeVisible()
 
+  const variantsBeforeExchange = await page.getByLabel(/Active layout variant/i).locator('option').allTextContents()
   const downloadPromise = page.waitForEvent('download')
-  await page.getByRole('button', { name: /Export project/i }).click()
+  await page.getByRole('button', { name: /Export all layouts/i }).click()
   const download = await downloadPromise
   const exportedPath = await download.path()
   expect(exportedPath).toBeTruthy()
   await page.getByLabel(/Import project JSON/i).setInputFiles(exportedPath!)
   await expect(page.getByRole('status')).toContainText(/Imported/i)
+  await expect.poll(() => page.getByLabel(/Active layout variant/i).locator('option').allTextContents()).toEqual(variantsBeforeExchange)
 })
 
 test('creates an advanced room and recommended essentials through the novice wizard', async ({ page }) => {
@@ -101,6 +103,32 @@ test('creates an advanced room and recommended essentials through the novice wiz
   await expect(page.getByRole('dialog', { name: 'Check essentials' })).toContainText(/operational guidance, not regulatory certification/i)
 })
 
+test('runs, inspects, compares, and atomically adopts an auto-layout finalist', async ({ page }) => {
+  const pageErrors: string[] = []
+  page.on('pageerror', (error) => pageErrors.push(error.message))
+  await page.goto('/')
+  await page.getByRole('button', { name: 'Auto-layout' }).click()
+  await expect(page.getByRole('heading', { name: 'Auto-layout' })).toBeVisible()
+  await page.getByLabel('Maximum evaluations').fill('8')
+  await page.getByLabel('Time budget (seconds)').fill('10')
+  await page.getByRole('button', { name: 'Run auto-layout' }).click()
+
+  const fastest = page.getByTestId('finalist-fastest-service')
+  await expect(fastest).toBeVisible({ timeout: 30_000 })
+  await expect(fastest).toContainText(/Hard feasible/i)
+  await expect(fastest).toContainText(/Seeds.*3, 5.*101/i)
+  await page.getByRole('button', { name: 'Inspect Fastest service' }).click()
+  await expect(page.getByRole('region', { name: 'Inspected finalist' })).toBeVisible()
+  await page.getByRole('button', { name: 'Compare Least travel' }).click()
+  await expect(page.getByRole('region', { name: 'Finalist comparison' })).toBeVisible()
+  await page.getByRole('button', { name: 'Save Minimal change as new layout' }).click()
+  await expect(page.getByRole('status')).toContainText(/saved as a new layout/i)
+
+  await page.getByRole('button', { name: 'Plan', exact: true }).click()
+  await expect(page.getByRole('tab', { name: /Minimal change/ })).toBeVisible()
+  expect(pageErrors).toEqual([])
+})
+
 test('keeps the full simulation readable at phone width', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 })
   await page.goto('/')
@@ -115,6 +143,38 @@ test('keeps the full simulation readable at phone width', async ({ page }) => {
 
   expect(await liveStatus.evaluate((element) => getComputedStyle(element).gridTemplateColumns.split(' ').length)).toBe(3)
   expect(await page.getByLabel(/Live station queues/i).evaluate((element) => getComputedStyle(element).left)).toBe('10px')
+})
+
+test('keeps Plan controls and canvas in the phone viewport', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 })
+  await page.goto('/')
+
+  const workspace = page.getByRole('region', { name: '2D plan workspace' })
+  const toolbarBox = await workspace.locator('.workspace-toolbar').boundingBox()
+  const canvasBox = await page.getByTestId('plan-canvas').boundingBox()
+
+  expect(toolbarBox).not.toBeNull()
+  expect(toolbarBox!.height).toBeLessThan(180)
+  expect(canvasBox).not.toBeNull()
+  expect(canvasBox!.y).toBeLessThan(500)
+  expect(canvasBox!.height).toBeGreaterThan(200)
+  expect(canvasBox!.y + canvasBox!.height).toBeLessThanOrEqual(844)
+})
+
+test('resizes the desktop Plan canvas without remounting it when drawers collapse', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 })
+  await page.goto('/')
+  const canvas = page.getByTestId('plan-canvas')
+  const before = await canvas.boundingBox()
+  const nodeIdentity = await canvas.evaluate((node) => { (window as unknown as { planCanvasNode?: Element }).planCanvasNode = node; return true })
+
+  await page.getByRole('button', { name: 'Toggle equipment catalog' }).click()
+  await page.getByRole('button', { name: 'Toggle inspector' }).click()
+  const after = await canvas.boundingBox()
+
+  expect(nodeIdentity).toBe(true)
+  expect(await canvas.evaluate((node) => (window as unknown as { planCanvasNode?: Element }).planCanvasNode === node)).toBe(true)
+  expect(after!.width).toBeGreaterThan(before!.width + 400)
 })
 
 test('keeps every 3D control usable and recovers a lost WebGL context', async ({ page }) => {
@@ -309,7 +369,7 @@ test('shares live service state across 2D, 3D, and first-person views', async ({
   await expect(scene).toHaveAttribute('data-view', 'overview-3d')
 
   await scene.locator('canvas').evaluate((node) => node.dispatchEvent(new Event('webglcontextlost', { bubbles: false, cancelable: true })))
-  await expect(page.getByRole('alert')).toContainText(/Live 3D rendering paused/i)
+  await expect(page.getByText('Live 3D rendering paused', { exact: true })).toBeVisible()
   await page.getByRole('button', { name: /Restart live 3D/i }).click()
   await expect(scene.locator('canvas')).toBeVisible()
 

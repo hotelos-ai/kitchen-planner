@@ -6,7 +6,7 @@ import { EMPTY_WALK_INPUT, walkActionForKeyboardEvent, walkInputReducer, type Wa
 import { advanceWalkPlayerMotion, createWalkPlayerPose } from './player-motion'
 import { DEFAULT_CHASE_BOOM_MM, cameraTransformForPose, updateObstacleAwareChaseCamera } from './walk-camera'
 import { PointerLockLook } from './PointerLockLook'
-import type { WalkPlayerPose, WalkPlayerPosition, WalkViewMode } from './types'
+import type { WalkLocomotionState, WalkPlayerPose, WalkPlayerPosition, WalkViewMode } from './types'
 
 const MAX_PITCH_RAD = Math.PI / 2 - .015
 
@@ -29,6 +29,7 @@ export function FirstPersonController({ active, view = 'first-person', architect
   const jumpConsumed = useRef(false)
   const wasActive = useRef(false)
   const lastPositionNotice = useRef(0)
+  const lastPublishedLocomotion = useRef<WalkLocomotionState>('idle')
   const lastNearby = useRef(false)
   const handleLock = useCallback(() => onLockedChange?.(true), [onLockedChange])
   const handleUnlock = useCallback(() => { input.current = { ...EMPTY_WALK_INPUT }; onLockedChange?.(false) }, [onLockedChange])
@@ -44,6 +45,7 @@ export function FirstPersonController({ active, view = 'first-person', architect
     if (active && !wasActive.current) {
       pose.current = createWalkPlayerPose(spawn)
       chaseBoomMm.current = DEFAULT_CHASE_BOOM_MM
+      lastPublishedLocomotion.current = pose.current.locomotion
       onPoseChange?.(pose.current)
       onPositionChange?.(pose.current)
     }
@@ -115,8 +117,13 @@ export function FirstPersonController({ active, view = 'first-person', architect
       onNearbyChange?.(nearby)
     }
     const now = performance.now()
-    if (now - lastPositionNotice.current > 100) {
+    const holdLandingPose = lastPublishedLocomotion.current === 'landing'
+      && pose.current.locomotion === 'idle'
+      && now - lastPositionNotice.current <= 100
+    const locomotionChanged = pose.current.locomotion !== lastPublishedLocomotion.current && !holdLandingPose
+    if (locomotionChanged || now - lastPositionNotice.current > 100) {
       lastPositionNotice.current = now
+      lastPublishedLocomotion.current = pose.current.locomotion
       onPoseChange?.(pose.current)
       onPositionChange?.(pose.current)
     }

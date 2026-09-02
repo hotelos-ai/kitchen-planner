@@ -7,6 +7,7 @@ import {
   inferEquipmentConfiguration,
   isEquipmentConfigurationModified,
   listCompatibleConfigurations,
+  physicalConfigurationDetails,
 } from './equipment-configurations'
 
 describe('equipment configurations', () => {
@@ -98,5 +99,7 @@ describe('equipment configurations', () => {
       visualPreset: 'storage-wall-shelf',
     })
     expect(configured.widthMm).not.toBe(shelf.widthMm)
+    expect(physicalConfigurationDetails(configured)).toEqual(expect.objectContaining({ tierCount: 2, mounting: 'wall', mobile: false }))
+    expect(physicalConfigurationDetails({ ...configured, appearanceSkinId: 'galvanized' })).toEqual(physicalConfigurationDetails(configured))
   })
 })

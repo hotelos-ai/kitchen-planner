@@ -3,7 +3,7 @@ import { optimizerManifestSchema } from './experiment-schema'
 
 const valid = {
   id: 'experiment', documentId: 'document', revision: 1, baselineVariantId: 'base', scenarioIds: ['dinner'],
-  seeds: [1, 2], confirmationSeeds: [9], permissionTier: 'A', lockedComponentIds: [], lockedArchitectureElementIds: [],
+  seeds: [1, 2], confirmationSeeds: [9], permissions: { placement: true, equipmentRedesign: false, architecture: false }, lockedComponentIds: [], lockedArchitectureElementIds: [],
   hardRules: { minimumAisleMm: 800, noGoZones: [] }, budget: { maxEvaluations: 50, maxDurationMs: 10_000 }, priority: 'balanced',
 }
 
