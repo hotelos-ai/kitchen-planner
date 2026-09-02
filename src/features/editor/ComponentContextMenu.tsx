@@ -49,8 +49,8 @@ export function ComponentContextMenu({ item, locked, position, onAction, onClose
   >
     <button type="button" role="menuitem" onClick={action('configure')}>Configure</button>
     <button type="button" role="menuitem" onClick={action('skin')}>Skin</button>
-    <button type="button" role="menuitem" onClick={action('rotate-left')}>Rotate Left</button>
-    <button type="button" role="menuitem" onClick={action('rotate-right')}>Rotate Right</button>
+    <button type="button" role="menuitem" onClick={action('rotate-left')}>Rotate left</button>
+    <button type="button" role="menuitem" onClick={action('rotate-right')}>Rotate right</button>
     <button type="button" role="menuitem" onClick={action('duplicate')}>Duplicate</button>
     <button type="button" role="menuitem" onClick={action('toggle-lock')}>{locked ? 'Unlock' : 'Lock'}</button>
     <button type="button" role="menuitem" onClick={action('inspect-3d')}>Inspect in 3D</button>

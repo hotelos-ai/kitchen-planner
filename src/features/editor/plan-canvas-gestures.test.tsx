@@ -44,11 +44,11 @@ describe('PlanCanvas component gestures', () => {
     await user.click(screen.getByRole('button', { name: 'Close quick configuration' }))
 
     await user.click(screen.getByRole('button', { name: 'Open component menu' }))
-    await user.click(screen.getByRole('menuitem', { name: 'Rotate Left' }))
+    await user.click(screen.getByRole('menuitem', { name: 'Rotate left' }))
     expect(getActiveItem(store.getState(), 'tandoor').rotationDeg).toBe(270)
 
     await user.click(screen.getByRole('button', { name: 'Open component menu' }))
-    await user.click(screen.getByRole('menuitem', { name: 'Rotate Right' }))
+    await user.click(screen.getByRole('menuitem', { name: 'Rotate right' }))
     expect(getActiveItem(store.getState(), 'tandoor').rotationDeg).toBe(0)
 
     await user.click(screen.getByRole('button', { name: 'Open component menu' }))

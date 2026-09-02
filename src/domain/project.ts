@@ -153,6 +153,15 @@ export interface AdoptedExperimentManifest {
   resultMetrics?: Record<string, number>
 }
 
+export interface LayoutCheckpoint {
+  id: string
+  revision: number
+  label: string
+  createdAt: string
+  architecture: Architecture
+  equipment: EquipmentItem[]
+}
+
 export interface LayoutVariant {
   id: string
   name: string
@@ -162,6 +171,7 @@ export interface LayoutVariant {
   operationalProfile?: OperationalProfile
   layoutConstraints?: LayoutConstraints
   adoptedExperimentManifest?: AdoptedExperimentManifest
+  checkpoints?: LayoutCheckpoint[]
   createdAt: string
   updatedAt: string
 }
@@ -177,6 +187,8 @@ export interface ScenarioChecks {
   dirtyCleanCrossings: boolean
 }
 
+export type ServiceVariability = 'low' | 'typical' | 'high'
+
 export interface SimulationScenario {
   id: string
   name: string
@@ -189,6 +201,8 @@ export interface SimulationScenario {
   checks: ScenarioChecks
   taskDurations?: Partial<Record<StationCapability, { minSeconds: number; maxSeconds: number }>>
   stationCapacities?: Record<string, number>
+  serviceStyle?: string
+  variability?: ServiceVariability
 }
 
 export interface KitchenProject {

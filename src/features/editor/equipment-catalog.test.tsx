@@ -21,7 +21,7 @@ describe('equipment catalog gallery', () => {
     const synonym = entry.synonyms.find((candidate) => !entry.displayName.toLowerCase().includes(candidate.toLowerCase()))!
     render(<EquipmentLibrary store={emptyStore()} />)
 
-    await user.type(screen.getByRole('searchbox', { name: /Search equipment catalog/i }), synonym)
+    await user.type(screen.getByRole('searchbox', { name: /^Search$/i }), synonym)
 
     expect(screen.getByRole('heading', { name: entry.displayName })).toBeInTheDocument()
   })
@@ -44,7 +44,7 @@ describe('equipment catalog gallery', () => {
 
   it('renders a useful empty state', async () => {
     render(<EquipmentLibrary store={emptyStore()} />)
-    await userEvent.type(screen.getByRole('searchbox', { name: /Search equipment catalog/i }), 'no-such-kitchen-component-zzzz')
+    await userEvent.type(screen.getByRole('searchbox', { name: /^Search$/i }), 'no-such-kitchen-component-zzzz')
     expect(screen.getByText(/No catalog components match/i)).toBeInTheDocument()
   })
 
@@ -55,7 +55,7 @@ describe('equipment catalog gallery', () => {
     const entry = KITCHEN_CATALOG.find((candidate) => candidate.typicalDimensions.widthMm <= 1200 && candidate.typicalDimensions.depthMm <= 900)!
     render(<EquipmentLibrary store={store} />)
 
-    await user.type(screen.getByRole('searchbox', { name: /Search equipment catalog/i }), entry.displayName)
+    await user.type(screen.getByRole('searchbox', { name: /^Search$/i }), entry.displayName)
     await user.click(screen.getByRole('button', { name: `Add ${entry.displayName}` }))
 
     const selectedId = store.getState().selectedIds[0]
@@ -98,5 +98,18 @@ describe('equipment catalog gallery', () => {
     await user.click(screen.getByRole('button', { name: /^Add to plan$/i }))
 
     expect(getActiveVariant(store.getState()).equipment[0]).toMatchObject({ label: 'Special warmer', category: 'custom' })
+  })
+
+  it('places a station template as an editable cluster', async () => {
+    const user = userEvent.setup()
+    const store = emptyStore()
+    render(<EquipmentLibrary store={store} />)
+
+    await user.click(screen.getByRole('tab', { name: 'Station templates' }))
+    await user.click(screen.getByRole('button', { name: 'Add Plating and pass template' }))
+
+    const equipment = getActiveVariant(store.getState()).equipment
+    expect(equipment.length).toBeGreaterThanOrEqual(1)
+    expect(equipment.some((item) => /pass|chef/i.test(item.label))).toBe(true)
   })
 })

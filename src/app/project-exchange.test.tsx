@@ -14,9 +14,9 @@ describe('project exchange', () => {
   it('imports a validated project without reloading the app', async () => {
     const imported = { ...createSeedProject(), name: 'Imported Manta Raja option' }
     render(<ProjectExchange />)
-    await userEvent.upload(screen.getByLabelText(/Import project JSON/i), new File([exportProject(imported)], 'kitchen.json', { type: 'application/json' }))
+    await userEvent.upload(screen.getByLabelText(/Open project JSON/i), new File([exportProject(imported)], 'kitchen.json', { type: 'application/json' }))
     expect(projectStore.getState().project.name).toBe('Imported Manta Raja option')
-    expect(screen.getByText(/Imported kitchen.json/i)).toBeInTheDocument()
+    expect(screen.getByText(/Opened kitchen.json/i)).toBeInTheDocument()
   })
 
   it('keeps the current project when an import is invalid', async () => {
@@ -24,7 +24,7 @@ describe('project exchange', () => {
     store.getState().nudgeItems(['tandoor'], { x: 100, y: 0 })
     const before = store.getState()
     render(<ProjectExchange store={store} />)
-    await userEvent.upload(screen.getByLabelText(/Import project JSON/i), new File(['{"bad":true}'], 'bad.json', { type: 'application/json' }))
+    await userEvent.upload(screen.getByLabelText(/Open project JSON/i), new File(['{"bad":true}'], 'bad.json', { type: 'application/json' }))
     expect(store.getState()).toMatchObject({
       project: before.project,
       documentId: before.documentId,
@@ -47,11 +47,11 @@ describe('project exchange', () => {
       clickedDownload = this.download
     })
     render(<ProjectExchange />)
-    await userEvent.click(screen.getByRole('button', { name: /Export all layouts/i }))
+    await userEvent.click(screen.getByRole('button', { name: /Save project/i }))
     expect(createObjectURL).toHaveBeenCalledOnce()
     expect(exportedBlob).toBeInstanceOf(Blob)
-    expect(clickedDownload).toBe('hotelos-kitchen-planner.json')
-    expect(screen.getByRole('status')).toHaveTextContent(/all layouts exported/i)
+    expect(clickedDownload).toBe('manta-raja-kitchen-lab.json')
+    expect(screen.getByRole('status')).toHaveTextContent(/Project saved/i)
   })
 
   it('atomically replaces the document and invalidates previews from the previous document', async () => {
@@ -69,7 +69,7 @@ describe('project exchange', () => {
 
     render(<ProjectExchange store={store} />)
     await userEvent.upload(
-      screen.getByLabelText(/Import project JSON/i),
+      screen.getByLabelText(/Open project JSON/i),
       new File([exportProject(imported)], 'complete.json', { type: 'application/json' }),
     )
 

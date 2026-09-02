@@ -1,42 +1,172 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useStore } from 'zustand'
+import type { WorkflowStage } from '../../app/workflow'
+import { StageToolbar } from '../../app/AppHeader'
 import { getActiveVariant, projectStore, type ProjectStore } from '../../state/project-store'
+import { CanvasFooter } from './CanvasFooter'
 import { EquipmentInspector } from './EquipmentInspector'
-import { EquipmentLibrary } from './EquipmentLibrary'
 import { EssentialsChecker } from './EssentialsChecker'
-import { LayoutVariants } from './LayoutVariants'
 import { LayoutWizard } from './LayoutWizard'
 import { LayoutDiagnostics } from './LayoutDiagnostics'
 import { PlanCanvas } from './PlanCanvas'
 import { ProjectSettings } from './ProjectSettings'
+import { RevisionHistory } from './RevisionHistory'
+import { SpaceImpactDialog } from './SpaceImpactDialog'
+import { StageOverview } from './StageOverview'
 import { useWorkspaceShortcuts } from './useWorkspaceShortcuts'
+import { WorkflowCatalog } from './WorkflowCatalog'
 
 type Props = {
   store?: ProjectStore
+  stage?: WorkflowStage
   showCanvas?: boolean
   compact?: boolean
   shortcutEnabled?: boolean
+  showReference?: boolean
+  catalogOpen?: boolean
+  inspectorOpen?: boolean
+  essentialsOpen?: boolean
+  revisionsOpen?: boolean
+  wizardOpen?: boolean
+  wizardStartsAtRoom?: boolean
+  closedLayout?: { name: string; revision: number; undo(): boolean } | null
   onInspectComponentIn3D?(itemId: string): void
+  onStageChange?(stage: WorkflowStage): void
+  onCatalogOpenChange?(open: boolean): void
+  onInspectorOpenChange?(open: boolean): void
+  onEssentialsOpenChange?(open: boolean): void
+  onRevisionsOpenChange?(open: boolean): void
+  sourceImageUrl?: string
+  onSourceImageUrlChange?(url: string): void
+  onWizardOpenChange?(open: boolean): void
+  onWizardStartsAtRoomChange?(startsAtRoom: boolean): void
+  onClosedLayoutChange?(layout: { name: string; revision: number; undo(): boolean } | null): void
+  onAddLayout?(): void
+  includeToolbar?: boolean
 }
 
 const drawersInitiallyOpen = () => typeof globalThis.matchMedia !== 'function' || !globalThis.matchMedia('(max-width: 760px)').matches
 
 const duplicateId = (sourceId: string, index: number) => `${sourceId}-copy-${globalThis.crypto?.randomUUID?.() ?? Math.random().toString(36).slice(2)}-${index + 1}`
 
-export function PlanWorkspace({ store = projectStore, showCanvas = typeof ResizeObserver !== 'undefined', compact = false, shortcutEnabled = true, onInspectComponentIn3D }: Props) {
-  const [showReference, setShowReference] = useState(false)
-  const [catalogOpen, setCatalogOpen] = useState(drawersInitiallyOpen)
-  const [inspectorOpen, setInspectorOpen] = useState(drawersInitiallyOpen)
-  const [wizardOpen, setWizardOpen] = useState(false)
-  const [wizardStartsAtRoom, setWizardStartsAtRoom] = useState(false)
-  const [essentialsOpen, setEssentialsOpen] = useState(false)
-  const [closedLayout, setClosedLayout] = useState<{ name: string; revision: number; undo(): boolean } | null>(null)
+export function PlanWorkspace({
+  store = projectStore,
+  stage = 'equipment',
+  showCanvas = typeof ResizeObserver !== 'undefined',
+  compact = false,
+  shortcutEnabled = true,
+  showReference = false,
+  catalogOpen = true,
+  inspectorOpen = true,
+  essentialsOpen = false,
+  revisionsOpen = false,
+  wizardOpen = false,
+  wizardStartsAtRoom = false,
+  closedLayout = null,
+  onInspectComponentIn3D,
+  onStageChange,
+  onCatalogOpenChange,
+  onInspectorOpenChange,
+  onEssentialsOpenChange,
+  onRevisionsOpenChange,
+  sourceImageUrl,
+  onSourceImageUrlChange,
+  onWizardOpenChange,
+  onWizardStartsAtRoomChange,
+  onClosedLayoutChange,
+  onAddLayout,
+  includeToolbar = false,
+}: Props) {
+  const [internalClosedLayout, setInternalClosedLayout] = useState<{ name: string; revision: number; undo(): boolean } | null>(null)
+  const [internalWizardOpen, setInternalWizardOpen] = useState(false)
+  const [internalWizardStartsAtRoom, setInternalWizardStartsAtRoom] = useState(false)
+  const [internalEssentialsOpen, setInternalEssentialsOpen] = useState(false)
+  const [internalRevisionsOpen, setInternalRevisionsOpen] = useState(false)
+  const [spaceImpactOpen, setSpaceImpactOpen] = useState(false)
+  const [sourcePopover, setSourcePopover] = useState(false)
+  const [sourceOpacity, setSourceOpacity] = useState(35)
+  const [sourceLocked, setSourceLocked] = useState(false)
+  const [localSourceUrl, setLocalSourceUrl] = useState(sourceImageUrl ?? '/reference/manta-raja-layout.png')
+  const [equipmentPromptOpen, setEquipmentPromptOpen] = useState(true)
+  const [checksFocusId, setChecksFocusId] = useState<string | undefined>()
+  const activeClosedLayout = closedLayout ?? internalClosedLayout
+  const wizardVisible = wizardOpen || internalWizardOpen
+  const wizardRoomStep = wizardStartsAtRoom || internalWizardStartsAtRoom
+  const essentialsVisible = essentialsOpen || internalEssentialsOpen
+  const revisionsVisible = revisionsOpen || internalRevisionsOpen
+
+  const setEssentialsVisible = (open: boolean) => {
+    setInternalEssentialsOpen(open)
+    onEssentialsOpenChange?.(open)
+    if (open) {
+      setInternalRevisionsOpen(false)
+      onRevisionsOpenChange?.(false)
+    } else {
+      setChecksFocusId(undefined)
+    }
+  }
+
+  const setRevisionsVisible = (open: boolean) => {
+    setInternalRevisionsOpen(open)
+    onRevisionsOpenChange?.(open)
+    if (open) {
+      setInternalEssentialsOpen(false)
+      onEssentialsOpenChange?.(false)
+    }
+  }
+
+  useEffect(() => {
+    if (sourceImageUrl) setLocalSourceUrl(sourceImageUrl)
+  }, [sourceImageUrl])
+
+  const openChecksForItem = (itemId: string) => {
+    setChecksFocusId(itemId)
+    setEssentialsVisible(true)
+  }
+
+  const openLayoutWizard = (startsAtRoom = false) => {
+    if (onAddLayout && !startsAtRoom) {
+      onAddLayout()
+      return
+    }
+    setInternalWizardStartsAtRoom(startsAtRoom)
+    setInternalWizardOpen(true)
+    onWizardStartsAtRoomChange?.(startsAtRoom)
+    onWizardOpenChange?.(true)
+  }
+
+  const closeLayoutWizard = () => {
+    setInternalWizardOpen(false)
+    setInternalWizardStartsAtRoom(false)
+    onWizardOpenChange?.(false)
+    onWizardStartsAtRoomChange?.(false)
+  }
   const selectedIds = useStore(store, (state) => state.selectedIds)
   const revision = useStore(store, (state) => state.revision)
   const canUndo = useStore(store, (state) => state.past.length > 0)
   const canRedo = useStore(store, (state) => state.future.length > 0)
   const selectedItem = useStore(store, (state) => getActiveVariant(state).equipment.find((item) => item.id === state.selectedIds[0]))
+  const architectureLocked = stage !== 'space'
   const dragResizeEnabled = Boolean(selectedItem && !selectedItem.dimensionsLocked)
+  const [localReference, setLocalReference] = useState(showReference)
+  const [localCatalogOpen, setLocalCatalogOpen] = useState(includeToolbar ? drawersInitiallyOpen() : catalogOpen)
+  const [localInspectorOpen, setLocalInspectorOpen] = useState(includeToolbar ? drawersInitiallyOpen() : inspectorOpen)
+
+  const referenceVisible = includeToolbar ? localReference : showReference
+  const catalogVisible = includeToolbar ? localCatalogOpen : catalogOpen
+  const inspectorVisible = (includeToolbar ? localInspectorOpen : inspectorOpen) || essentialsVisible || revisionsVisible
+
+  useEffect(() => {
+    if (referenceVisible) setSourcePopover(true)
+  }, [referenceVisible])
+  const continueToEquipment = () => {
+    const layouts = store.getState().project.variants.length
+    if (stage === 'space' && layouts > 1) {
+      setSpaceImpactOpen(true)
+      return
+    }
+    onStageChange?.('equipment')
+  }
 
   useWorkspaceShortcuts({
     enabled: shortcutEnabled,
@@ -55,62 +185,168 @@ export function PlanWorkspace({ store = projectStore, showCanvas = typeof Resize
     rotate: (ids, deltaDeg) => store.getState().rotateItems(ids, deltaDeg),
     clearSelection: () => store.getState().clearSelection(),
     onEscape: () => {
-      if (essentialsOpen) { setEssentialsOpen(false); return true }
-      if (wizardOpen) { setWizardOpen(false); setWizardStartsAtRoom(false); return true }
-      if (closedLayout) { setClosedLayout(null); return true }
+      if (essentialsVisible) { setEssentialsVisible(false); return true }
+      if (internalRevisionsOpen || revisionsOpen) { setRevisionsVisible(false); return true }
+      if (spaceImpactOpen) { setSpaceImpactOpen(false); return true }
+      if (wizardVisible) { closeLayoutWizard(); return true }
+      if (activeClosedLayout) { onClosedLayoutChange?.(null); setInternalClosedLayout(null); return true }
       return false
     },
   })
 
+  const showInspectorContent = !selectedIds.length
+
   return (
     <>
-    <section className={`plan-workspace${compact ? ' compact' : ''}`} aria-label="2D plan workspace">
-      {!compact && <div key="toolbar" className="workspace-toolbar">
-        <LayoutVariants store={store} onAdd={() => { setWizardStartsAtRoom(false); setWizardOpen(true) }} onClosed={(closed) => setClosedLayout(closed)} />
-        <div className="toolbar-actions">
-          <button type="button" aria-label="Toggle equipment catalog" aria-pressed={catalogOpen} onClick={() => setCatalogOpen((open) => !open)}>Catalog</button>
-          <button type="button" aria-label="Toggle inspector" aria-pressed={inspectorOpen} onClick={() => setInspectorOpen((open) => !open)}>Inspector</button>
-          <button type="button" onClick={() => setEssentialsOpen(true)}>Check essentials</button>
-          <button type="button" aria-label="Undo" disabled={!canUndo} onClick={() => store.getState().undo()}>↶ Undo</button>
-          <button type="button" aria-label="Redo" disabled={!canRedo} onClick={() => store.getState().redo()}>↷ Redo</button>
-          <button type="button" aria-pressed={showReference} onClick={() => setShowReference((value) => !value)}>Source reference</button>
-          <span className="transform-actions" role="group" aria-label="Selected item transforms">
-            <button type="button" className="icon-action" aria-label="Rotate selected left 90 degrees" title="Rotate left 90°" disabled={!selectedIds.length} onClick={() => store.getState().rotateItems(selectedIds, -90)}><b aria-hidden="true">↶</b><small>Left</small></button>
-            <button type="button" className="icon-action" aria-label="Rotate selected right 90 degrees" title="Rotate right 90°" disabled={!selectedIds.length} onClick={() => store.getState().rotateItems(selectedIds, 90)}><b aria-hidden="true">↷</b><small>Right</small></button>
-            <button type="button" className="icon-action resize-action" aria-label={dragResizeEnabled ? 'Disable drag resize' : 'Enable drag resize'} title={dragResizeEnabled ? 'Lock dimensions' : 'Enable click-and-drag resize handles'} aria-pressed={dragResizeEnabled} disabled={!selectedItem} onClick={() => selectedItem && store.getState().setDimensionsLocked(selectedItem.id, !selectedItem.dimensionsLocked)}><b aria-hidden="true">↔</b><small>{dragResizeEnabled ? 'Lock' : 'Resize'}</small></button>
-          </span>
-        </div>
-      </div>}
-      <div key="editor" className={`editor-layout${catalogOpen ? '' : ' catalog-collapsed'}${inspectorOpen ? '' : ' inspector-collapsed'}`}>
-        {!compact && <div key="library" className="editor-drawer catalog-drawer" data-editor-drawer="catalog" aria-hidden={!catalogOpen}><EquipmentLibrary store={store} /></div>}
-        <div key="canvas" className="canvas-column">
-          <div className="canvas-status">
-            <span>{compact ? '2D plan · 10 cm grid' : '10 cm source grid'}</span>
-            {!compact && <span>Architecture locked by default</span>}
-            <span>{selectedIds.length ? `${selectedIds.length} selected` : compact ? 'Select equipment' : 'Select equipment to edit'}</span>
+      <section className={`plan-workspace${compact ? ' compact' : ''}`} aria-label="2D plan workspace">
+        {includeToolbar && !compact && (
+          <StageToolbar
+            store={store}
+            stage={stage}
+            catalogOpen={catalogVisible}
+            inspectorOpen={inspectorVisible}
+            essentialsCount={0}
+            showReference={referenceVisible}
+            canUndo={canUndo}
+            canRedo={canRedo}
+            dragResizeEnabled={dragResizeEnabled}
+            hasSelection={selectedIds.length > 0}
+            onToggleCatalog={() => setLocalCatalogOpen((open) => !open)}
+            onToggleInspector={() => setLocalInspectorOpen((open) => !open)}
+            onOpenEssentials={() => setEssentialsVisible(true)}
+            onOpenRevisions={() => setRevisionsVisible(true)}
+            onUndo={() => store.getState().undo()}
+            onRedo={() => store.getState().redo()}
+            onToggleReference={() => setLocalReference((value) => !value)}
+            onRotateLeft={() => store.getState().rotateItems(selectedIds, -90)}
+            onRotateRight={() => store.getState().rotateItems(selectedIds, 90)}
+            onToggleResize={() => selectedItem && store.getState().setDimensionsLocked(selectedItem.id, !selectedItem.dimensionsLocked)}
+            onAddLayout={() => openLayoutWizard(false)}
+            onClosedLayout={(closed) => {
+              onClosedLayoutChange?.(closed)
+              if (!onClosedLayoutChange) setInternalClosedLayout(closed)
+            }}
+          />
+        )}
+        <div className={`editor-layout${catalogVisible ? '' : ' catalog-collapsed'}${inspectorVisible ? '' : ' inspector-collapsed'}`}>
+          {!compact && (
+            <div className="editor-drawer catalog-drawer" data-editor-drawer="catalog" aria-hidden={!catalogVisible}>
+              <WorkflowCatalog store={store} stage={stage} />
+            </div>
+          )}
+          <div className="canvas-column">
+            {showCanvas ? (
+              <PlanCanvas
+                store={store}
+                showReference={compact ? false : referenceVisible}
+                sourceImageUrl={localSourceUrl}
+                sourceOpacity={sourceOpacity}
+                architectureLocked={architectureLocked}
+                onInspectComponentIn3D={onInspectComponentIn3D}
+                onWarningBadgeClick={openChecksForItem}
+              />
+            ) : (
+              <div className="test-canvas-placeholder" />
+            )}
+            {referenceVisible && sourcePopover && (
+              <div className="source-reference-popover" role="dialog" aria-label="Source reference">
+                <strong>Source reference</strong>
+                <label>On <input type="checkbox" checked={referenceVisible} onChange={() => { setLocalReference(false); setSourcePopover(false) }} /></label>
+                <label>Opacity {sourceOpacity}% <input aria-label="Source opacity" type="range" min="10" max="80" value={sourceOpacity} onChange={(event) => setSourceOpacity(Number(event.target.value))} /></label>
+                <label>Lock reference <input type="checkbox" checked={sourceLocked} onChange={(event) => setSourceLocked(event.target.checked)} /></label>
+                <label>Replace
+                  <input
+                    type="file"
+                    accept="image/*,application/pdf"
+                    aria-label="Replace source drawing"
+                    onChange={(event) => {
+                      const file = event.target.files?.[0]
+                      if (!file) return
+                      const url = URL.createObjectURL(file)
+                      setLocalSourceUrl(url)
+                      onSourceImageUrlChange?.(url)
+                    }}
+                  />
+                </label>
+                <button type="button" onClick={() => { setLocalSourceUrl('/reference/manta-raja-layout.png'); onSourceImageUrlChange?.('/reference/manta-raja-layout.png') }}>Remove</button>
+                <button type="button" onClick={() => setSourcePopover(false)}>Close</button>
+              </div>
+            )}
+            {stage === 'equipment' && equipmentPromptOpen && !compact && (
+              <div className="equipment-start-prompt" role="note">
+                <p>Add equipment from the catalog, or begin with a station template. Your room can still be edited from the Space stage.</p>
+                <button type="button" onClick={() => setEquipmentPromptOpen(false)}>Dismiss</button>
+              </div>
+            )}
+            {!compact && (
+              <CanvasFooter
+                store={store}
+                stage={stage}
+                selectedCount={selectedIds.length}
+                onEditSpace={() => onStageChange?.('space')}
+              />
+            )}
           </div>
-          {showCanvas ? <PlanCanvas store={store} showReference={compact ? false : showReference} onInspectComponentIn3D={onInspectComponentIn3D} /> : <div className="test-canvas-placeholder" />}
+          {!compact && (
+            <div className="editor-drawer right-panel inspector-drawer" data-editor-drawer="inspector" aria-hidden={!inspectorVisible}>
+              {essentialsVisible && (
+                <section className="essentials-dialog in-panel" role="dialog" aria-modal="true" aria-label="Check essentials">
+                  <button type="button" className="workspace-modal-close" aria-label="Close essentials checker" onClick={() => setEssentialsVisible(false)}>×</button>
+                  <EssentialsChecker store={store} focusItemId={checksFocusId} onEditRoom={() => {
+                    setEssentialsVisible(false)
+                    openLayoutWizard(true)
+                    onStageChange?.('space')
+                  }} />
+                </section>
+              )}
+              {revisionsVisible && <RevisionHistory store={store} />}
+              {!essentialsVisible && !revisionsVisible && (showInspectorContent ? (
+                <StageOverview
+                  store={store}
+                  stage={stage}
+                  hideToolbarActions={includeToolbar}
+                  onContinueToEquipment={continueToEquipment}
+                  onCheckEssentials={() => setEssentialsVisible(true)}
+                  onSetUpSimulation={() => onStageChange?.('simulate')}
+                />
+              ) : (
+                <EquipmentInspector store={store} />
+              ))}
+              <LayoutDiagnostics store={store} />
+              <ProjectSettings store={store} stage={stage} />
+            </div>
+          )}
         </div>
-        {!compact && <div key="inspector" className="editor-drawer right-panel inspector-drawer" data-editor-drawer="inspector" aria-hidden={!inspectorOpen}><EquipmentInspector store={store} /><LayoutDiagnostics store={store} /><ProjectSettings store={store} /></div>}
-      </div>
-    </section>
-    {!compact && closedLayout && <div className="workspace-toast" role="status"><span>{closedLayout.name} closed.</span><button type="button" aria-label={`Undo close ${closedLayout.name}`} disabled={revision !== closedLayout.revision} title={revision === closedLayout.revision ? 'Restore the closed layout' : 'Undo is unavailable after another edit'} onClick={() => { if (closedLayout.undo()) setClosedLayout(null) }}>Undo</button><button type="button" aria-label="Dismiss closed layout message" onClick={() => setClosedLayout(null)}>×</button></div>}
-    {!compact && wizardOpen && <LayoutWizard
-      store={store}
-      initialStep={wizardStartsAtRoom ? 1 : 0}
-      initialMode={wizardStartsAtRoom ? 'polygon' : 'duplicate'}
-      onClose={() => { setWizardOpen(false); setWizardStartsAtRoom(false) }}
-    />}
-    {!compact && essentialsOpen && <div className="workspace-modal-backdrop">
-      <section className="essentials-dialog" role="dialog" aria-modal="true" aria-label="Check essentials">
-        <button type="button" className="workspace-modal-close" aria-label="Close essentials checker" onClick={() => setEssentialsOpen(false)}>×</button>
-        <EssentialsChecker store={store} onEditRoom={() => {
-          setEssentialsOpen(false)
-          setWizardStartsAtRoom(true)
-          setWizardOpen(true)
-        }} />
       </section>
-    </div>}
+      {!compact && activeClosedLayout && (
+        <div className="workspace-toast" role="status">
+          <span>{activeClosedLayout.name} closed.</span>
+          <button type="button" aria-label={`Undo close ${activeClosedLayout.name}`} disabled={revision !== activeClosedLayout.revision} title={revision === activeClosedLayout.revision ? 'Restore the closed layout' : 'Undo is unavailable after another edit'} onClick={() => { if (activeClosedLayout.undo()) { onClosedLayoutChange?.(null); setInternalClosedLayout(null) } }}>Undo</button>
+          <button type="button" aria-label="Dismiss closed layout message" onClick={() => { onClosedLayoutChange?.(null); setInternalClosedLayout(null) }}>×</button>
+        </div>
+      )}
+      {!compact && wizardVisible && (
+        <LayoutWizard
+          store={store}
+          initialStep={wizardRoomStep ? 1 : 0}
+          initialMode={wizardRoomStep ? 'polygon' : 'duplicate'}
+          onClose={closeLayoutWizard}
+        />
+      )}
+      {!compact && spaceImpactOpen && (
+        <SpaceImpactDialog
+          project={store.getState().project}
+          nextArchitecture={getActiveVariant(store.getState()).architecture}
+          onCancel={() => setSpaceImpactOpen(false)}
+          onApply={() => {
+            const architecture = getActiveVariant(store.getState()).architecture
+            store.getState().checkpointAllLayouts('Before a shared-space change')
+            store.getState().applySharedArchitecture(architecture)
+            setSpaceImpactOpen(false)
+            onStageChange?.('equipment')
+          }}
+        />
+      )}
     </>
   )
 }

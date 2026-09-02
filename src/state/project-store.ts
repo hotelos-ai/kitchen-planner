@@ -2,6 +2,7 @@ import { useStore } from 'zustand'
 import { createStore, type StoreApi } from 'zustand/vanilla'
 import { createWorkspaceFacade, type WorkspaceFacade } from '../core/workspace/workspace-facade'
 import type {
+  Architecture,
   DisplayUnit,
   EquipmentItem,
   KitchenProject,
@@ -14,6 +15,7 @@ import { suggestCatalogPlacement } from '../domain/catalog/suggest-placement'
 import { applyEquipmentConfiguration as configureEquipmentItem } from '../domain/equipment-configurations'
 import { evaluateOperationalRequirements } from '../domain/requirements/operational-requirements'
 import { projectSchema } from '../domain/project-schema'
+import { createCheckpoint, restoreCheckpointOnto } from '../domain/layout-checkpoints'
 import { createSeedProject } from '../domain/seed-project'
 import { appendHistory } from './history'
 import { loadProject, saveProject } from './persistence'
@@ -71,12 +73,19 @@ export interface ProjectState {
   setSnapMm(intervalMm: number): void
   setArchitectureLocked(locked: boolean): void
   createVariant(name: string): string
+  createEmptyVariant(name: string): string
   activateVariant(id: string): void
   renameVariant(id: string, name: string): void
   deleteVariant(id: string): void
   updateScenario(id: string, patch: Partial<SimulationScenario>): void
   commitProjectCandidate(project: unknown, expectedRevision: number, expectedDocumentId: string): ProjectCommitResult
   replaceProject(project: KitchenProject): void
+  patchProject(mutator: (project: KitchenProject) => void): ProjectCommitResult
+  renameProject(name: string): void
+  addNamedCheckpoint(label: string, variantId?: string): string | null
+  checkpointAllLayouts(label: string): void
+  restoreCheckpoint(checkpointId: string): boolean
+  applySharedArchitecture(architecture: Architecture): ReturnType<WorkspaceFacade['applyOperations']>
   undo(): void
   redo(): void
 }
@@ -279,6 +288,11 @@ export function createProjectStore(initialProject: KitchenProject): ProjectStore
         applyOperations([{ type: 'create_layout', variantId: id, parentVariantId: activeVariantId(), name: name.trim() || 'Untitled layout', equipmentMode: 'duplicate' }], 'Create layout')
         return id
       },
+      createEmptyVariant: (name) => {
+        const id = makeId('variant')
+        applyOperations([{ type: 'create_layout', variantId: id, parentVariantId: activeVariantId(), name: name.trim() || 'Empty layout', equipmentMode: 'empty' }], 'Create empty layout')
+        return id
+      },
       activateVariant: (id) => {
         const result = applyOperations([{ type: 'activate_layout', variantId: id }], 'Activate layout')
         if (result.ok) set({ selectedIds: [] })
@@ -309,6 +323,73 @@ export function createProjectStore(initialProject: KitchenProject): ProjectStore
         return { ok: true, revision: state.revision + 1 }
       },
       replaceProject: (project) => set({ project: structuredClone(project), documentId: makeId('document'), revision: 0, selectedIds: [], past: [], future: [] }),
+      patchProject: (mutator) => {
+        const snapshot = get()
+        const project = structuredClone(snapshot.project)
+        mutator(project)
+        return get().commitProjectCandidate(project, snapshot.revision, snapshot.documentId)
+      },
+      renameProject: (name) => {
+        const trimmed = name.trim()
+        if (!trimmed) return
+        get().patchProject((project) => { project.name = trimmed })
+      },
+      addNamedCheckpoint: (label, variantId) => {
+        const snapshot = get()
+        const variant = snapshot.project.variants.find((candidate) => candidate.id === (variantId ?? snapshot.project.activeVariantId)) ?? getActiveVariant(snapshot)
+        const checkpoint = createCheckpoint(variant, snapshot.revision, label.trim() || `Rev ${snapshot.revision}`)
+        const result = get().patchProject((project) => {
+          const target = project.variants.find((candidate) => candidate.id === variant.id)
+          if (target) target.checkpoints = [...(target.checkpoints ?? []), checkpoint]
+        })
+        return result.ok ? checkpoint.id : null
+      },
+      checkpointAllLayouts: (label) => {
+        const snapshot = get()
+        const trimmed = label.trim() || `Rev ${snapshot.revision}`
+        get().patchProject((project) => {
+          project.variants.forEach((variant) => {
+            variant.checkpoints = [...(variant.checkpoints ?? []), createCheckpoint(variant, snapshot.revision, trimmed)]
+          })
+        })
+      },
+      restoreCheckpoint: (checkpointId) => {
+        const snapshot = get()
+        const variant = getActiveVariant(snapshot)
+        const checkpoint = variant.checkpoints?.find((entry) => entry.id === checkpointId)
+        if (!checkpoint) return false
+        const restored = restoreCheckpointOnto(variant, checkpoint)
+        const current = createCheckpoint(variant, snapshot.revision, 'Current before restore')
+        const result = get().patchProject((project) => {
+          const target = project.variants.find((candidate) => candidate.id === variant.id)
+          if (!target) return
+          target.architecture = restored.architecture
+          target.equipment = restored.equipment
+          target.updatedAt = restored.updatedAt
+          target.checkpoints = [...(target.checkpoints ?? []), current]
+          if (project.activeVariantId === target.id) project.architecture = structuredClone(restored.architecture)
+        })
+        return result.ok
+      },
+      applySharedArchitecture: (architecture) => {
+        const operations = get().project.variants.flatMap((variant) => [
+          { type: 'update_architecture' as const, variantId: variant.id, patch: { locked: false } },
+          {
+            type: 'update_architecture' as const,
+            variantId: variant.id,
+            patch: {
+              widthMm: architecture.widthMm,
+              depthMm: architecture.depthMm,
+              wallHeightMm: architecture.wallHeightMm,
+              roomPolygon: architecture.roomPolygon.map((point) => ({ xMm: point.x, yMm: point.y })),
+              openings: architecture.openings,
+              pillars: architecture.pillars,
+              storageZones: architecture.storageZones,
+            },
+          },
+        ])
+        return applyOperations(operations, 'Update shared space')
+      },
       undo: () => set((state) => {
         const previous = state.past.at(-1)
         if (!previous) return state

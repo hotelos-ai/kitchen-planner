@@ -9,6 +9,7 @@ test('edits, simulates, compares, exports, and restores Manta Raja', async ({ pa
   await page.goto('/')
   await expect(page.getByRole('heading', { name: /Kitchen Planner/i })).toBeVisible()
 
+  await page.getByRole('tab', { name: /Placed/i }).click()
   await page.getByRole('button', { name: /Select Tandoor, 700 mm by 700 mm/i }).click()
   await page.getByLabel(/Lock dimensions/i).uncheck()
   await page.getByLabel(/^Width \(mm\)$/i).fill('750')
@@ -33,7 +34,8 @@ test('edits, simulates, compares, exports, and restores Manta Raja', async ({ pa
   await page.getByRole('button', { name: /Plan/i }).click()
   await expect(page.getByLabel(/Equipment label/i)).toHaveValue('Tandoor')
 
-  await page.getByRole('button', { name: /New variant/i }).click()
+  await page.getByRole('button', { name: /New layout/i }).click()
+  await page.getByRole('menuitem', { name: 'Duplicate current layout' }).click()
   await page.getByRole('button', { name: 'Next' }).click()
   await page.getByRole('button', { name: 'Next' }).click()
   await page.getByRole('button', { name: 'Next' }).click()
@@ -61,18 +63,19 @@ test('edits, simulates, compares, exports, and restores Manta Raja', async ({ pa
 
   const variantsBeforeExchange = await page.getByLabel(/Active layout variant/i).locator('option').allTextContents()
   const downloadPromise = page.waitForEvent('download')
-  await page.getByRole('button', { name: /Export all layouts/i }).click()
+  await page.getByRole('button', { name: /Save project/i }).click()
   const download = await downloadPromise
   const exportedPath = await download.path()
   expect(exportedPath).toBeTruthy()
-  await page.getByLabel(/Import project JSON/i).setInputFiles(exportedPath!)
-  await expect(page.getByRole('status')).toContainText(/Imported/i)
+  await page.getByLabel(/Open project JSON/i).setInputFiles(exportedPath!)
+  await expect(page.getByRole('status')).toContainText(/Opened/i)
   await expect.poll(() => page.getByLabel(/Active layout variant/i).locator('option').allTextContents()).toEqual(variantsBeforeExchange)
 })
 
 test('creates an advanced room and recommended essentials through the novice wizard', async ({ page }) => {
   await page.goto('/')
-  await page.getByRole('button', { name: /New variant/i }).click()
+  await page.getByRole('button', { name: /New layout/i }).click()
+  await page.getByRole('menuitem', { name: 'Duplicate current layout' }).click()
   const wizard = page.getByRole('dialog')
 
   await wizard.getByLabel('Layout name').fill('Jagged service concept')

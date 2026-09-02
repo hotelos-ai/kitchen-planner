@@ -124,6 +124,8 @@ const scenarioPatchSchema = z.object({
   checks: scenarioChecksPatchSchema.optional(),
   taskDurations: z.partialRecord(stationCapabilitySchema, durationRangeSchema).optional(),
   stationCapacities: z.record(idSchema, z.number().int().positive().max(100)).optional(),
+  serviceStyle: nameSchema.optional(),
+  variability: z.enum(['low', 'typical', 'high']).optional(),
 }).strict().refine((patch) => Object.keys(patch).length > 0, 'Scenario patch cannot be empty')
 
 const operationalProfilePatchSchema = operationalProfileSchema.partial()

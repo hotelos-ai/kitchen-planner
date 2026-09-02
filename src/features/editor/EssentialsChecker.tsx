@@ -83,7 +83,7 @@ const titleFor = (severity: OperationalRequirementResult['severity']) => {
   return severity === 'blocker' ? 'Blockers' : 'Warnings'
 }
 
-export function EssentialsChecker({ store, onEditRoom }: { store: ProjectStore; onEditRoom?(): void }) {
+export function EssentialsChecker({ store, onEditRoom, focusItemId }: { store: ProjectStore; onEditRoom?(): void; focusItemId?: string }) {
   const project = useStore(store, (state) => state.project)
   const variant = useStore(store, getActiveVariant)
   const [message, setMessage] = useState('')
@@ -124,10 +124,12 @@ export function EssentialsChecker({ store, onEditRoom }: { store: ProjectStore; 
             : <ul>{findings.map((result, index) => {
               const catalogId = result.recommendedCatalogIds.find((id) => getCatalogEntry(id))
               const entry = catalogId ? getCatalogEntry(catalogId) : undefined
-              return <li key={`${result.code}-${index}`}>
+              const focused = Boolean(focusItemId && result.itemIds.includes(focusItemId))
+              return <li key={`${result.code}-${index}`} className={focused ? 'focused-check' : undefined}>
                 <p>{result.reason}</p>
                 {result.scope === 'architecture' && <button type="button" onClick={onEditRoom} disabled={!onEditRoom} aria-label={`Edit room for ${result.reason}`}>Edit room</button>}
                 {severity !== 'professional-review' && catalogId && entry && <button type="button" onClick={() => addRecommendations(catalogId)}>Add {entry.displayName}</button>}
+                {result.itemIds.length > 0 && <button type="button" onClick={() => store.getState().selectItems(result.itemIds)}>Show on plan</button>}
               </li>
             })}</ul>}
         </section>

@@ -1,3 +1,4 @@
+import type { ComponentProps } from 'react'
 import { act, fireEvent, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -5,14 +6,23 @@ import { createSeedProject } from '../../domain/seed-project'
 import { createProjectStore, getActiveItem, projectStore } from '../../state/project-store'
 import { PlanWorkspace } from './PlanWorkspace'
 
+const workspace = (props: Partial<ComponentProps<typeof PlanWorkspace>> = {}) => (
+  <PlanWorkspace showCanvas={false} includeToolbar {...props} />
+)
+
+async function selectPlacedItem(user: ReturnType<typeof userEvent.setup>, pattern: RegExp) {
+  await user.click(screen.getByRole('tab', { name: /Placed/i }))
+  await user.click(screen.getByRole('button', { name: pattern }))
+}
+
 describe('plan workspace', () => {
   beforeEach(() => projectStore.getState().replaceProject(createSeedProject()))
   afterEach(() => vi.unstubAllGlobals())
 
   it('selects an item and exposes editable dimensions in the inspector', async () => {
     const user = userEvent.setup()
-    render(<PlanWorkspace showCanvas={false} />)
-    await user.click(screen.getByRole('button', { name: /Select Tandoor, 700 mm by 700 mm/i }))
+    render(workspace())
+    await selectPlacedItem(user, /Select Tandoor, 700 mm by 700 mm/i)
     expect(screen.getByRole('textbox', { name: /Equipment label/i })).toHaveValue('Tandoor')
     expect(screen.getByLabelText(/Lock dimensions/i)).not.toBeChecked()
     expect(screen.getByLabelText(/^Width/i)).toBeEnabled()
@@ -20,8 +30,8 @@ describe('plan workspace', () => {
 
   it('changes dimensions without changing units internally', async () => {
     const user = userEvent.setup()
-    render(<PlanWorkspace showCanvas={false} />)
-    await user.click(screen.getByRole('button', { name: /Select Tandoor/i }))
+    render(workspace())
+    await selectPlacedItem(user, /Select Tandoor/i)
     const width = screen.getByLabelText(/^Width/i)
     await user.clear(width)
     await user.type(width, '750')
@@ -35,8 +45,8 @@ describe('plan workspace', () => {
 
   it('rotates the selected item left and right with explicit controls', async () => {
     const user = userEvent.setup()
-    render(<PlanWorkspace showCanvas={false} />)
-    await user.click(screen.getByRole('button', { name: /Select Tandoor/i }))
+    render(workspace())
+    await selectPlacedItem(user, /Select Tandoor/i)
 
     await user.click(screen.getByRole('button', { name: /Rotate selected left/i }))
     expect(getActiveItem(projectStore.getState(), 'tandoor').rotationDeg).toBe(270)
@@ -47,8 +57,8 @@ describe('plan workspace', () => {
 
   it('enables drag resize on selection and keeps inspector dimensions synchronized', async () => {
     const user = userEvent.setup()
-    render(<PlanWorkspace showCanvas={false} />)
-    await user.click(screen.getByRole('button', { name: /Select Tandoor/i }))
+    render(workspace())
+    await selectPlacedItem(user, /Select Tandoor/i)
     expect(screen.getByRole('button', { name: /Disable drag resize/i })).toHaveAttribute('aria-pressed', 'true')
     expect(screen.getByLabelText(/Lock dimensions/i)).not.toBeChecked()
 
@@ -59,7 +69,7 @@ describe('plan workspace', () => {
 
   it('adds, duplicates, removes, and restores a custom item', async () => {
     const user = userEvent.setup()
-    render(<PlanWorkspace showCanvas={false} />)
+    render(workspace())
     await user.click(screen.getByRole('button', { name: /Add custom item/i }))
     await user.clear(screen.getByLabelText(/New item label/i))
     await user.type(screen.getByLabelText(/New item label/i), 'Rice warmer')
@@ -70,6 +80,7 @@ describe('plan workspace', () => {
     expect(screen.getByRole('button', { name: /Confirm remove selected item/i })).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: /Confirm remove selected item/i }))
     await user.click(screen.getByRole('button', { name: /Undo/i }))
+    await user.click(screen.getByRole('tab', { name: /Placed/i }))
     expect(screen.getByRole('button', { name: /Select Rice warmer copy/i })).toBeInTheDocument()
   })
 
@@ -78,7 +89,7 @@ describe('plan workspace', () => {
     const before = store.getState().project.variants[0].equipment
     const sourceIds = before.slice(0, 2).map((item) => item.id)
     store.getState().selectItems(sourceIds)
-    render(<PlanWorkspace store={store} showCanvas={false} />)
+    render(workspace({ store }))
 
     fireEvent.keyDown(window, { key: 'd', ctrlKey: true })
 
@@ -92,8 +103,9 @@ describe('plan workspace', () => {
 
   it('opens the layout wizard and atomically switches to its new variant', async () => {
     const user = userEvent.setup()
-    render(<PlanWorkspace showCanvas={false} />)
-    await user.click(screen.getByRole('button', { name: /New variant/i }))
+    render(workspace())
+    await user.click(screen.getByRole('button', { name: /New layout/i }))
+    await user.click(screen.getByRole('menuitem', { name: 'Duplicate current layout' }))
     expect(screen.getByRole('dialog', { name: 'Starting point' })).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Next' }))
     await user.click(screen.getByRole('button', { name: 'Next' }))
@@ -107,7 +119,7 @@ describe('plan workspace', () => {
 
   it('collapses overlay drawers without remounting the active canvas host', async () => {
     const user = userEvent.setup()
-    const { container } = render(<PlanWorkspace showCanvas={false} />)
+    const { container } = render(workspace())
     const canvasHost = container.querySelector('.canvas-column')
     const catalogDrawer = container.querySelector('[data-editor-drawer="catalog"]')
     const inspectorDrawer = container.querySelector('[data-editor-drawer="inspector"]')
@@ -126,7 +138,7 @@ describe('plan workspace', () => {
 
   it('starts narrow overlay drawers closed while retaining desktop-open defaults', () => {
     vi.stubGlobal('matchMedia', vi.fn(() => ({ matches: true })))
-    const { container } = render(<PlanWorkspace showCanvas={false} />)
+    const { container } = render(workspace())
 
     expect(screen.getByRole('button', { name: 'Toggle equipment catalog' })).toHaveAttribute('aria-pressed', 'false')
     expect(screen.getByRole('button', { name: 'Toggle inspector' })).toHaveAttribute('aria-pressed', 'false')
@@ -136,9 +148,9 @@ describe('plan workspace', () => {
 
   it('opens operational essentials from the workspace toolbar', async () => {
     const user = userEvent.setup()
-    render(<PlanWorkspace showCanvas={false} />)
+    render(workspace())
 
-    await user.click(screen.getByRole('button', { name: 'Check essentials' }))
+    await user.click(screen.getByRole('button', { name: /Check essentials/i }))
     expect(screen.getByRole('dialog', { name: 'Check essentials' })).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Professional review' })).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Close essentials checker' }))
@@ -147,9 +159,9 @@ describe('plan workspace', () => {
 
   it('uses Escape to close transient workspace UI before clearing selection', async () => {
     const user = userEvent.setup()
-    render(<PlanWorkspace showCanvas={false} />)
-    await user.click(screen.getByRole('button', { name: /Select Tandoor/i }))
-    await user.click(screen.getByRole('button', { name: 'Check essentials' }))
+    render(workspace())
+    await selectPlacedItem(user, /Select Tandoor/i)
+    await user.click(screen.getByRole('button', { name: /Check essentials/i }))
     ;(document.activeElement as HTMLElement).blur()
 
     await user.keyboard('{Escape}')
@@ -163,9 +175,9 @@ describe('plan workspace', () => {
     const project = createSeedProject()
     project.variants[0].architecture.openings = project.variants[0].architecture.openings.filter((opening) => opening.flow !== 'entry')
     project.architecture = structuredClone(project.variants[0].architecture)
-    render(<PlanWorkspace store={createProjectStore(project)} showCanvas={false} />)
+    render(workspace({ store: createProjectStore(project) }))
 
-    await user.click(screen.getByRole('button', { name: 'Check essentials' }))
+    await user.click(screen.getByRole('button', { name: /Check essentials/i }))
     await user.click(screen.getByRole('button', { name: /Edit room.*dedicated staff entry/i }))
 
     expect(screen.queryByRole('dialog', { name: 'Check essentials' })).not.toBeInTheDocument()

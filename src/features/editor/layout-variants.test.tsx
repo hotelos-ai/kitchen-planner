@@ -131,7 +131,8 @@ describe('layout variant tabs', () => {
     render(<LayoutVariants store={store} onAdd={onAdd} />)
 
     expect(screen.getByRole('button', { name: 'Close Layout A' })).toBeDisabled()
-    await user.click(screen.getByRole('button', { name: 'New variant' }))
+    await user.click(screen.getByRole('button', { name: 'New layout' }))
+    await user.click(screen.getByRole('menuitem', { name: 'Duplicate current layout' }))
     expect(onAdd).toHaveBeenCalledOnce()
     expect(store.getState().project.variants).toHaveLength(1)
   })
@@ -143,11 +144,39 @@ describe('layout variant tabs', () => {
     const store = createProjectStore(project)
     render(<LayoutVariants store={store} />)
 
-    await user.click(screen.getByRole('button', { name: 'New variant' }))
+    await user.click(screen.getByRole('button', { name: 'New layout' }))
+    await user.click(screen.getByRole('menuitem', { name: 'Duplicate current layout' }))
 
     expect(store.getState().project.variants).toHaveLength(2)
     expect(store.getState().project.activeVariantId).not.toBe('layout-a')
     expect(screen.getByRole('tab', { name: 'Layout option 2' })).toHaveAttribute('aria-selected', 'true')
     expect(screen.getByRole('tab', { name: 'Layout option 2' })).toHaveFocus()
+  })
+
+  it('creates an empty layout from the plus menu', async () => {
+    const user = userEvent.setup()
+    const project = projectWithLayouts('layout-a')
+    project.variants = [project.variants[0]]
+    const store = createProjectStore(project)
+    render(<LayoutVariants store={store} />)
+
+    await user.click(screen.getByRole('button', { name: 'New layout' }))
+    await user.click(screen.getByRole('menuitem', { name: 'Create empty layout' }))
+
+    const created = store.getState().project.variants.find((variant) => variant.id !== 'layout-a')
+    expect(created?.equipment).toEqual([])
+    expect(created?.name).toMatch(/Empty layout/)
+  })
+
+  it('creates a named checkpoint from the layout actions menu', async () => {
+    const user = userEvent.setup()
+    const store = createProjectStore(projectWithLayouts())
+    render(<LayoutVariants store={store} />)
+
+    await user.click(screen.getByRole('button', { name: 'Layout B actions' }))
+    await user.click(screen.getByRole('menuitem', { name: 'Create named checkpoint' }))
+
+    const variant = store.getState().project.variants.find((entry) => entry.id === 'layout-b')
+    expect(variant?.checkpoints?.some((checkpoint) => checkpoint.label.includes('Layout B'))).toBe(true)
   })
 })

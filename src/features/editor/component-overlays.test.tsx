@@ -15,10 +15,10 @@ describe('component editing overlays', () => {
     const onAction = vi.fn()
     render(<ComponentContextMenu item={item} locked={false} position={{ x: 20, y: 30 }} onAction={onAction} onClose={vi.fn()} />)
 
-    for (const name of ['Configure', 'Skin', 'Rotate Left', 'Rotate Right', 'Duplicate', 'Lock', 'Inspect in 3D', 'Remove']) {
+    for (const name of ['Configure', 'Skin', 'Rotate left', 'Rotate right', 'Duplicate', 'Lock', 'Inspect in 3D', 'Remove']) {
       expect(screen.getByRole('menuitem', { name })).toBeInTheDocument()
     }
-    await user.click(screen.getByRole('menuitem', { name: 'Rotate Left' }))
+    await user.click(screen.getByRole('menuitem', { name: 'Rotate left' }))
     expect(onAction).toHaveBeenCalledWith('rotate-left')
   })
 

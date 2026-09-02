@@ -17,15 +17,19 @@ import { QuickConfigurationPopover, type QuickConfigurationMode } from './QuickC
 type Props = {
   store: ProjectStore
   showReference: boolean
+  sourceImageUrl?: string
+  sourceOpacity?: number
+  architectureLocked?: boolean
   onInspectComponentIn3D?(itemId: string): void
   onComponentLockChange?(itemId: string, locked: boolean): void
   onSkinChange?(itemId: string, skinId: string): void
+  onWarningBadgeClick?(itemId: string): void
 }
 
 type ContextRequest = { itemId: string; position: OverlayPosition }
 type QuickRequest = ContextRequest & { mode: QuickConfigurationMode }
 
-export function PlanCanvas({ store, showReference, onInspectComponentIn3D, onComponentLockChange, onSkinChange }: Props) {
+export function PlanCanvas({ store, showReference, sourceImageUrl = '/reference/manta-raja-layout.png', sourceOpacity = 22, architectureLocked: _architectureLocked = true, onInspectComponentIn3D, onComponentLockChange, onSkinChange, onWarningBadgeClick }: Props) {
   const containerRef = useRef<HTMLDivElement>(null)
   const [size, setSize] = useState({ width: 740, height: 720 })
   const [contextRequest, setContextRequest] = useState<ContextRequest>()
@@ -33,7 +37,12 @@ export function PlanCanvas({ store, showReference, onInspectComponentIn3D, onCom
   const project = useStore(store, (state) => state.project)
   const selectedIds = useStore(store, (state) => state.selectedIds)
   const variant = useStore(store, getActiveVariant)
-  const warningIds = [...new Set(analyzeLayout(variant.architecture, variant.equipment, { layoutConstraints: variant.layoutConstraints }).flatMap((issue) => issue.itemIds))]
+  const issues = analyzeLayout(variant.architecture, variant.equipment, { layoutConstraints: variant.layoutConstraints })
+  const warningCounts = issues.reduce((counts, issue) => {
+    issue.itemIds.forEach((id) => counts.set(id, (counts.get(id) ?? 0) + 1))
+    return counts
+  }, new Map<string, number>())
+  const warningIds = [...warningCounts.keys()]
   const contextItem = contextRequest ? variant.equipment.find((item) => item.id === contextRequest.itemId) : undefined
   const quickItem = quickRequest ? variant.equipment.find((item) => item.id === quickRequest.itemId) : undefined
 
@@ -109,7 +118,7 @@ export function PlanCanvas({ store, showReference, onInspectComponentIn3D, onCom
 
   return (
     <div ref={containerRef} className="plan-canvas" data-testid="plan-canvas" onDragOver={(event) => event.preventDefault()} onDrop={addDroppedCatalogItem}>
-      {showReference && <img className="source-reference" src="/reference/manta-raja-layout.png" alt="Original graph-paper kitchen layout reference" />}
+      {showReference && <img className="source-reference" src={sourceImageUrl} alt="Source drawing overlay" style={{ opacity: sourceOpacity / 100 }} />}
       <Stage width={size.width} height={size.height} onMouseDown={(event) => {
         if (event.target === event.target.getStage()) {
           store.getState().clearSelection()
@@ -153,6 +162,30 @@ export function PlanCanvas({ store, showReference, onInspectComponentIn3D, onCom
         onSkinChange={onSkinChange ?? ((itemId, skinId) => store.getState().setAppearanceSkin(itemId, skinId))}
       />}
       <div className="canvas-scale"><span />1 metre · 10 squares</div>
+      <div className="plan-warning-badges">
+        {variant.equipment.map((item) => {
+          const count = warningCounts.get(item.id)
+          if (!count) return null
+          return (
+            <button
+              key={item.id}
+              type="button"
+              className="plan-warning-badge"
+              style={{
+                left: originX + (item.xMm + item.widthMm) * pixelsPerMm - 8,
+                top: originY + item.yMm * pixelsPerMm - 8,
+              }}
+              aria-label={`${count} checks for ${item.label}`}
+              onClick={() => {
+                store.getState().selectItems([item.id])
+                onWarningBadgeClick?.(item.id)
+              }}
+            >
+              ⚠{count}
+            </button>
+          )
+        })}
+      </div>
     </div>
   )
 }

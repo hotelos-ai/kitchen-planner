@@ -134,6 +134,15 @@ export const adoptedExperimentManifestSchema = z.object({
   resultMetrics: z.record(z.string(), z.number().finite()).optional(),
 }).strict()
 
+export const layoutCheckpointSchema = z.object({
+  id: z.string().min(1),
+  revision: z.number().int().nonnegative(),
+  label: z.string().min(1),
+  createdAt: z.string().datetime(),
+  architecture: architectureSchema,
+  equipment: z.array(equipmentSchema),
+}).strict()
+
 export const variantSchema = z.object({
   id: z.string().min(1),
   name: z.string().min(1),
@@ -143,6 +152,7 @@ export const variantSchema = z.object({
   operationalProfile: operationalProfileSchema.optional(),
   layoutConstraints: layoutConstraintsSchema.optional(),
   adoptedExperimentManifest: adoptedExperimentManifestSchema.optional(),
+  checkpoints: z.array(layoutCheckpointSchema).optional(),
   createdAt: z.string().datetime(),
   updatedAt: z.string().datetime(),
 }).strict()
@@ -159,6 +169,8 @@ export const scenarioSchema = z.object({
   checks: z.object({ collisions: z.boolean(), doorSwings: z.boolean(), dirtyCleanCrossings: z.boolean() }).strict(),
   taskDurations: z.partialRecord(capabilitySchema, taskDurationRangeSchema).optional(),
   stationCapacities: z.record(z.string(), z.number().int().positive()).optional(),
+  serviceStyle: z.string().min(1).optional(),
+  variability: z.enum(['low', 'typical', 'high']).optional(),
 }).strict()
 
 export const projectSchema = z.object({

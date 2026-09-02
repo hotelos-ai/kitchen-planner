@@ -1,8 +1,13 @@
 import { lazy, Suspense, useMemo, useState } from 'react'
+import { useStore } from 'zustand'
 import { createBrowserAutoLayoutRunner } from '../features/optimizer/browser-auto-layout-runner'
-import { configureWorkspaceAutoLayout, getWorkspaceFacade, projectStore } from '../state/project-store'
+import { evaluateOperationalRequirements } from '../domain/requirements/operational-requirements'
+import { configureWorkspaceAutoLayout, getWorkspaceFacade, getActiveVariant, projectStore } from '../state/project-store'
+import { AppHeader } from './AppHeader'
+import { ProjectStartScreen } from './ProjectStartScreen'
+import { createBlankProject } from '../domain/blank-project'
+import type { ViewMode, WorkflowStage, WorkspaceOverlay } from './workflow'
 import { ErrorBoundary } from './ErrorBoundary'
-import { ProjectExchange } from './ProjectExchange'
 import './styles.css'
 
 const PlanWorkspace = lazy(() => import('../features/editor/PlanWorkspace').then((module) => ({ default: module.PlanWorkspace })))
@@ -11,7 +16,7 @@ const SimulationWorkspace = lazy(() => import('../features/simulation/Simulation
 const CompareWorkspace = lazy(() => import('../features/compare/CompareWorkspace').then((module) => ({ default: module.CompareWorkspace })))
 const AutoLayoutWorkspace = lazy(() => import('../features/optimizer/AutoLayoutWorkspace').then((module) => ({ default: module.AutoLayoutWorkspace })))
 
-export type WorkspaceView = 'plan' | 'scene' | 'split' | 'simulate' | 'compare' | 'auto-layout'
+export type WorkspaceView = ViewMode
 
 void Promise.all([
   import('../features/simulation/SimulationWorkspace'),
@@ -19,17 +24,43 @@ void Promise.all([
   import('../features/optimizer/AutoLayoutWorkspace'),
 ])
 
-const VIEW_LABELS: Record<WorkspaceView, string> = {
-  plan: 'Plan',
-  scene: '3D',
-  split: 'Split',
-  simulate: 'Simulate',
-  compare: 'Compare',
-  'auto-layout': 'Auto-layout',
-}
-
 export function App() {
-  const [view, setView] = useState<WorkspaceView>('plan')
+  const [stage, setStage] = useState<WorkflowStage>('equipment')
+  const [view, setView] = useState<ViewMode>('plan')
+  const [overlay, setOverlay] = useState<WorkspaceOverlay>(null)
+  const project = useStore(projectStore, (state) => state.project)
+  const selectedIds = useStore(projectStore, (state) => state.selectedIds)
+  const selectedItem = useStore(projectStore, (state) => getActiveVariant(state).equipment.find((item) => item.id === state.selectedIds[0]))
+  const canUndo = useStore(projectStore, (state) => state.past.length > 0)
+  const canRedo = useStore(projectStore, (state) => state.future.length > 0)
+
+  const [showReference, setShowReference] = useState(false)
+  const [catalogOpen, setCatalogOpen] = useState(true)
+  const [inspectorOpen, setInspectorOpen] = useState(true)
+  const [wizardOpen, setWizardOpen] = useState(false)
+  const [wizardStartsAtRoom, setWizardStartsAtRoom] = useState(false)
+  const [essentialsOpen, setEssentialsOpen] = useState(false)
+  const [revisionsOpen, setRevisionsOpen] = useState(false)
+  const [sourceImageUrl, setSourceImageUrl] = useState('/reference/manta-raja-layout.png')
+  const [closedLayout, setClosedLayout] = useState<{ name: string; revision: number; undo(): boolean } | null>(null)
+  const [showStartScreen, setShowStartScreen] = useState(false)
+
+  const dragResizeEnabled = Boolean(selectedItem && !selectedItem.dimensionsLocked)
+  const canCompare = project.variants.length >= 2 || project.scenarios.length >= 2
+  const showAutoLayout = stage !== 'space'
+
+  const essentialsCount = useMemo(() => {
+    const variant = getActiveVariant(projectStore.getState())
+    const scenario = project.scenarios.find((entry) => entry.id === project.activeScenarioId) ?? project.scenarios[0]
+    if (!scenario) return 0
+    return evaluateOperationalRequirements({
+      architecture: variant.architecture,
+      equipment: variant.equipment,
+      scenario,
+      layoutConstraints: variant.layoutConstraints,
+    }).filter((result) => result.severity !== 'professional-review').length
+  }, [project])
+
   const autoLayoutRunner = useMemo(() => {
     const browserRunner = createBrowserAutoLayoutRunner(projectStore)
     configureWorkspaceAutoLayout(projectStore, {
@@ -46,51 +77,116 @@ export function App() {
     }
   }, [])
 
+  const openWizard = () => { setWizardStartsAtRoom(false); setWizardOpen(true) }
+
   return (
     <main className="app-shell">
-      <header className="topbar">
-        <div className="brand-lockup">
-          <span className="brand-mark" aria-hidden="true">KP</span>
-          <div>
-            <h1>Kitchen Planner</h1>
-            <p>Commercial kitchen planning and service simulation</p>
-          </div>
-        </div>
-        <ProjectExchange />
-        <nav aria-label="Workspace views" className="view-switcher">
-          {(Object.keys(VIEW_LABELS) as WorkspaceView[]).map((next) => (
-            <button
-              key={next}
-              type="button"
-              aria-pressed={view === next}
-              onClick={() => setView(next)}
-            >
-              {VIEW_LABELS[next]}
-            </button>
-          ))}
-        </nav>
-      </header>
+      <AppHeader
+        projectName={project.name}
+        saveLabel="Saved on this device"
+        view={view}
+        stage={stage}
+        overlay={overlay}
+        canCompare={canCompare}
+        showAutoLayout={showAutoLayout}
+        onViewChange={setView}
+        onStageChange={setStage}
+        onOpenCompare={() => setOverlay((current) => current === 'compare' ? null : 'compare')}
+        onOpenAutoLayout={() => setOverlay((current) => current === 'auto-layout' ? null : 'auto-layout')}
+        onCloseOverlay={() => setOverlay(null)}
+        onNewProject={() => {
+          projectStore.getState().replaceProject(createBlankProject())
+          setStage('space')
+          setView('plan')
+          setOverlay(null)
+          setShowStartScreen(true)
+        }}
+        onOpenSettings={() => { setInspectorOpen(true); setRevisionsOpen(false); setEssentialsOpen(false) }}
+        onOpenRevisions={() => { setInspectorOpen(true); setRevisionsOpen(true); setEssentialsOpen(false) }}
+        store={projectStore}
+        catalogOpen={catalogOpen}
+        inspectorOpen={inspectorOpen}
+        essentialsCount={essentialsCount}
+        showReference={showReference}
+        canUndo={canUndo}
+        canRedo={canRedo}
+        dragResizeEnabled={dragResizeEnabled}
+        hasSelection={selectedIds.length > 0}
+        onToggleCatalog={() => setCatalogOpen((open) => !open)}
+        onToggleInspector={() => setInspectorOpen((open) => !open)}
+        onOpenEssentials={() => { setEssentialsOpen(true); setRevisionsOpen(false); setInspectorOpen(true) }}
+        onUndo={() => projectStore.getState().undo()}
+        onRedo={() => projectStore.getState().redo()}
+        onToggleReference={() => setShowReference((value) => !value)}
+        onRotateLeft={() => projectStore.getState().rotateItems(selectedIds, -90)}
+        onRotateRight={() => projectStore.getState().rotateItems(selectedIds, 90)}
+        onToggleResize={() => selectedItem && projectStore.getState().setDimensionsLocked(selectedItem.id, !selectedItem.dimensionsLocked)}
+        onAddLayout={openWizard}
+        onClosedLayout={(closed) => setClosedLayout(closed)}
+      />
       <ErrorBoundary>
         <Suspense fallback={<section className="workspace-placeholder">Loading workspace…</section>}>
-          <section className={`workspace-surfaces${view === 'split' ? ' split-workspace' : ''}`}>
-            <div
-              className={`workspace-surface plan-surface${view === 'plan' || view === 'split' ? ' active' : ''}`}
-              data-workspace-surface="plan"
-              aria-hidden={view !== 'plan' && view !== 'split'}
-            >
-              <PlanWorkspace compact={view === 'split'} shortcutEnabled={view === 'plan' || view === 'scene' || view === 'split'} onInspectComponentIn3D={() => setView('scene')} />
-            </div>
-            <div
-              className={`workspace-surface scene-surface${view === 'scene' || view === 'split' ? ' active' : ''}`}
-              data-workspace-surface="scene"
-              aria-hidden={view !== 'scene' && view !== 'split'}
-            >
-              <SceneWorkspace compact={view === 'split'} />
-            </div>
-            {view === 'simulate' && <div className="workspace-surface active"><SimulationWorkspace /></div>}
-            {view === 'compare' && <div className="workspace-surface active"><CompareWorkspace /></div>}
-            {view === 'auto-layout' && <div className="workspace-surface active"><AutoLayoutWorkspace runner={autoLayoutRunner} /></div>}
+          {showStartScreen ? (
+            <ProjectStartScreen
+              onCreateRoom={(architecture) => {
+                projectStore.getState().applySharedArchitecture(architecture)
+                setShowStartScreen(false)
+                setStage('space')
+              }}
+              onDrawManually={() => { setShowStartScreen(false); setStage('space'); setWizardOpen(true); setWizardStartsAtRoom(true) }}
+              onTraceImage={(url) => { setSourceImageUrl(url); setShowReference(true) }}
+              onOpenProject={(opened) => { projectStore.getState().replaceProject(opened); setShowStartScreen(false) }}
+            />
+          ) : (
+          <section className={`workspace-surfaces${view === 'split' && overlay === null && stage !== 'simulate' ? ' split-workspace' : ''}`}>
+            {overlay === 'compare' && <div className="workspace-surface active"><CompareWorkspace /></div>}
+            {overlay === 'auto-layout' && <div className="workspace-surface active"><AutoLayoutWorkspace runner={autoLayoutRunner} /></div>}
+            {overlay === null && stage === 'simulate' && <div className="workspace-surface active"><SimulationWorkspace /></div>}
+            {overlay === null && stage !== 'simulate' && (
+              <>
+                <div
+                  className={`workspace-surface plan-surface${view === 'plan' || view === 'split' ? ' active' : ''}`}
+                  data-workspace-surface="plan"
+                  aria-hidden={view !== 'plan' && view !== 'split'}
+                >
+                  <PlanWorkspace
+                    store={projectStore}
+                    stage={stage}
+                    compact={view === 'split'}
+                    shortcutEnabled={view === 'plan' || view === 'scene' || view === 'split'}
+                    showReference={showReference}
+                    catalogOpen={catalogOpen}
+                    inspectorOpen={inspectorOpen}
+                    essentialsOpen={essentialsOpen}
+                    revisionsOpen={revisionsOpen}
+                    sourceImageUrl={sourceImageUrl}
+                    wizardOpen={wizardOpen}
+                    wizardStartsAtRoom={wizardStartsAtRoom}
+                    closedLayout={closedLayout}
+                    onInspectComponentIn3D={() => setView('scene')}
+                    onStageChange={setStage}
+                    onCatalogOpenChange={setCatalogOpen}
+                    onInspectorOpenChange={setInspectorOpen}
+                    onEssentialsOpenChange={setEssentialsOpen}
+                    onRevisionsOpenChange={setRevisionsOpen}
+                    onSourceImageUrlChange={setSourceImageUrl}
+                    onWizardOpenChange={setWizardOpen}
+                    onWizardStartsAtRoomChange={setWizardStartsAtRoom}
+                    onClosedLayoutChange={setClosedLayout}
+                    onAddLayout={openWizard}
+                  />
+                </div>
+                <div
+                  className={`workspace-surface scene-surface${view === 'scene' || view === 'split' ? ' active' : ''}`}
+                  data-workspace-surface="scene"
+                  aria-hidden={view !== 'scene' && view !== 'split'}
+                >
+                  <SceneWorkspace compact={view === 'split'} />
+                </div>
+              </>
+            )}
           </section>
+          )}
         </Suspense>
       </ErrorBoundary>
     </main>

@@ -140,6 +140,8 @@ export function AutoLayoutWorkspace({ store = projectStore, runner, now = () => 
   const [minimumAisleMm, setMinimumAisleMm] = useState(baseline.layoutConstraints?.minimumAisleMm ?? 0)
   const [noGoZones, setNoGoZones] = useState<RectMm[]>(() => structuredClone(baseline.layoutConstraints?.noGoZones ?? []))
   const [priority, setPriority] = useState<NonNullable<OptimizerManifest['priority']>>('balanced')
+  const [alternativeCount, setAlternativeCount] = useState<1 | 3>(3)
+  const [keepWalls, setKeepWalls] = useState(true)
   const [targetP90Minutes, setTargetP90Minutes] = useState(15)
   const [maxEvaluations, setMaxEvaluations] = useState(60)
   const [timeBudgetSeconds, setTimeBudgetSeconds] = useState(30)
@@ -262,10 +264,26 @@ export function AutoLayoutWorkspace({ store = projectStore, runner, now = () => 
   }
 
   return (
-    <section className="auto-layout-workspace" aria-label="Auto-layout experiment">
-      <header><span className="eyebrow">Constraint-first experiment</span><h2>Auto-layout</h2><p>Searches for the best observed feasible layouts under the frozen inputs, rules, scenarios, seeds, and budget. It does not claim a universal optimum or regulatory approval.</p></header>
+    <section className="auto-layout-workspace auto-layout-sheet" aria-label="Auto-layout experiment">
+      <header><span className="eyebrow">Generate layout alternatives</span><h2>Auto-layout</h2><p>Creates new layout tabs. Nothing overwrites the current arrangement. Searches for the best observed feasible layouts under the frozen inputs, rules, scenarios, seeds, and budget.</p></header>
       <div className="auto-layout-body">
         <form className="auto-layout-controls" onSubmit={(event) => { event.preventDefault(); void run() }}>
+          <fieldset><legend>What should be prioritized?</legend>
+            <label><input type="radio" name="auto-layout-priority" checked={priority === 'travel'} onChange={() => setPriority('travel')} />Shorter staff walking</label>
+            <label><input type="radio" name="auto-layout-priority" checked={priority === 'service'} onChange={() => setPriority('service')} />Higher throughput</label>
+            <label><input type="radio" name="auto-layout-priority" checked={priority === 'balanced'} onChange={() => setPriority('balanced')} />Better clean/dirty separation</label>
+            <label><input type="radio" name="auto-layout-priority" checked={priority === 'minimal-change'} onChange={() => setPriority('minimal-change')} />More open working space</label>
+          </fieldset>
+          <fieldset><legend>Keep fixed</legend>
+            <label><input type="checkbox" checked={keepWalls} onChange={(event) => { setKeepWalls(event.target.checked); setPermissions((value) => ({ ...value, architecture: !event.target.checked })) }} />Walls and openings</label>
+            {baseline.architecture.pillars.map((pillar) => <label key={pillar.id}><input type="checkbox" checked={lockedArchitectureElementIds.includes(pillar.id)} onChange={(event) => toggle(lockedArchitectureElementIds, setLockedArchitectureElementIds, pillar.id, event.target.checked)} />Pillar {pillar.id}</label>)}
+            {baseline.architecture.openings.filter((opening) => opening.kind === 'service-window').map((opening) => <label key={opening.id}><input type="checkbox" checked={lockedArchitectureElementIds.includes(opening.id)} onChange={(event) => toggle(lockedArchitectureElementIds, setLockedArchitectureElementIds, opening.id, event.target.checked)} />{opening.label}</label>)}
+            <label><input type="checkbox" checked={!permissions.placement} onChange={(event) => setPermissions((value) => ({ ...value, placement: !event.target.checked }))} />Current equipment positions</label>
+          </fieldset>
+          <fieldset><legend>Generate</legend>
+            <label><input type="radio" name="alternative-count" checked={alternativeCount === 1} onChange={() => setAlternativeCount(1)} />1 alternative</label>
+            <label><input type="radio" name="alternative-count" checked={alternativeCount === 3} onChange={() => setAlternativeCount(3)} />3 alternatives</label>
+          </fieldset>
           <fieldset><legend>Demand and staffing</legend>
             <label>Covers<input type="number" min="1" value={covers} onChange={(event) => setCovers(Number(event.target.value))} /></label>
             <label>Peak duration (minutes)<input type="number" min="1" value={durationMinutes} onChange={(event) => setDurationMinutes(Number(event.target.value))} /></label>
@@ -314,8 +332,9 @@ export function AutoLayoutWorkspace({ store = projectStore, runner, now = () => 
               </>}
             </section>}
             <div className="auto-layout-finalists">
-              {namedFinalists.map(({ name, candidate }) => <FinalistCard key={name} name={name} candidate={candidate} baseline={baselineResult} manifest={result.manifest} onInspect={() => setInspected(candidate)} onCompare={() => setCompared(candidate)} onSave={() => adopt(name, candidate)} />)}
+              {namedFinalists.slice(0, alternativeCount === 1 ? 1 : namedFinalists.length).map(({ name, candidate }) => <FinalistCard key={name} name={name} candidate={candidate} baseline={baselineResult} manifest={result.manifest} onInspect={() => setInspected(candidate)} onCompare={() => setCompared(candidate)} onSave={() => adopt(name, candidate)} />)}
             </div>
+            {namedFinalists.length > 0 && <button type="button" onClick={() => namedFinalists.slice(0, alternativeCount).forEach(({ name, candidate }) => adopt(name, candidate))}>Save alternatives as new layouts</button>}
           </>}
           {inspected && <section role="region" aria-label="Inspected finalist"><h3>Inspected finalist</h3><p>{inspected.id} · {inspected.variant.equipment.length} components · read-only spatial preview</p><LayoutThumbnail variant={inspected.variant} baseline={baseline} label="Inspected finalist plan" /></section>}
           {compared && <section role="region" aria-label="Finalist comparison"><h3>Finalist comparison</h3><p>{compared.id} against {baseline.id} · read-only spatial comparison</p><div className="auto-layout-comparison"><div><strong>Baseline</strong><LayoutThumbnail variant={baseline} label="Baseline comparison plan" /></div><div><strong>Finalist</strong><LayoutThumbnail variant={compared.variant} baseline={baseline} label="Finalist comparison plan" /></div></div></section>}

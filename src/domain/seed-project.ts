@@ -161,7 +161,7 @@ export function createSeedProject(): KitchenProject {
     architecture: structuredClone(architecture),
     variants: [{
       id: 'baseline-trace',
-      name: 'Current trace',
+      name: 'Layout A',
       architecture: structuredClone(architecture),
       equipment: equipmentItems,
       createdAt: CREATED_AT,
