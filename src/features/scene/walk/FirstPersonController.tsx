@@ -3,7 +3,7 @@ import { useCallback, useEffect, useMemo, useRef } from 'react'
 import * as THREE from 'three'
 import type { Architecture, EquipmentItem } from '../../../domain/project'
 import { softenPlayerStep } from './staff-proximity'
-import { buildWalkColliders, cameraYawForHeading, findD2Spawn, findJumpObstacle, resolveWalkStep, supportHeightAt } from './walk-collision'
+import { buildWalkColliders, cameraYawForHeading, findJumpObstacle, resolveWalkStep, supportHeightAt, type WalkSpawn } from './walk-collision'
 import { EMPTY_WALK_INPUT, walkActionForKeyboardEvent, walkInputReducer, type WalkInputState } from './walk-input'
 import { advanceVerticalMotion, cameraRelativeRight, jumpVelocityForObstacle, type VerticalMotionState } from './walk-motion'
 import { PointerLockLook } from './PointerLockLook'
@@ -14,10 +14,11 @@ const WALK_MPS = 1.45
 const BOOST_MPS = 2.35
 const PLAYER_RADIUS_MM = 260
 
-export function FirstPersonController({ active, architecture, equipment, staff = [], onLockedChange, onNearbyChange, onPositionChange }: {
+export function FirstPersonController({ active, architecture, equipment, spawn, staff = [], onLockedChange, onNearbyChange, onPositionChange }: {
   active: boolean
   architecture: Architecture
   equipment: readonly EquipmentItem[]
+  spawn: WalkSpawn
   staff?: readonly { agentId: string; xMm: number; yMm: number }[]
   onLockedChange?(locked: boolean): void
   onNearbyChange?(nearby: boolean): void
@@ -36,14 +37,13 @@ export function FirstPersonController({ active, architecture, equipment, staff =
 
   useEffect(() => {
     if (active && !wasActive.current) {
-      const spawn = findD2Spawn(architecture, colliders)
       const camera = getThree().camera
       camera.position.set(spawn.xMm / 1000, EYE_HEIGHT_M, spawn.yMm / 1000)
       camera.rotation.set(0, cameraYawForHeading(spawn.headingRad), 0, 'YXZ')
       vertical.current = { footHeightMm: 0, velocityMps: 0, grounded: true }
     }
     wasActive.current = active
-  }, [active, architecture, colliders, getThree])
+  }, [active, getThree, spawn.headingRad, spawn.xMm, spawn.yMm])
 
   useEffect(() => {
     if (!active) return

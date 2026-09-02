@@ -1,7 +1,7 @@
 import { act, render, screen } from '@testing-library/react'
 import { useEffect } from 'react'
 import userEvent from '@testing-library/user-event'
-import { beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { EquipmentItem } from '../../domain/project'
 import { createSeedProject } from '../../domain/seed-project'
 import { projectStore } from '../../state/project-store'
@@ -10,6 +10,7 @@ import { buildWallSegments } from './ArchitectureMesh'
 
 describe('3D scene synchronization', () => {
   beforeEach(() => projectStore.getState().replaceProject(createSeedProject()))
+  afterEach(() => vi.restoreAllMocks())
 
   it('uses the active item geometry and synchronizes selection', async () => {
     const FakeSceneRenderer = ({ items, onSelect }: { items: EquipmentItem[]; onSelect(id: string): void }) => (
@@ -70,6 +71,30 @@ describe('3D scene synchronization', () => {
     expect(screen.getByRole('alert')).toHaveTextContent(/3D rendering paused/i)
     await user.click(screen.getByRole('button', { name: /Restart 3D renderer/i }))
     expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+  })
+
+  it('reports unsupported WebGL without mounting a renderer', () => {
+    const Renderer = vi.fn(() => <div>Should not mount</div>)
+    render(<SceneWorkspace renderer={Renderer} webglSupported={false} />)
+    expect(screen.getByRole('alert')).toHaveTextContent(/WebGL is not available/i)
+    expect(Renderer).not.toHaveBeenCalled()
+  })
+
+  it('retries an unexpected scene exception without changing the plan', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => undefined)
+    const projectBefore = projectStore.getState().project
+    const Renderer = ({ rendererGeneration }: SceneRendererProps) => {
+      if (rendererGeneration === 0) throw new Error('transient scene failure')
+      return <div data-testid="recovered-renderer">Recovered kitchen</div>
+    }
+
+    render(<SceneWorkspace renderer={Renderer} />)
+    expect(screen.getByRole('alert')).toHaveTextContent(/transient scene failure/i)
+    await userEvent.click(screen.getByRole('button', { name: /Retry 3D view/i }))
+
+    expect(screen.getByTestId('recovered-renderer')).toBeInTheDocument()
+    expect(projectStore.getState().project).toBe(projectBefore)
+    expect(screen.getByTestId('kitchen-scene')).toHaveAttribute('data-renderer-generation', '1')
   })
 
   it('toggles transparent wall surfaces without hiding their borders', async () => {
@@ -145,5 +170,36 @@ describe('3D scene synchronization', () => {
     expect(screen.getByTestId('walk-state')).toHaveTextContent('false')
     expect(screen.getByRole('button', { name: 'Perspective' })).toHaveAttribute('aria-pressed', 'true')
     expect(screen.getByTestId('kitchen-scene')).toHaveAttribute('data-renderer-generation', generation)
+  })
+
+  it('keeps the overview renderer mounted when Walk has no valid spawn', async () => {
+    const user = userEvent.setup()
+    let mounts = 0
+    const UnavailableWalkRenderer = ({ walkMode, onWalkAvailabilityChange }: SceneRendererProps) => {
+      useEffect(() => {
+        mounts += 1
+      }, [])
+      useEffect(() => {
+        if (walkMode) onWalkAvailabilityChange({
+          status: 'unavailable',
+          code: 'no-valid-spawn',
+          message: 'No safe walkthrough start is available. Add a staff entry or clear space inside the room.',
+        })
+      }, [onWalkAvailabilityChange, walkMode])
+      return <output data-testid="persistent-overview">Kitchen overview</output>
+    }
+
+    render(<SceneWorkspace renderer={UnavailableWalkRenderer} />)
+    await user.click(screen.getByRole('button', { name: 'Walk kitchen' }))
+
+    expect(screen.getByRole('alert')).toHaveTextContent(/No safe walkthrough start/i)
+    expect(screen.getByTestId('persistent-overview')).toBeInTheDocument()
+    expect(mounts).toBe(1)
+    expect(screen.getByTestId('kitchen-scene')).toHaveAttribute('data-renderer-generation', '0')
+
+    await user.click(screen.getByRole('button', { name: 'Return to 3D overview' }))
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+    expect(screen.getByTestId('persistent-overview')).toBeInTheDocument()
+    expect(mounts).toBe(1)
   })
 })

@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test'
+import { createSeedProject } from '../src/domain/seed-project'
 
 test.beforeEach(async ({ page }) => {
   await page.addInitScript(() => localStorage.clear())
@@ -112,6 +113,44 @@ test('keeps every 3D control usable and recovers a lost WebGL context', async ({
   await page.getByRole('button', { name: 'Top', exact: true }).click()
   await page.getByRole('button', { name: 'Fit room', exact: true }).click()
   expect(pageErrors).toEqual([])
+})
+
+test('keeps overview 3D mounted when no safe Walk spawn exists', async ({ page }) => {
+  const project = createSeedProject()
+  project.variants[0].equipment = [{
+    id: 'blocked-room',
+    label: 'Blocked room test fixture',
+    category: 'custom',
+    xMm: 0,
+    yMm: 0,
+    widthMm: project.architecture.widthMm,
+    depthMm: project.architecture.depthMm,
+    heightMm: 2500,
+    rotationDeg: 0,
+    dimensionsLocked: true,
+    movable: false,
+    removable: false,
+    capabilities: [],
+  }]
+  await page.addInitScript(({ json }) => {
+    localStorage.setItem('manta-raja:project:v1', json)
+  }, { json: JSON.stringify(project) })
+
+  await page.goto('/')
+  await page.getByRole('button', { name: '3D', exact: true }).click()
+  const scene = page.getByTestId('kitchen-scene')
+  const canvas = scene.locator('canvas')
+  await expect(canvas).toBeVisible()
+  await page.getByRole('button', { name: 'Walk kitchen', exact: true }).click()
+
+  await expect(page.getByRole('alert')).toContainText(/No safe walkthrough start/i)
+  await expect(canvas).toBeVisible()
+  await expect(scene).toHaveAttribute('data-renderer-generation', '0')
+
+  await page.getByRole('button', { name: 'Return to 3D overview' }).click()
+  await expect(page.getByRole('alert')).toHaveCount(0)
+  await expect(canvas).toBeVisible()
+  await expect(scene).toHaveAttribute('data-renderer-generation', '0')
 })
 
 test('applies a typical equipment configuration and reflects it in 3D', async ({ page }) => {

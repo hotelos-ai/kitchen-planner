@@ -12,6 +12,13 @@ export type WalkCollider = {
   landable: boolean
 }
 export type WalkBody = { positionMm: PointMm; radiusMm: number }
+export type WalkSpawn = { xMm: number; yMm: number; headingRad: number }
+export type WalkSpawnResolution =
+  | { status: 'ready'; source: 'entry' | 'interior'; spawn: WalkSpawn }
+  | { status: 'unavailable'; code: 'no-valid-spawn'; message: string }
+
+const PLAYER_RADIUS_MM = 260
+const SPAWN_SEARCH_STEP_MM = 100
 
 export const cameraYawForHeading = (headingRad: number) => -Math.PI / 2 - headingRad
 
@@ -102,6 +109,65 @@ const overlapsAny = (position: PointMm, radiusMm: number, colliders: readonly Wa
   return pointInPolygon(position, collider.polygon) || nearest.distance < radiusMm
 })
 
+const isValidSpawn = (position: PointMm, architecture: Architecture, colliders: readonly WalkCollider[]) =>
+  architecture.roomPolygon.length >= 3
+  && pointInPolygon(position, architecture.roomPolygon)
+  && nearestBoundary(position, architecture.roomPolygon).distance >= PLAYER_RADIUS_MM
+  && !overlapsAny(position, PLAYER_RADIUS_MM, colliders)
+
+const entryGeometry = (architecture: Architecture) => {
+  const door = architecture.openings.find((opening) => opening.kind === 'door' && opening.flow === 'entry')
+  if (!door) return undefined
+  const middle = door.offsetMm + door.widthMm / 2
+  const inward = door.wall === 'left' ? { x: 1, y: 0 } : door.wall === 'right' ? { x: -1, y: 0 } : door.wall === 'top' ? { x: 0, y: 1 } : { x: 0, y: -1 }
+  const edge = door.wall === 'left' ? { x: 0, y: middle } : door.wall === 'right' ? { x: architecture.widthMm, y: middle } : door.wall === 'top' ? { x: middle, y: 0 } : { x: middle, y: architecture.depthMm }
+  return { edge, inward, headingRad: Math.atan2(inward.y, inward.x) }
+}
+
+export function resolveWalkSpawn(architecture: Architecture, colliders: readonly WalkCollider[]): WalkSpawnResolution {
+  const entry = entryGeometry(architecture)
+  if (entry) {
+    for (let distance = 450; distance <= 1800; distance += 100) {
+      for (const lateral of [0, 150, -150, 300, -300]) {
+        const candidate = {
+          x: entry.edge.x + entry.inward.x * distance - entry.inward.y * lateral,
+          y: entry.edge.y + entry.inward.y * distance + entry.inward.x * lateral,
+        }
+        if (isValidSpawn(candidate, architecture, colliders)) return {
+          status: 'ready',
+          source: 'entry',
+          spawn: { xMm: candidate.x, yMm: candidate.y, headingRad: entry.headingRad },
+        }
+      }
+    }
+  }
+
+  if (architecture.roomPolygon.length >= 3) {
+    const xs = architecture.roomPolygon.map((point) => point.x)
+    const ys = architecture.roomPolygon.map((point) => point.y)
+    const startX = Math.ceil((Math.min(...xs) + PLAYER_RADIUS_MM) / SPAWN_SEARCH_STEP_MM) * SPAWN_SEARCH_STEP_MM
+    const endX = Math.max(...xs) - PLAYER_RADIUS_MM
+    const startY = Math.ceil((Math.min(...ys) + PLAYER_RADIUS_MM) / SPAWN_SEARCH_STEP_MM) * SPAWN_SEARCH_STEP_MM
+    const endY = Math.max(...ys) - PLAYER_RADIUS_MM
+    const headingRad = entry?.headingRad ?? 0
+    for (let y = startY; y <= endY; y += SPAWN_SEARCH_STEP_MM) {
+      for (let x = startX; x <= endX; x += SPAWN_SEARCH_STEP_MM) {
+        if (isValidSpawn({ x, y }, architecture, colliders)) return {
+          status: 'ready',
+          source: 'interior',
+          spawn: { xMm: x, yMm: y, headingRad },
+        }
+      }
+    }
+  }
+
+  return {
+    status: 'unavailable',
+    code: 'no-valid-spawn',
+    message: 'No safe walkthrough start is available. Add a staff entry or clear space inside the room.',
+  }
+}
+
 const blocksAtFootHeight = (collider: WalkCollider, footHeightMm: number) =>
   !collider.jumpable || footHeightMm < collider.topMm + 40
 
@@ -146,19 +212,4 @@ export function findJumpObstacle(body: WalkBody, direction: PointMm, colliders: 
     if (hit) return hit
   }
   return undefined
-}
-
-export function findD2Spawn(architecture: Architecture, colliders: readonly WalkCollider[]): { xMm: number; yMm: number; headingRad: number } {
-  const door = architecture.openings.find((opening) => opening.kind === 'door' && opening.flow === 'entry')
-  if (!door) throw new Error('D2 entry is required for Walk Kitchen')
-  const middle = door.offsetMm + door.widthMm / 2
-  const inward = door.wall === 'left' ? { x: 1, y: 0 } : door.wall === 'right' ? { x: -1, y: 0 } : door.wall === 'top' ? { x: 0, y: 1 } : { x: 0, y: -1 }
-  const edge = door.wall === 'left' ? { x: 0, y: middle } : door.wall === 'right' ? { x: architecture.widthMm, y: middle } : door.wall === 'top' ? { x: middle, y: 0 } : { x: middle, y: architecture.depthMm }
-  for (let distance = 450; distance <= 1800; distance += 100) {
-    for (const lateral of [0, 150, -150, 300, -300]) {
-      const candidate = { x: edge.x + inward.x * distance - inward.y * lateral, y: edge.y + inward.y * distance + inward.x * lateral }
-      if (!overlapsAny(candidate, 260, colliders)) return { xMm: candidate.x, yMm: candidate.y, headingRad: Math.atan2(inward.y, inward.x) }
-    }
-  }
-  throw new Error('D2 spawn is obstructed')
 }
