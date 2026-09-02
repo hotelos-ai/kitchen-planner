@@ -1,23 +1,34 @@
-import type { Architecture, EquipmentItem, PointMm, SimulationScenario, StaffRole, StationCapability } from '../domain/project'
+import type { Architecture, EquipmentItem, LayoutConstraints, PointMm, SimulationScenario, StaffRole, StationCapability } from '../domain/project'
 import type { SpatialAgentFrame } from '../core/agents/types'
+
+export type SimulationOutputMode = 'full' | 'metrics-only'
 
 export interface SimulationInput {
   architecture: Architecture
   equipment: readonly EquipmentItem[]
   scenario: SimulationScenario
+  outputMode?: SimulationOutputMode
+  layoutConstraints?: Pick<LayoutConstraints, 'minimumAisleMm' | 'noGoZones'>
+  navigationBodyRadiusMm?: number
 }
 
-export interface SimTask {
+export interface SimTaskDemand {
   id: string
   orderId?: string
   dishBatchId?: string
   predecessorId?: string
   capability: StationCapability
-  stationId: string
+  /** Equivalent physical capabilities allowed to satisfy this deterministic demand. */
+  compatibleCapabilities?: readonly StationCapability[]
   durationSeconds: number
   readyAtSeconds: number
   flow: 'clean' | 'dirty'
   preferredRoles: readonly StaffRole[]
+}
+
+export interface SimTask extends SimTaskDemand {
+  /** All compatible station instances. The dispatcher chooses one at execution time. */
+  stationIds: readonly string[]
 }
 
 export type AgentFrame = SpatialAgentFrame<StaffRole>
@@ -92,16 +103,22 @@ export interface SimulationMetrics {
   trafficCells: readonly { xMm: number; yMm: number; visits: number }[]
 }
 
-export interface SimulationResult {
+export interface SimulationResultSummary {
   seed: number
   durationSeconds: number
+  metrics: SimulationMetrics
+  warnings: readonly string[]
+}
+
+export interface SimulationResult extends SimulationResultSummary {
   frames: readonly SimulationFrame[]
   events: readonly SimulationEvent[]
   taskTimeline: readonly TaskTimelineEntry[]
   orders: readonly OrderTimeline[]
-  metrics: SimulationMetrics
-  warnings: readonly string[]
 }
+
+export type MetricsOnlySimulationResult = SimulationResultSummary
+export type SimulationRunResult = SimulationResult | MetricsOnlySimulationResult
 
 export interface NavCell { x: number; y: number }
 

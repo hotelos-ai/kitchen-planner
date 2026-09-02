@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { aggregateMetrics } from './metrics'
+import { aggregateMetrics, compareSimulationMetrics, emptyMetrics } from './metrics'
 import type { SimulationEvent } from './types'
 
 describe('simulation metrics', () => {
@@ -24,5 +24,31 @@ describe('simulation metrics', () => {
     expect(metrics.ordersWithin15MinutesPct).toBe(100)
     expect(metrics.orderWaitSamplesSeconds).toEqual([420])
     expect(metrics.trafficCells).toEqual([{ xMm: 100, yMm: 200, visits: 3 }])
+  })
+
+  it('ranks unfinished work and backlog before deceptively low served-order waits', () => {
+    const mostlyUnfinished = {
+      ...emptyMetrics(),
+      totalOrders: 50,
+      completedOrders: 1,
+      unfinishedOrders: 49,
+      peakOrderBacklog: 49,
+      orderCompletionP90Seconds: 10,
+      averageOrderWaitSeconds: 10,
+    }
+    const viable = {
+      ...emptyMetrics(),
+      totalOrders: 50,
+      completedOrders: 50,
+      unfinishedOrders: 0,
+      peakOrderBacklog: 12,
+      orderCompletionP90Seconds: 900,
+      averageOrderWaitSeconds: 700,
+    }
+    const lowerBacklog = { ...viable, peakOrderBacklog: 8, averageOrderWaitSeconds: 800 }
+
+    expect(compareSimulationMetrics(viable, mostlyUnfinished)).toBeLessThan(0)
+    expect(compareSimulationMetrics(lowerBacklog, viable)).toBeLessThan(0)
+    expect(compareSimulationMetrics(viable, { ...viable, averageOrderWaitSeconds: 800 })).toBeLessThan(0)
   })
 })

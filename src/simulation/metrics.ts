@@ -56,3 +56,30 @@ export function aggregateMetrics(events: readonly SimulationEvent[]): Simulation
   metrics.trafficCells = [...traffic.values()].sort((left, right) => right.visits - left.visits || left.yMm - right.yMm || left.xMm - right.xMm)
   return metrics
 }
+
+/**
+ * Orders layouts by service viability before considering deceptively good waits
+ * from the small subset of orders that happened to finish.
+ */
+export function compareSimulationMetrics(left: SimulationMetrics, right: SimulationMetrics): number {
+  const leftRank = [
+    left.unfinishedOrders,
+    left.peakOrderBacklog,
+    left.orderCompletionP90Seconds,
+    left.averageOrderWaitSeconds,
+    left.totalTravelMm,
+    left.congestionEvents,
+  ]
+  const rightRank = [
+    right.unfinishedOrders,
+    right.peakOrderBacklog,
+    right.orderCompletionP90Seconds,
+    right.averageOrderWaitSeconds,
+    right.totalTravelMm,
+    right.congestionEvents,
+  ]
+  for (let index = 0; index < leftRank.length; index += 1) {
+    if (leftRank[index] !== rightRank[index]) return leftRank[index] - rightRank[index]
+  }
+  return 0
+}

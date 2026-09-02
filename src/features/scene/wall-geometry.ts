@@ -46,14 +46,15 @@ export function buildWallPanels(architecture: Architecture): WallPanel[] {
     const edgeLength = Math.hypot(end.x - start.x, end.y - start.y)
     const wall = wallName(start, end, architecture)
     const forward = !wall || (wall === 'top' || wall === 'bottom' ? end.x >= start.x : end.y >= start.y)
-    const openings = wall ? architecture.openings
-      .filter((opening) => opening.wall === wall && opening.kind !== 'sealed-opening')
+    const openings = architecture.openings
+      .filter((opening) => opening.kind !== 'sealed-opening'
+        && (opening.segmentIndex !== undefined ? opening.segmentIndex === edgeIndex : Boolean(wall && opening.wall === wall)))
       .map((opening) => {
-        const localStart = forward ? opening.offsetMm : edgeLength - opening.offsetMm - opening.widthMm
+        const localStart = opening.segmentIndex !== undefined || forward ? opening.offsetMm : edgeLength - opening.offsetMm - opening.widthMm
         return { opening, start: Math.max(0, localStart), end: Math.min(edgeLength, localStart + opening.widthMm) }
       })
       .filter((entry) => entry.end > entry.start)
-      .sort((left, right) => left.start - right.start) : []
+      .sort((left, right) => left.start - right.start)
 
     const append = (localStart: number, localEnd: number, heightMm: number, baseMm: number, part: WallPanel['part'], openingId?: string) => {
       if (localEnd <= localStart || heightMm <= 0) return
@@ -93,6 +94,23 @@ export function serviceWindowFixtures(architecture: Architecture): ServiceWindow
       const midpoint = opening.offsetMm + opening.widthMm / 2
       const sillHeightMm = opening.sillHeightMm ?? 950
       const openingHeightMm = opening.heightMm ?? 900
+      if (opening.segmentIndex !== undefined) {
+        const start = architecture.roomPolygon[opening.segmentIndex]
+        const end = architecture.roomPolygon[(opening.segmentIndex + 1) % architecture.roomPolygon.length]
+        if (start && end) {
+          const center = pointAt(start, end, midpoint)
+          return {
+            id: opening.id,
+            flow: opening.flow,
+            label: opening.label,
+            centerMm: { x: center.x, y: sillHeightMm, z: center.y },
+            widthMm: opening.widthMm,
+            sillHeightMm,
+            openingHeightMm,
+            rotationYRad: -Math.atan2(end.y - start.y, end.x - start.x),
+          }
+        }
+      }
       if (opening.wall === 'top') return { id: opening.id, flow: opening.flow, label: opening.label, centerMm: { x: midpoint, y: sillHeightMm, z: 0 }, widthMm: opening.widthMm, sillHeightMm, openingHeightMm, rotationYRad: 0 }
       if (opening.wall === 'bottom') return { id: opening.id, flow: opening.flow, label: opening.label, centerMm: { x: midpoint, y: sillHeightMm, z: architecture.depthMm }, widthMm: opening.widthMm, sillHeightMm, openingHeightMm, rotationYRad: Math.PI }
       if (opening.wall === 'left') return { id: opening.id, flow: opening.flow, label: opening.label, centerMm: { x: 0, y: sillHeightMm, z: midpoint }, widthMm: opening.widthMm, sillHeightMm, openingHeightMm, rotationYRad: Math.PI / 2 }

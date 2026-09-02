@@ -74,6 +74,12 @@ const staffAssignmentSchema = z.object({
   count: z.number().int().nonnegative(),
 }).strict()
 
+const scenarioStaffAssignmentSchema = staffAssignmentSchema.extend({ count: z.number().int().positive() }).strict()
+const taskDurationRangeSchema = z.object({
+  minSeconds: z.number().positive().finite(),
+  maxSeconds: z.number().positive().finite(),
+}).strict().refine((range) => range.minSeconds <= range.maxSeconds, 'Minimum duration cannot exceed maximum duration')
+
 export const operationalProfileSchema = z.object({
   covers: z.number().int().positive().optional(),
   peakDurationMinutes: z.number().positive().finite().optional(),
@@ -137,9 +143,9 @@ export const scenarioSchema = z.object({
   arrivalPattern: z.enum(['seating-wave', 'steady', 'two-waves']),
   cookToOrderRatio: z.number().min(0).max(1),
   seed: z.number().int(),
-  staff: z.array(staffAssignmentSchema).min(1),
+  staff: z.array(scenarioStaffAssignmentSchema).min(1),
   checks: z.object({ collisions: z.boolean(), doorSwings: z.boolean(), dirtyCleanCrossings: z.boolean() }).strict(),
-  taskDurations: z.partialRecord(capabilitySchema, z.object({ minSeconds: z.number().positive().finite(), maxSeconds: z.number().positive().finite() }).strict()).optional(),
+  taskDurations: z.partialRecord(capabilitySchema, taskDurationRangeSchema).optional(),
   stationCapacities: z.record(z.string(), z.number().int().positive()).optional(),
 }).strict()
 

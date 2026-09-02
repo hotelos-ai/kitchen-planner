@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { buildNavGrid, findRoute } from './nav-grid'
+import type { EquipmentItem } from '../domain/project'
+import { buildNavGrid, findRoute, stationApproachPoints } from './nav-grid'
 
 const room = {
   architecture: {
@@ -26,5 +27,41 @@ describe('navigation grid', () => {
     expect(grid.isWalkable({ x: 950, y: 1050 })).toBe(false)
     expect(grid.isWalkable({ x: 1050, y: 1050 })).toBe(false)
     expect(() => findRoute(grid, { x: 100, y: 1000 }, { x: 1900, y: 1000 })).toThrow(/unreachable/i)
+  })
+
+  it('closes bottlenecks narrower than the body diameter or user minimum aisle', () => {
+    const bottleneck = structuredClone(room)
+    bottleneck.architecture.widthMm = 2400
+    bottleneck.architecture.roomPolygon = [{ x: 0, y: 0 }, { x: 2400, y: 0 }, { x: 2400, y: 2000 }, { x: 0, y: 2000 }]
+    bottleneck.architecture.pillars = [
+      { id: 'upper', xMm: 1050, yMm: 0, widthMm: 300, depthMm: 750 },
+      { id: 'lower', xMm: 1050, yMm: 1250, widthMm: 300, depthMm: 750 },
+    ]
+
+    const narrowBody = buildNavGrid(bottleneck, 100, { bodyRadiusMm: 150 })
+    expect(findRoute(narrowBody, { x: 500, y: 1000 }, { x: 1900, y: 1000 }).length).toBeGreaterThan(0)
+
+    const standardBody = buildNavGrid(bottleneck, 100, { bodyRadiusMm: 260 })
+    expect(() => findRoute(standardBody, { x: 500, y: 1000 }, { x: 1900, y: 1000 })).toThrow(/unreachable/i)
+
+    const minimumAisle = buildNavGrid(bottleneck, 100, { bodyRadiusMm: 100, minimumAisleMm: 600 })
+    expect(() => findRoute(minimumAisle, { x: 500, y: 1000 }, { x: 1900, y: 1000 })).toThrow(/unreachable/i)
+  })
+
+  it('blocks generic no-go zones and derives catalog approach faces through rotation', () => {
+    const noGoGrid = buildNavGrid({
+      ...room,
+      layoutConstraints: { noGoZones: [{ id: 'protected-services', xMm: 700, yMm: 0, widthMm: 600, depthMm: 2000 }] },
+    }, 100, { bodyRadiusMm: 100 })
+    expect(() => findRoute(noGoGrid, { x: 300, y: 1000 }, { x: 1700, y: 1000 })).toThrow(/unreachable/i)
+
+    const item: EquipmentItem = {
+      id: 'rotated-range', catalogId: 'hot-six-burner-range', label: 'Rotated range', category: 'cooking',
+      widthMm: 1200, depthMm: 900, heightMm: 900, xMm: 1000, yMm: 2000, rotationDeg: 90,
+      dimensionsLocked: false, movable: true, removable: true, capabilities: ['range-cook'],
+    }
+    expect(stationApproachPoints(item)).toEqual([{ x: -50, y: 2600 }])
+    expect(stationApproachPoints(item, 'left')).toEqual([{ x: 550, y: 1850 }])
+    expect(stationApproachPoints(item, 'either-side')).toEqual([{ x: 550, y: 1850 }, { x: 550, y: 3350 }])
   })
 })

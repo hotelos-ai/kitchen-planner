@@ -98,6 +98,16 @@ describe('project schema', () => {
     expect(projectSchema.safeParse({ ...validProject, scenarios: [] }).success).toBe(false)
   })
 
+  it('rejects non-positive scenario role counts and reversed task duration ranges', () => {
+    const invalidCount = structuredClone(validProject)
+    invalidCount.scenarios[0].staff[0].count = 0
+    expect(projectSchema.safeParse(invalidCount).success).toBe(false)
+
+    const invalidDuration = structuredClone(validProject)
+    Object.assign(invalidDuration.scenarios[0], { taskDurations: { 'food-prep': { minSeconds: 90, maxSeconds: 30 } } })
+    expect(projectSchema.safeParse(invalidDuration).success).toBe(false)
+  })
+
   it('accepts variant-owned architecture and reproducible layout metadata', () => {
     const enriched = structuredClone(validProject)
     Object.assign(enriched.variants[0], {
