@@ -28,6 +28,18 @@ type CustomItemInput = {
 
 type ResizeInput = Pick<EquipmentItem, 'widthMm' | 'depthMm'>
 
+type AdoptAutoLayoutCandidateInput = {
+  runId: string
+  resultId: string
+  baselineVariantId: string
+  newVariantId: string
+  name: string
+  candidate: LayoutVariant
+}
+
+type AdoptAutoLayoutCandidateResult = ReturnType<WorkspaceFacade['applyOperations']> |
+  { ok: false; revision: number; code: 'result-consumed'; message: string }
+
 export interface ProjectState {
   project: KitchenProject
   documentId: string
@@ -37,6 +49,7 @@ export interface ProjectState {
   future: KitchenProject[]
   executeCommand(command: unknown, options?: { dryRun?: boolean; expectedRevision?: number }): CommandResult<KitchenProject>
   applyWorkspaceOperations(operations: readonly unknown[], intent?: string): ReturnType<WorkspaceFacade['applyOperations']>
+  adoptAutoLayoutCandidate(input: AdoptAutoLayoutCandidateInput): AdoptAutoLayoutCandidateResult
   selectItems(ids: string[]): void
   toggleItemSelection(id: string): void
   clearSelection(): void
@@ -94,6 +107,9 @@ export function getActiveItem(state: ProjectState, itemId: string): EquipmentIte
 
 export function createProjectStore(initialProject: KitchenProject): ProjectStore {
   const workspaceFacade: { current?: WorkspaceFacade } = {}
+  const adoptedCandidates = new Map<string, LayoutVariant>()
+  const consumedAdoptedCandidates = new Set<string>()
+  const adoptedCandidateKey = (runId: string, resultId: string) => `${runId}\u0000${resultId}`
   const store = createStore<ProjectState>()((set, get) => {
     const dispatch = (command: unknown, options: { dryRun?: boolean; expectedRevision?: number } = {}) => {
       const state = get()
@@ -126,6 +142,30 @@ export function createProjectStore(initialProject: KitchenProject): ProjectStore
       future: [],
       executeCommand: dispatch,
       applyWorkspaceOperations: (operations, intent) => applyOperations(operations, intent ?? 'Update workspace'),
+      adoptAutoLayoutCandidate: (input) => {
+        const key = adoptedCandidateKey(input.runId, input.resultId)
+        if (consumedAdoptedCandidates.has(key)) return {
+          ok: false,
+          revision: get().revision,
+          code: 'result-consumed',
+          message: 'This auto-layout result has already been adopted.',
+        }
+        adoptedCandidates.set(key, structuredClone(input.candidate))
+        try {
+          const result = applyOperations([{
+            type: 'adopt_auto_layout_result',
+            variantId: input.baselineVariantId,
+            runId: input.runId,
+            resultId: input.resultId,
+            newVariantId: input.newVariantId,
+            name: input.name,
+          }], 'Adopt auto-layout finalist')
+          if (result.ok) consumedAdoptedCandidates.add(key)
+          return result
+        } finally {
+          adoptedCandidates.delete(key)
+        }
+      },
       selectItems: (ids) => set({ selectedIds: [...new Set(ids)] }),
       toggleItemSelection: (id) => set((state) => ({
         selectedIds: state.selectedIds.includes(id)
@@ -261,6 +301,11 @@ export function createProjectStore(initialProject: KitchenProject): ProjectStore
       ...(operation.configurationId ? { configurationId: operation.configurationId } : {}),
       ...(operation.skinId ? { skinId: operation.skinId } : {}),
     }),
+    resolveAdoptedVariant: (operation) => {
+      const candidate = adoptedCandidates.get(adoptedCandidateKey(operation.runId, operation.resultId))
+      if (!candidate) throw new Error('The auto-layout result is unavailable or has already been adopted.')
+      return structuredClone(candidate)
+    },
   })
   return store
 }

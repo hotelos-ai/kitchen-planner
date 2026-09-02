@@ -26,4 +26,11 @@ describe('App', () => {
     expect(plan.closest('[data-workspace-surface]')).toHaveAttribute('aria-hidden', 'false')
     expect(scene.closest('[data-workspace-surface]')).toHaveAttribute('aria-hidden', 'false')
   })
+
+  it('opens the auto-layout experiment workspace', async () => {
+    render(<App />)
+    await userEvent.click(screen.getByRole('button', { name: 'Auto-layout' }))
+    expect(await screen.findByLabelText('Auto-layout experiment')).toBeInTheDocument()
+    expect(screen.getByText(/best observed feasible layouts/i)).toBeInTheDocument()
+  })
 })

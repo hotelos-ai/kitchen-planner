@@ -1,11 +1,18 @@
 import { analyzeLayout } from '../../domain/layout-diagnostics'
-import type { EquipmentItem, KitchenProject } from '../../domain/project'
+import type { EquipmentItem, KitchenProject, LayoutVariant } from '../../domain/project'
 import type { ProjectStore } from '../../state/project-store'
 import { executeWorkspaceBatch } from './execute-workspace-batch'
 import { createPreviewRegistry } from './preview-registry'
 import type { WorkspaceOperation } from './workspace-operation'
 
 type FacadeError = { ok: false; revision: number; code: string; message: string; issues?: unknown; operationIndex?: number }
+
+export type WorkspaceSimulationRequest = {
+  variantId: string
+  scenarioId: string
+  seed: number
+  outputMode?: 'full' | 'metrics-only'
+}
 
 type PreviewCandidate = {
   project: KitchenProject
@@ -19,13 +26,17 @@ type FacadeDependencies = {
   listCatalog?: (filters?: unknown) => unknown[]
   getRequirements?: (input: { variantId: string; scenarioId?: string }) => unknown[]
   suggestPlacement?: (input: { variantId: string; catalogId: string; preferredPoint?: { xMm: number; yMm: number } }) => unknown
-  runSimulation?: (input: unknown) => unknown
+  runSimulation?: (input: WorkspaceSimulationRequest & { outputMode: 'full' | 'metrics-only' }) => unknown
   runAutoLayout?: (input: unknown) => unknown
   cancelRun?: (input: { runId: string }) => unknown
   resolveCatalogComponent?: (
     operation: Extract<WorkspaceOperation, { type: 'add_component' }>,
     project: KitchenProject,
   ) => EquipmentItem
+  resolveAdoptedVariant?: (
+    operation: Extract<WorkspaceOperation, { type: 'adopt_auto_layout_result' }>,
+    project: KitchenProject,
+  ) => LayoutVariant
 }
 
 const diagnosticsFor = (project: KitchenProject) => {
@@ -44,6 +55,7 @@ export function createWorkspaceFacade(dependencies: FacadeDependencies) {
       expectedRevision: input.expectedRevision,
       operations: input.operations,
       resolveCatalogComponent: dependencies.resolveCatalogComponent,
+      resolveAdoptedVariant: dependencies.resolveAdoptedVariant,
     })
     if (!result.ok) return {
       ok: false as const,
@@ -116,8 +128,8 @@ export function createWorkspaceFacade(dependencies: FacadeDependencies) {
       if (!preview.ok) return preview
       return applyLayoutChanges({ previewToken: preview.previewToken })
     },
-    runSimulation(input: unknown): unknown | FacadeError {
-      if (dependencies.runSimulation) return dependencies.runSimulation(input)
+    runSimulation(input: WorkspaceSimulationRequest): unknown | FacadeError {
+      if (dependencies.runSimulation) return dependencies.runSimulation({ ...input, outputMode: input.outputMode ?? 'full' })
       return { ok: false, revision: dependencies.store.getState().revision, code: 'simulation-not-configured', message: 'Simulation service is not configured.' }
     },
     runAutoLayout(input: unknown): unknown | FacadeError {

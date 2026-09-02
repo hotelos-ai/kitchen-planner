@@ -166,4 +166,66 @@ describe('project store', () => {
     expect(store.getState().documentId).not.toBe(previousDocumentId)
     expect(store.getState()).toMatchObject({ revision: 0, past: [], future: [] })
   })
+
+  it('adopts one transient auto-layout result as one parented variant and cleans its resolver entry', () => {
+    const store = createProjectStore(createSeedProject())
+    const candidate = structuredClone(store.getState().project.variants[0])
+    candidate.equipment.find((item) => item.id === 'tandoor')!.xMm += 200
+    candidate.adoptedExperimentManifest = {
+      id: 'experiment-1',
+      baselineVariantId: 'baseline-trace',
+      finalistId: 'fastest',
+      createdAt: '2026-09-02T00:00:00.000Z',
+      scenarioIds: ['dinner-peak'],
+      seeds: [3, 5],
+      confirmationSeeds: [101],
+      permissions: { placement: true, equipmentRedesign: false, architecture: false },
+      budget: { maxDurationMs: 10_000, maxEvaluations: 30 },
+      objective: 'fastest-service',
+      resultHash: 'candidate-fastest',
+      resultMetrics: { p90WaitSeconds: 720 },
+    }
+
+    const result = store.getState().adoptAutoLayoutCandidate({
+      runId: 'experiment-1',
+      resultId: 'fastest',
+      baselineVariantId: 'baseline-trace',
+      newVariantId: 'layout-fastest',
+      name: 'Fastest service',
+      candidate,
+    })
+
+    expect(result).toMatchObject({ ok: true, revision: 1 })
+    expect(store.getState()).toMatchObject({ revision: 1 })
+    expect(store.getState().past).toHaveLength(1)
+    expect(store.getState().project.variants).toHaveLength(2)
+    expect(store.getState().project.variants[1]).toMatchObject({
+      id: 'layout-fastest',
+      name: 'Fastest service',
+      parentId: 'baseline-trace',
+      adoptedExperimentManifest: candidate.adoptedExperimentManifest,
+    })
+
+    const duplicateAdoption = store.getState().adoptAutoLayoutCandidate({
+      runId: 'experiment-1',
+      resultId: 'fastest',
+      baselineVariantId: 'baseline-trace',
+      newVariantId: 'layout-duplicate',
+      name: 'Duplicate adoption',
+      candidate,
+    })
+    expect(duplicateAdoption).toMatchObject({ ok: false, code: 'result-consumed', revision: 1 })
+
+    const replay = store.getState().applyWorkspaceOperations([{
+      type: 'adopt_auto_layout_result',
+      variantId: 'baseline-trace',
+      runId: 'experiment-1',
+      resultId: 'fastest',
+      newVariantId: 'layout-replay',
+      name: 'Replay',
+    }], 'Replay adopted result')
+    expect(replay).toMatchObject({ ok: false, code: 'batch-operation-failed' })
+    expect(store.getState()).toMatchObject({ revision: 1 })
+    expect(store.getState().project.variants).toHaveLength(2)
+  })
 })

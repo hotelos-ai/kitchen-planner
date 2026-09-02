@@ -1,4 +1,6 @@
-import { lazy, Suspense, useState } from 'react'
+import { lazy, Suspense, useMemo, useState } from 'react'
+import { createBrowserAutoLayoutRunner } from '../features/optimizer/browser-auto-layout-runner'
+import { projectStore } from '../state/project-store'
 import { ErrorBoundary } from './ErrorBoundary'
 import { ProjectExchange } from './ProjectExchange'
 import './styles.css'
@@ -7,8 +9,9 @@ const PlanWorkspace = lazy(() => import('../features/editor/PlanWorkspace').then
 const SceneWorkspace = lazy(() => import('../features/scene/SceneWorkspace').then((module) => ({ default: module.SceneWorkspace })))
 const SimulationWorkspace = lazy(() => import('../features/simulation/SimulationWorkspace').then((module) => ({ default: module.SimulationWorkspace })))
 const CompareWorkspace = lazy(() => import('../features/compare/CompareWorkspace').then((module) => ({ default: module.CompareWorkspace })))
+const AutoLayoutWorkspace = lazy(() => import('../features/optimizer/AutoLayoutWorkspace').then((module) => ({ default: module.AutoLayoutWorkspace })))
 
-export type WorkspaceView = 'plan' | 'scene' | 'split' | 'simulate' | 'compare'
+export type WorkspaceView = 'plan' | 'scene' | 'split' | 'simulate' | 'compare' | 'auto-layout'
 
 const VIEW_LABELS: Record<WorkspaceView, string> = {
   plan: 'Plan',
@@ -16,10 +19,12 @@ const VIEW_LABELS: Record<WorkspaceView, string> = {
   split: 'Split',
   simulate: 'Simulate',
   compare: 'Compare',
+  'auto-layout': 'Auto-layout',
 }
 
 export function App() {
   const [view, setView] = useState<WorkspaceView>('plan')
+  const autoLayoutRunner = useMemo(() => createBrowserAutoLayoutRunner(projectStore), [])
 
   return (
     <main className="app-shell">
@@ -64,6 +69,7 @@ export function App() {
             </div>
             {view === 'simulate' && <div className="workspace-surface active"><SimulationWorkspace /></div>}
             {view === 'compare' && <div className="workspace-surface active"><CompareWorkspace /></div>}
+            {view === 'auto-layout' && <div className="workspace-surface active"><AutoLayoutWorkspace runner={autoLayoutRunner} /></div>}
           </section>
         </Suspense>
       </ErrorBoundary>

@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { createSeedProject } from '../../domain/seed-project'
 import { createProjectStore, getActiveItem } from '../../state/project-store'
 import { createWorkspaceFacade } from './workspace-facade'
@@ -64,5 +64,15 @@ describe('workspace facade', () => {
     const facade = createWorkspaceFacade({ store: createProjectStore(createSeedProject()) })
     expect(facade.previewLayoutChanges({ expectedRevision: 1, operations })).toMatchObject({ ok: false, code: 'stale-revision', revision: 0 })
     expect(facade.previewLayoutChanges({ expectedRevision: 0, operations: [{ ...operations[0], surprise: true }] })).toMatchObject({ ok: false, code: 'invalid-operation', revision: 0 })
+  })
+
+  it('defaults workspace simulations to full output while allowing optimizer metrics-only requests', () => {
+    const runSimulation = vi.fn((input) => input)
+    const facade = createWorkspaceFacade({ store: createProjectStore(createSeedProject()), runSimulation })
+
+    expect(facade.runSimulation({ variantId: 'baseline-trace', scenarioId: 'dinner-peak', seed: 7 })).toMatchObject({ outputMode: 'full' })
+    expect(facade.runSimulation({ variantId: 'baseline-trace', scenarioId: 'dinner-peak', seed: 7, outputMode: 'metrics-only' })).toMatchObject({ outputMode: 'metrics-only' })
+    expect(runSimulation).toHaveBeenNthCalledWith(1, expect.objectContaining({ outputMode: 'full' }))
+    expect(runSimulation).toHaveBeenNthCalledWith(2, expect.objectContaining({ outputMode: 'metrics-only' }))
   })
 })
