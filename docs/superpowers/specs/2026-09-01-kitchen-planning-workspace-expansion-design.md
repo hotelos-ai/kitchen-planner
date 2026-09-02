@@ -1,7 +1,7 @@
 # Kitchen Planning Workspace Expansion Design
 
 **Date:** 2026-09-01  
-**Status:** Draft for written-spec approval  
+**Status:** Approved
 **Product:** Kitchen Planner
 
 ## Purpose
