@@ -17,7 +17,7 @@ export function ProjectExchange({ store = projectStore }: { store?: ProjectStore
       link.download = `${project.name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}.json`
       link.click()
       setTimeout(() => revoke(url), 0)
-      setMessage({ kind: 'status', text: 'Project exported.' })
+      setMessage({ kind: 'status', text: 'All layouts exported.' })
     } catch (error) { setMessage({ kind: 'error', text: error instanceof Error ? error.message : 'Export failed' }) }
   }
   const onImport = async (event: ChangeEvent<HTMLInputElement>) => {
@@ -31,7 +31,7 @@ export function ProjectExchange({ store = projectStore }: { store?: ProjectStore
   }
   return (
     <div className="project-exchange">
-      <button type="button" onClick={onExport}>Export project</button>
+      <button type="button" onClick={onExport}>Export all layouts</button>
       <label className="import-project">Import<input type="file" accept="application/json,.json" aria-label="Import project JSON" onChange={onImport} /></label>
       <button type="button" aria-expanded={showHelp} onClick={() => setShowHelp((value) => !value)} aria-label="Keyboard help">?</button>
       {showHelp && <div className="shortcut-popover" role="dialog" aria-label="Keyboard shortcuts"><strong>Keyboard shortcuts</strong><span>Arrow keys · move by snap</span><span>Shift + arrows · move 10 mm</span><span>⌘/Ctrl Z · undo</span><span>⌘/Ctrl D · duplicate</span><span>Delete · remove</span><span>Escape · clear selection</span></div>}

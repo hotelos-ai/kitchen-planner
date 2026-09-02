@@ -49,8 +49,40 @@ describe('project persistence', () => {
     project.variants.push(alternative)
     project.activeVariantId = alternative.id
     project.architecture = structuredClone(alternative.architecture)
+    const secondScenario = structuredClone(project.scenarios[0])
+    secondScenario.id = 'lunch-steady'
+    secondScenario.name = 'Lunch steady'
+    secondScenario.covers = 48
+    secondScenario.arrivalPattern = 'steady'
+    secondScenario.seed = 41
+    secondScenario.stationCapacities = { tandoor: 3 }
+    project.scenarios.push(secondScenario)
+    project.activeScenarioId = secondScenario.id
+    project.displayUnit = 'cm'
+    project.snapMm = 25
 
-    expect(importProject(exportProject(project))).toEqual(project)
+    const exported = exportProject(project)
+    const decoded = JSON.parse(exported)
+    expect(decoded).toMatchObject({
+      schemaVersion: 2,
+      activeVariantId: 'courtyard-option',
+      activeScenarioId: 'lunch-steady',
+      displayUnit: 'cm',
+      snapMm: 25,
+    })
+    expect(decoded.variants[1]).toMatchObject({
+      id: 'courtyard-option',
+      parentId: project.variants[0].id,
+      architecture: { widthMm: 5200 },
+      operationalProfile: { covers: 72 },
+      layoutConstraints: { lockedComponentIds: ['tandoor'], minimumAisleMm: 1000 },
+      adoptedExperimentManifest: { id: 'run-1', finalistId: 'fastest-service' },
+    })
+    expect(decoded.variants[1].equipment).toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: project.variants[0].equipment[0].id, appearanceSkinId: 'blackened-steel' }),
+    ]))
+    expect(decoded.scenarios).toHaveLength(2)
+    expect(importProject(exported)).toEqual(project)
   })
 
   it('falls back to the last good snapshot when current JSON is corrupt', () => {
@@ -102,6 +134,18 @@ describe('project persistence', () => {
     expect(migrated.variants[0].architecture).toEqual(migrated.architecture)
     expect(migrated.variants[1].architecture).toEqual(migrated.architecture)
     expect(migrated.variants[0].architecture).not.toBe(migrated.variants[1].architecture)
+  })
+
+  it('strictly rejects unknown fields in current projects at every persisted boundary', () => {
+    const project = createSeedProject() as unknown as Record<string, unknown>
+    project.transientPreviewToken = 'must-not-leak'
+    expect(() => exportProject(project as never)).toThrow(/invalid kitchen project/i)
+
+    const nested = structuredClone(createSeedProject()) as unknown as Record<string, unknown>
+    const variants = nested.variants as Array<Record<string, unknown>>
+    const equipment = variants[0].equipment as Array<Record<string, unknown>>
+    equipment[0].unknownPhysicalField = true
+    expect(() => importProject(JSON.stringify(nested))).toThrow(/not a valid kitchen project/i)
   })
 
   it('reads legacy Manta storage keys only as fallback and saves generic product keys', () => {

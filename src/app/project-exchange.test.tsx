@@ -2,8 +2,9 @@ import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createSeedProject } from '../domain/seed-project'
+import { createWorkspaceFacade } from '../core/workspace/workspace-facade'
 import { exportProject } from '../state/persistence'
-import { projectStore } from '../state/project-store'
+import { createProjectStore, projectStore } from '../state/project-store'
 import { ProjectExchange } from './ProjectExchange'
 
 describe('project exchange', () => {
@@ -19,19 +20,71 @@ describe('project exchange', () => {
   })
 
   it('keeps the current project when an import is invalid', async () => {
-    render(<ProjectExchange />)
+    const store = createProjectStore(createSeedProject())
+    store.getState().nudgeItems(['tandoor'], { x: 100, y: 0 })
+    const before = store.getState()
+    render(<ProjectExchange store={store} />)
     await userEvent.upload(screen.getByLabelText(/Import project JSON/i), new File(['{"bad":true}'], 'bad.json', { type: 'application/json' }))
-    expect(projectStore.getState().project.name).toBe('Manta Raja Kitchen Lab')
+    expect(store.getState()).toMatchObject({
+      project: before.project,
+      documentId: before.documentId,
+      revision: before.revision,
+      past: before.past,
+    })
     expect(screen.getByRole('alert')).toHaveTextContent(/not a valid kitchen project/i)
   })
 
-  it('exports the current validated project', async () => {
-    const createObjectURL = vi.fn(() => 'blob:kitchen-project')
+  it('exports every layout in one complete versioned project file', async () => {
+    let exportedBlob: Blob | undefined
+    const createObjectURL = vi.fn((blob: Blob) => {
+      exportedBlob = blob
+      return 'blob:kitchen-project'
+    })
     const revokeObjectURL = vi.fn()
     vi.stubGlobal('URL', { ...URL, createObjectURL, revokeObjectURL })
-    vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => undefined)
+    let clickedDownload = ''
+    vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function (this: HTMLAnchorElement) {
+      clickedDownload = this.download
+    })
     render(<ProjectExchange />)
-    await userEvent.click(screen.getByRole('button', { name: /Export project/i }))
+    await userEvent.click(screen.getByRole('button', { name: /Export all layouts/i }))
     expect(createObjectURL).toHaveBeenCalledOnce()
+    expect(exportedBlob).toBeInstanceOf(Blob)
+    expect(clickedDownload).toBe('manta-raja-kitchen-lab.json')
+    expect(screen.getByRole('status')).toHaveTextContent(/all layouts exported/i)
+  })
+
+  it('atomically replaces the document and invalidates previews from the previous document', async () => {
+    const store = createProjectStore(createSeedProject())
+    store.getState().nudgeItems(['tandoor'], { x: 100, y: 0 })
+    store.getState().selectItems(['tandoor'])
+    const facade = createWorkspaceFacade({ store })
+    const preview = facade.previewLayoutChanges({
+      expectedRevision: store.getState().revision,
+      operations: [{ type: 'rename_layout', variantId: 'baseline-trace', name: 'Pending preview name' }],
+    })
+    if (!preview.ok) throw new Error(preview.message)
+    const previousDocumentId = store.getState().documentId
+    const imported = { ...createSeedProject(), name: 'Complete imported project' }
+
+    render(<ProjectExchange store={store} />)
+    await userEvent.upload(
+      screen.getByLabelText(/Import project JSON/i),
+      new File([exportProject(imported)], 'complete.json', { type: 'application/json' }),
+    )
+
+    expect(store.getState()).toMatchObject({
+      project: { name: 'Complete imported project' },
+      revision: 0,
+      past: [],
+      future: [],
+      selectedIds: [],
+    })
+    expect(store.getState().documentId).not.toBe(previousDocumentId)
+    expect(facade.applyLayoutChanges({ previewToken: preview.previewToken })).toMatchObject({
+      ok: false,
+      code: 'preview-document-mismatch',
+      revision: 0,
+    })
   })
 })

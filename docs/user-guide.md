@@ -82,11 +82,13 @@ The app never declares a universal “best” layout. “Performs better” mean
 
 ## Import, export, autosave, and recovery
 
-The browser autosaves a versioned current project and last-known-good snapshot. **Export project** downloads human-readable JSON. **Import** validates the entire file before replacing current state; malformed or unsupported future schemas leave the current project untouched. Supported version-0 files migrate to schema version 1.
+The browser autosaves a versioned current project and last-known-good snapshot. **Export all layouts** downloads one human-readable schema-version-2 JSON file containing the complete editable project: every layout and its distinct room architecture, openings, pillars, storage zones, equipment with stable component IDs, physical configurations and appearance skins, operational profiles and layout constraints, scenarios and simulation settings, adopted experiment manifests, display and snap settings, and the active layout and scenario IDs.
+
+**Import** validates the entire file before replacing current state. Version-0 and version-1 projects are migrated to version 2; valid version-2 projects are loaded directly. Malformed files, unknown fields, invalid references, and unsupported future schema versions leave the open project untouched. A successful import is an atomic document replacement: current selection and undo/redo history are cleared, and any uncommitted preview token from the previously open document becomes invalid. Draft previews, camera position, open drawers, and other transient interface state are not part of the exported project.
 
 Older schema-valid projects that predate equipment 3D presets are enriched on load: known Manta Raja items regain their distinctive registered skins, explicit custom presets are preserved, and unknown custom items safely remain generic. This compatibility step does not alter placement, dimensions, rotations, labels, variants, scenarios, or revision history.
 
-Keep exported checkpoints before major alternatives. JSON is the supported exchange format; this release does not import BIM, DWG, DXF, or IFC.
+Keep exported checkpoints before major alternatives. JSON is the supported exchange format; this release does not import BIM, DWG, DXF, or IFC. Exported plans and simulation results are planning artifacts, not regulatory certification or approval. Qualified local professionals and authorities must review fire, ventilation, hygiene, accessibility, structure, services, and code compliance.
 
 ## Planning limitations
 
