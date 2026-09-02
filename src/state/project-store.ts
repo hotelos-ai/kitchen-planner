@@ -1,7 +1,5 @@
 import { useStore } from 'zustand'
 import { createStore, type StoreApi } from 'zustand/vanilla'
-import type { CommandResult } from '../core/commands/execute-layout-command'
-import { executeLayoutCommand } from '../core/commands/execute-layout-command'
 import { createWorkspaceFacade, type WorkspaceFacade } from '../core/workspace/workspace-facade'
 import type {
   DisplayUnit,
@@ -17,7 +15,6 @@ import { applyEquipmentConfiguration as configureEquipmentItem } from '../domain
 import { evaluateOperationalRequirements } from '../domain/requirements/operational-requirements'
 import { projectSchema } from '../domain/project-schema'
 import { createSeedProject } from '../domain/seed-project'
-import { kitchenSpatialAdapter } from '../domain/spatial-adapter'
 import { appendHistory } from './history'
 import { loadProject, saveProject } from './persistence'
 import { runSimulation } from '../simulation/engine'
@@ -52,7 +49,6 @@ export interface ProjectState {
   selectedIds: string[]
   past: KitchenProject[]
   future: KitchenProject[]
-  executeCommand(command: unknown, options?: { dryRun?: boolean; expectedRevision?: number }): CommandResult<KitchenProject>
   applyWorkspaceOperations(operations: readonly unknown[], intent?: string): ReturnType<WorkspaceFacade['applyOperations']>
   adoptAutoLayoutCandidate(input: AdoptAutoLayoutCandidateInput): AdoptAutoLayoutCandidateResult
   selectItems(ids: string[]): void
@@ -119,25 +115,6 @@ export function createProjectStore(initialProject: KitchenProject): ProjectStore
   const consumedAdoptedCandidates = new Set<string>()
   const adoptedCandidateKey = (runId: string, resultId: string) => `${runId}\u0000${resultId}`
   const store = createStore<ProjectState>()((set, get) => {
-    const dispatch = (command: unknown, options: { dryRun?: boolean; expectedRevision?: number } = {}) => {
-      const state = get()
-      const result = executeLayoutCommand({
-        envelope: { project: state.project, revision: state.revision },
-        adapter: kitchenSpatialAdapter,
-        command,
-        ...options,
-      })
-      if (result.ok && !result.dryRun) {
-        set({
-          project: result.project,
-          revision: result.revision,
-          past: appendHistory(state.past, state.project),
-          future: [],
-        })
-      }
-      return result
-    }
-
     const applyOperations = (operations: readonly unknown[], intent: string) => workspaceFacade.current!.applyOperations(operations, intent)
     const activeVariantId = () => get().project.activeVariantId
 
@@ -148,7 +125,6 @@ export function createProjectStore(initialProject: KitchenProject): ProjectStore
       selectedIds: [],
       past: [],
       future: [],
-      executeCommand: dispatch,
       applyWorkspaceOperations: (operations, intent) => applyOperations(operations, intent ?? 'Update workspace'),
       adoptAutoLayoutCandidate: (input) => {
         const snapshot = get()

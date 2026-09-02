@@ -1,7 +1,5 @@
 export * from './application/application-service'
 export * from './application/types'
-export * from './commands/execute-layout-command'
-export * from './commands/layout-command'
 export * from './queries/layout-query'
 export * from './spatial/types'
 export * from './workspace/execute-workspace-batch'

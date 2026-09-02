@@ -15,9 +15,21 @@ describe('executeLayoutQuery', () => {
   it('describes the supported command surface', () => {
     const result = executeLayoutQuery(envelope, kitchenSpatialAdapter, { type: 'capabilities' })
     expect(result).toMatchObject({ ok: true, revision: 4 })
-    expect(JSON.stringify(result)).toContain('move-items')
+    expect(JSON.stringify(result)).toContain('move_components')
+    expect(JSON.stringify(result)).not.toContain('move-items')
     expect(JSON.stringify(result)).toContain('tandoor')
     expect(JSON.stringify(result)).toContain('range-cook')
+  })
+
+  it('reads architecture from the active variant instead of the compatibility mirror', () => {
+    const project = createSeedProject()
+    project.architecture.widthMm = 99_000
+    project.variants[0].architecture.widthMm = 4_200
+
+    expect(executeLayoutQuery({ project, revision: 0 }, kitchenSpatialAdapter, { type: 'architecture' })).toMatchObject({
+      ok: true,
+      data: { widthMm: 4_200 },
+    })
   })
 
   it('returns available zones without requiring a full project snapshot', () => {

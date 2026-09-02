@@ -1,9 +1,9 @@
 import { analyzeLayout } from '../../domain/layout-diagnostics'
-import { projectSchema, scenarioSchema } from '../../domain/project-schema'
+import { projectSchema } from '../../domain/project-schema'
 import { kitchenSpatialAdapter } from '../../domain/spatial-adapter'
-import type { SimulationInput, SimulationResult } from '../../simulation/types'
+import type { SimulationResult } from '../../simulation/types'
 import { deriveLiveServiceState } from '../../simulation/live-state'
-import { getActiveVariant, type ProjectStore } from '../../state/project-store'
+import { getWorkspaceFacade, type ProjectStore } from '../../state/project-store'
 import { executeLayoutQuery } from '../queries/layout-query'
 import type { ApplicationService, ServiceResult } from './types'
 
@@ -14,11 +14,18 @@ const stale = <T,>(revision: number, expectedRevision?: number): ServiceResult<T
 
 export function createApplicationService(input: {
   store: ProjectStore
-  runSimulation: (simulationInput: SimulationInput) => SimulationResult
 }): ApplicationService {
   const runs = new Map<string, { revision: number; result: SimulationResult }>()
+  const facade = getWorkspaceFacade(input.store)
   return {
-    executeLayout: ({ command, ...options }) => input.store.getState().executeCommand(command, options),
+    ...facade,
+    runSimulation: (request) => {
+      const result = facade.runSimulation(request)
+      if (result && typeof result === 'object' && 'events' in result && 'metrics' in result) {
+        runs.set(request.scenarioId, { revision: input.store.getState().revision, result: result as SimulationResult })
+      }
+      return result
+    },
     replaceProject: ({ project, expectedRevision, dryRun = false }) => {
       const state = input.store.getState()
       const conflict = stale<{ projectId: string }>(state.revision, expectedRevision)
@@ -28,33 +35,12 @@ export function createApplicationService(input: {
       if (!dryRun) input.store.getState().replaceProject(parsed.data)
       return { ok: true, revision: dryRun ? state.revision : input.store.getState().revision, data: { projectId: parsed.data.id }, warnings: [], dryRun }
     },
-    updateScenario: ({ scenarioId, patch, expectedRevision, dryRun = false }) => {
-      const state = input.store.getState()
-      const conflict = stale<{ scenarioId: string }>(state.revision, expectedRevision)
-      if (conflict) return conflict
-      const scenario = state.project.scenarios.find((candidate) => candidate.id === scenarioId)
-      if (!scenario) return { ok: false, revision: state.revision, code: 'missing-scenario', message: `Scenario ${scenarioId} does not exist.` }
-      const parsed = scenarioSchema.safeParse({ ...scenario, ...(patch && typeof patch === 'object' ? patch : {}), id: scenario.id })
-      if (!parsed.success) return { ok: false, revision: state.revision, code: 'invalid-scenario', message: 'Scenario patch is invalid.', issues: parsed.error.issues }
-      if (!dryRun) input.store.getState().updateScenario(scenarioId, parsed.data)
-      return { ok: true, revision: dryRun ? state.revision : input.store.getState().revision, data: { scenarioId }, warnings: [], dryRun }
-    },
     queryLayout: (query) => {
       const state = input.store.getState()
       return executeLayoutQuery({ project: state.project, revision: state.revision }, kitchenSpatialAdapter, query, (project) => {
         const variant = project.variants.find((candidate) => candidate.id === project.activeVariantId)
-        return analyzeLayout(project.architecture, variant?.equipment ?? [])
+        return analyzeLayout(variant?.architecture ?? project.architecture, variant?.equipment ?? [])
       })
-    },
-    runScenario: ({ scenarioId, expectedRevision }) => {
-      const state = input.store.getState()
-      const conflict = stale<SimulationResult>(state.revision, expectedRevision)
-      if (conflict) return conflict
-      const scenario = state.project.scenarios.find((candidate) => candidate.id === scenarioId)
-      if (!scenario) return { ok: false, revision: state.revision, code: 'missing-scenario', message: `Scenario ${scenarioId} does not exist.` }
-      const result = input.runSimulation({ architecture: state.project.architecture, equipment: getActiveVariant(state).equipment, scenario })
-      runs.set(scenarioId, { revision: state.revision, result })
-      return { ok: true, revision: state.revision, data: result, warnings: [...result.warnings], dryRun: false }
     },
     querySimulation: ({ scenarioId, elapsedSeconds }) => {
       const state = input.store.getState()
@@ -68,7 +54,7 @@ export function createApplicationService(input: {
         ok: true,
         revision: state.revision,
         data: {
-          assumptions: { id: scenario.id, name: scenario.name, covers: scenario.covers, durationMinutes: scenario.durationMinutes, arrivalPattern: scenario.arrivalPattern, cookToOrderRatio: scenario.cookToOrderRatio, seed: scenario.seed, staff: structuredClone(scenario.staff) },
+          assumptions: { id: scenario.id, name: scenario.name, covers: scenario.covers, durationMinutes: scenario.durationMinutes, arrivalPattern: scenario.arrivalPattern, cookToOrderRatio: scenario.cookToOrderRatio, seed: run.result.seed, staff: structuredClone(scenario.staff) },
           progress: { elapsedSeconds: live.elapsedSeconds, durationSeconds: run.result.durationSeconds, fraction: live.elapsedSeconds / Math.max(1, run.result.durationSeconds), arrivedOrders: live.arrivedOrders, completedOrders: live.completedOrders, backlog: live.backlog, oldestOpenWaitSeconds: live.oldestOpenWaitSeconds },
           orders: structuredClone(live.orders),
           stationQueues: structuredClone(live.stationQueues),

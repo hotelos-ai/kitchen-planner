@@ -24,21 +24,31 @@ describe('project store', () => {
     expect(run).toHaveBeenCalledOnce()
     expect(cancel).toHaveBeenCalledWith({ runId: 'run-1' })
   })
-  it('routes UI actions and direct commands through identical semantics', () => {
+  it('routes UI helpers and future-agent calls through identical facade semantics', () => {
     const uiStore = createProjectStore(createSeedProject())
     const toolStore = createProjectStore(createSeedProject())
     uiStore.getState().moveItems(['tandoor'], { x: 2300, y: 900 })
-    const result = toolStore.getState().executeCommand({ type: 'move-items', ids: ['tandoor'], anchor: { x: 2300, y: 900 } })
+    const result = getWorkspaceFacade(toolStore).applyOperations([{
+      type: 'move_components',
+      variantId: 'baseline-trace',
+      componentIds: ['tandoor'],
+      anchor: { xMm: 2300, yMm: 900 },
+    }], 'Move components')
     expect(result.ok).toBe(true)
     expect(toolStore.getState().project).toEqual(uiStore.getState().project)
     expect(toolStore.getState().revision).toBe(1)
+    expect('executeCommand' in toolStore.getState()).toBe(false)
   })
 
-  it('does not change state for a dry run', () => {
+  it('does not change state while previewing through the public facade', () => {
     const store = createProjectStore(createSeedProject())
     const before = store.getState().project
-    const result = store.getState().executeCommand({ type: 'remove-items', ids: ['tandoor'] }, { dryRun: true })
-    expect(result).toMatchObject({ ok: true, dryRun: true, revision: 0 })
+    const result = getWorkspaceFacade(store).previewLayoutChanges({
+      expectedRevision: 0,
+      operations: [{ type: 'remove_components', variantId: 'baseline-trace', componentIds: ['tandoor'] }],
+      intent: 'Preview removal',
+    })
+    expect(result).toMatchObject({ ok: true, revision: 0 })
     expect(store.getState().project).toBe(before)
   })
 

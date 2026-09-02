@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { LAYOUT_COMMAND_TYPES } from '../commands/layout-command'
+import { WORKSPACE_OPERATION_TYPES } from '../workspace/workspace-operation'
 import type { ProjectEnvelope, SpatialDocumentAdapter, SpatialItem } from '../spatial/types'
 
 export const layoutQuerySchema = z.discriminatedUnion('type', [
@@ -33,12 +33,12 @@ export function executeLayoutQuery<TProject, TItem extends SpatialItem, TScenari
   switch (parsed.data.type) {
     case 'project-snapshot': return { ok: true, revision: envelope.revision, data: clone(project) }
     case 'active-layout': return { ok: true, revision: envelope.revision, data: clone(variant ?? null) }
-    case 'architecture': return { ok: true, revision: envelope.revision, data: clone(project.architecture) }
-    case 'available-zones': return { ok: true, revision: envelope.revision, data: clone(project.architecture.storageZones) }
+    case 'architecture': return { ok: true, revision: envelope.revision, data: clone(variant?.architecture ?? project.architecture) }
+    case 'available-zones': return { ok: true, revision: envelope.revision, data: clone((variant?.architecture ?? project.architecture).storageZones) }
     case 'diagnostics': return { ok: true, revision: envelope.revision, data: clone(diagnose?.(envelope.project) ?? []) }
     case 'capabilities': return {
       ok: true, revision: envelope.revision,
-      data: { commands: [...LAYOUT_COMMAND_TYPES], queries: ['project-snapshot', 'active-layout', 'list-items', 'item', 'architecture', 'available-zones', 'diagnostics', 'capabilities'], units: ['mm', 'cm', 'in', 'ft'], ...(adapter.describeCapabilities?.() ?? {}) },
+      data: { commands: [...WORKSPACE_OPERATION_TYPES], queries: ['project-snapshot', 'active-layout', 'list-items', 'item', 'architecture', 'available-zones', 'diagnostics', 'capabilities'], units: ['mm', 'cm', 'in', 'ft'], ...(adapter.describeCapabilities?.() ?? {}) },
     }
     case 'list-items': {
       const { category, tag } = parsed.data
