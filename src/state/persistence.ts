@@ -3,20 +3,30 @@ import { EQUIPMENT_CONFIGURATIONS, inferEquipmentConfiguration } from '../domain
 import { projectSchema } from '../domain/project-schema'
 import { createSeedProject } from '../domain/seed-project'
 
-export const CURRENT_PROJECT_KEY = 'manta-raja:project:v1'
-export const LAST_GOOD_PROJECT_KEY = 'manta-raja:project:last-good:v1'
+export const CURRENT_PROJECT_KEY = 'kitchen-planner:project:v2'
+export const LAST_GOOD_PROJECT_KEY = 'kitchen-planner:project:last-good:v2'
+export const LEGACY_CURRENT_PROJECT_KEY = 'manta-raja:project:v1'
+export const LEGACY_LAST_GOOD_PROJECT_KEY = 'manta-raja:project:last-good:v1'
 
 function migrate(value: unknown): unknown {
   if (!value || typeof value !== 'object') return value
   const source = value as Record<string, unknown>
-  if (source.schemaVersion !== 0) return value
+  if (source.schemaVersion !== 0 && source.schemaVersion !== 1) return value
   const migrated = structuredClone(source)
-  migrated.schemaVersion = 1
-  if (migrated.architecture && typeof migrated.architecture === 'object') {
+  if (migrated.schemaVersion === 0 && migrated.architecture && typeof migrated.architecture === 'object') {
     const architecture = migrated.architecture as Record<string, unknown>
     architecture.wallHeightMm ??= 2800
     architecture.locked ??= true
   }
+  if (migrated.architecture && typeof migrated.architecture === 'object' && Array.isArray(migrated.variants)) {
+    migrated.variants = migrated.variants.map((value) => {
+      if (!value || typeof value !== 'object') return value
+      const variant = structuredClone(value as Record<string, unknown>)
+      variant.architecture ??= structuredClone(migrated.architecture)
+      return variant
+    })
+  }
+  migrated.schemaVersion = 2
   return migrated
 }
 
@@ -34,7 +44,10 @@ export function hydrateEquipmentPresentation(project: KitchenProject): KitchenPr
       : undefined
     item.configurationPreset ??= inferred
     item.visualPreset ??= configuration?.visualPreset ?? 'generic'
+    item.appearanceSkinId ??= `${item.visualPreset}-default`
   }))
+  const activeArchitecture = hydrated.variants.find((variant) => variant.id === hydrated.activeVariantId)?.architecture
+  if (activeArchitecture) hydrated.architecture = structuredClone(activeArchitecture)
   return hydrated
 }
 
@@ -50,6 +63,8 @@ function parseStored(value: string | null): KitchenProject | null {
 export function loadProject(storage: Storage): KitchenProject {
   return parseStored(storage.getItem(CURRENT_PROJECT_KEY))
     ?? parseStored(storage.getItem(LAST_GOOD_PROJECT_KEY))
+    ?? parseStored(storage.getItem(LEGACY_CURRENT_PROJECT_KEY))
+    ?? parseStored(storage.getItem(LEGACY_LAST_GOOD_PROJECT_KEY))
     ?? createSeedProject()
 }
 
@@ -76,7 +91,7 @@ export function importProject(json: string): KitchenProject {
   }
   if (candidate && typeof candidate === 'object') {
     const version = (candidate as Record<string, unknown>).schemaVersion
-    if (typeof version === 'number' && version > 1) throw new Error(`Unsupported future schema version ${version}`)
+    if (typeof version === 'number' && version > 2) throw new Error(`Unsupported future schema version ${version}`)
   }
   const project = validated(candidate)
   if (!project) throw new Error('Import is not a valid kitchen project')

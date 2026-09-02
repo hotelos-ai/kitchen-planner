@@ -47,10 +47,11 @@ export interface SpatialArchitecture<TOpening extends SpatialOpening = SpatialOp
   locked: boolean
 }
 
-export interface SpatialVariant<TItem extends SpatialItem> {
+export interface SpatialVariant<TItem extends SpatialItem, TArchitecture extends SpatialArchitecture = SpatialArchitecture> {
   id: string
   name: string
   parentId?: string
+  architecture: TArchitecture
   items: TItem[]
   createdAt: string
   updatedAt: string
@@ -63,7 +64,7 @@ export interface SpatialProject<TItem extends SpatialItem, TScenario, TArchitect
   displayUnit: DisplayUnit
   snapMm: Millimetres
   architecture: TArchitecture
-  variants: SpatialVariant<TItem>[]
+  variants: SpatialVariant<TItem, TArchitecture>[]
   scenarios: TScenario[]
   activeVariantId: string
   activeScenarioId: string

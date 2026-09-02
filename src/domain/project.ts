@@ -96,13 +96,57 @@ export interface EquipmentItem {
   notes?: string
   visualPreset?: string
   configurationPreset?: string
+  appearanceSkinId?: string
+}
+
+export interface OperationalProfile {
+  covers?: number
+  peakDurationMinutes?: number
+  arrivalPattern?: ArrivalPattern
+  serviceStyle?: string
+  menuAssumptions?: string[]
+  staff?: StaffAssignment[]
+  targetCapacityPerHour?: number
+}
+
+export interface AutoLayoutPermissions {
+  placement: boolean
+  equipmentRedesign: boolean
+  architecture: boolean
+}
+
+export interface LayoutConstraints {
+  lockedComponentIds?: string[]
+  lockedArchitectureElementIds?: string[]
+  minimumAisleMm?: Millimetres
+  noGoZones?: RectMm[]
+  permissions?: AutoLayoutPermissions
+}
+
+export interface AdoptedExperimentManifest {
+  id: string
+  baselineVariantId: string
+  finalistId: string
+  createdAt: string
+  scenarioIds: string[]
+  seeds: number[]
+  confirmationSeeds: number[]
+  permissions: AutoLayoutPermissions
+  budget: { maxDurationMs?: number; maxEvaluations?: number }
+  objective: string
+  resultHash?: string
+  resultMetrics?: Record<string, number>
 }
 
 export interface LayoutVariant {
   id: string
   name: string
   parentId?: string
+  architecture: Architecture
   equipment: EquipmentItem[]
+  operationalProfile?: OperationalProfile
+  layoutConstraints?: LayoutConstraints
+  adoptedExperimentManifest?: AdoptedExperimentManifest
   createdAt: string
   updatedAt: string
 }
@@ -133,11 +177,12 @@ export interface SimulationScenario {
 }
 
 export interface KitchenProject {
-  schemaVersion: 1
+  schemaVersion: 2
   id: string
   name: string
   displayUnit: DisplayUnit
   snapMm: Millimetres
+  /** Compatibility mirror of the active variant architecture during the v2 transition. */
   architecture: Architecture
   variants: LayoutVariant[]
   scenarios: SimulationScenario[]

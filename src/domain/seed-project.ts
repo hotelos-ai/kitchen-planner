@@ -1,4 +1,5 @@
 import type {
+  Architecture,
   EquipmentCategory,
   EquipmentItem,
   KitchenProject,
@@ -47,6 +48,7 @@ function equipment(
     notes: options.notes,
     visualPreset: options.visualPreset,
     configurationPreset: options.configurationPreset ?? CONFIGURATION_BY_SEED_ID[id],
+    appearanceSkinId: `${options.visualPreset ?? 'generic'}-default`,
     clearance: options.clearanceFrontMm === undefined ? undefined : {
       frontMm: options.clearanceFrontMm,
       kind: category === 'cooking' ? 'heat' : 'work',
@@ -127,37 +129,40 @@ export function createSeedProject(): KitchenProject {
     }),
   ]
 
+  const architecture: Architecture = {
+    widthMm: 3900,
+    depthMm: 6650,
+    wallHeightMm: 2800,
+    roomPolygon: [
+      { x: 0, y: 0 },
+      { x: 3900, y: 0 },
+      { x: 3900, y: 5700 },
+      { x: 3500, y: 5700 },
+      { x: 3500, y: 6650 },
+      { x: 0, y: 6650 },
+    ],
+    openings: [
+      { id: 'd2', label: 'D2 · staff + receiving', kind: 'door', wall: 'left', offsetMm: 5550, widthMm: 900, flow: 'entry', swingDepthMm: 900 },
+      { id: 'd6', label: 'D6 · permanently closed', kind: 'sealed-opening', wall: 'top', offsetMm: 2450, widthMm: 900, flow: 'closed' },
+      { id: 'clean-window', label: 'Clean service window', kind: 'service-window', wall: 'right', offsetMm: 2050, widthMm: 900, sillHeightMm: 950, heightMm: 900, flow: 'clean-out' },
+      { id: 'dirty-window', label: 'Dirty service window', kind: 'service-window', wall: 'right', offsetMm: 3850, widthMm: 900, sillHeightMm: 950, heightMm: 900, flow: 'dirty-in' },
+    ],
+    pillars: [{ id: 'pillar', xMm: 3100, yMm: 900, widthMm: 400, depthMm: 400 }],
+    storageZones: [{ id: 'adjacent-storage', label: 'Adjacent storage area', xMm: 0, yMm: 0, widthMm: 2400, depthMm: 800, adjacent: true }],
+    locked: true,
+  }
+
   return {
-    schemaVersion: 1,
+    schemaVersion: 2,
     id: 'manta-raja-kitchen-lab',
     name: 'Manta Raja Kitchen Lab',
     displayUnit: 'mm',
     snapMm: 100,
-    architecture: {
-      widthMm: 3900,
-      depthMm: 6650,
-      wallHeightMm: 2800,
-      roomPolygon: [
-        { x: 0, y: 0 },
-        { x: 3900, y: 0 },
-        { x: 3900, y: 5700 },
-        { x: 3500, y: 5700 },
-        { x: 3500, y: 6650 },
-        { x: 0, y: 6650 },
-      ],
-      openings: [
-        { id: 'd2', label: 'D2 · staff + receiving', kind: 'door', wall: 'left', offsetMm: 5550, widthMm: 900, flow: 'entry', swingDepthMm: 900 },
-        { id: 'd6', label: 'D6 · permanently closed', kind: 'sealed-opening', wall: 'top', offsetMm: 2450, widthMm: 900, flow: 'closed' },
-        { id: 'clean-window', label: 'Clean service window', kind: 'service-window', wall: 'right', offsetMm: 2050, widthMm: 900, sillHeightMm: 950, heightMm: 900, flow: 'clean-out' },
-        { id: 'dirty-window', label: 'Dirty service window', kind: 'service-window', wall: 'right', offsetMm: 3850, widthMm: 900, sillHeightMm: 950, heightMm: 900, flow: 'dirty-in' },
-      ],
-      pillars: [{ id: 'pillar', xMm: 3100, yMm: 900, widthMm: 400, depthMm: 400 }],
-      storageZones: [{ id: 'adjacent-storage', label: 'Adjacent storage area', xMm: 0, yMm: 0, widthMm: 2400, depthMm: 800, adjacent: true }],
-      locked: true,
-    },
+    architecture: structuredClone(architecture),
     variants: [{
       id: 'baseline-trace',
       name: 'Current trace',
+      architecture: structuredClone(architecture),
       equipment: equipmentItems,
       createdAt: CREATED_AT,
       updatedAt: CREATED_AT,

@@ -2,6 +2,7 @@ import { useStore } from 'zustand'
 import { createStore, type StoreApi } from 'zustand/vanilla'
 import type { CommandResult } from '../core/commands/execute-layout-command'
 import { executeLayoutCommand } from '../core/commands/execute-layout-command'
+import { createWorkspaceFacade, type WorkspaceFacade } from '../core/workspace/workspace-facade'
 import type {
   DisplayUnit,
   EquipmentItem,
@@ -11,6 +12,7 @@ import type {
   SimulationScenario,
 } from '../domain/project'
 import { applyEquipmentConfiguration as configureEquipmentItem } from '../domain/equipment-configurations'
+import { projectSchema } from '../domain/project-schema'
 import { createSeedProject } from '../domain/seed-project'
 import { kitchenSpatialAdapter } from '../domain/spatial-adapter'
 import { appendHistory } from './history'
@@ -27,6 +29,7 @@ type ResizeInput = Pick<EquipmentItem, 'widthMm' | 'depthMm'>
 
 export interface ProjectState {
   project: KitchenProject
+  documentId: string
   revision: number
   selectedIds: string[]
   past: KitchenProject[]
@@ -53,12 +56,17 @@ export interface ProjectState {
   renameVariant(id: string, name: string): void
   deleteVariant(id: string): void
   updateScenario(id: string, patch: Partial<SimulationScenario>): void
+  commitProjectCandidate(project: unknown, expectedRevision: number, expectedDocumentId: string): ProjectCommitResult
   replaceProject(project: KitchenProject): void
   undo(): void
   redo(): void
 }
 
 export type ProjectStore = StoreApi<ProjectState>
+
+export type ProjectCommitResult =
+  | { ok: true; revision: number }
+  | { ok: false; revision: number; code: 'stale-revision' | 'wrong-document' | 'invalid-project'; message: string; issues?: unknown }
 
 const makeId = (prefix: string) => `${prefix}-${globalThis.crypto?.randomUUID?.() ?? Math.random().toString(36).slice(2)}`
 
@@ -80,16 +88,8 @@ export function getActiveItem(state: ProjectState, itemId: string): EquipmentIte
 }
 
 export function createProjectStore(initialProject: KitchenProject): ProjectStore {
-  return createStore<ProjectState>()((set, get) => {
-    const commitProject = (mutation: (project: KitchenProject) => KitchenProject) => {
-      set((state) => ({
-        project: mutation(state.project),
-        revision: state.revision + 1,
-        past: appendHistory(state.past, state.project),
-        future: [],
-      }))
-    }
-
+  const workspaceFacade: { current?: WorkspaceFacade } = {}
+  const store = createStore<ProjectState>()((set, get) => {
     const dispatch = (command: unknown, options: { dryRun?: boolean; expectedRevision?: number } = {}) => {
       const state = get()
       const result = executeLayoutCommand({
@@ -109,8 +109,12 @@ export function createProjectStore(initialProject: KitchenProject): ProjectStore
       return result
     }
 
+    const applyOperations = (operations: readonly unknown[], intent: string) => workspaceFacade.current!.applyOperations(operations, intent)
+    const activeVariantId = () => get().project.activeVariantId
+
     return {
       project: structuredClone(initialProject),
+      documentId: makeId('document'),
       revision: 0,
       selectedIds: [],
       past: [],
@@ -123,12 +127,23 @@ export function createProjectStore(initialProject: KitchenProject): ProjectStore
           : [...state.selectedIds, id],
       })),
       clearSelection: () => set({ selectedIds: [] }),
-      moveItems: (ids, point) => { if (ids.length) dispatch({ type: 'move-items', ids, anchor: point }) },
-      nudgeItems: (ids, delta) => { if (ids.length) dispatch({ type: 'nudge-items', ids, delta }) },
-      rotateItems: (ids, deltaDeg = 90) => { if (ids.length) dispatch({ type: 'rotate-items', ids, deltaDeg }) },
-      resizeItem: (id, size) => { dispatch({ type: 'resize-item', id, ...size }) },
-      setDimensionsLocked: (id, locked) => { dispatch({ type: 'set-dimensions-locked', id, locked }) },
-      updateItem: (id, patch) => { dispatch({ type: 'update-item', id, patch }) },
+      moveItems: (ids, point) => { if (ids.length) applyOperations([{ type: 'move_components', variantId: activeVariantId(), componentIds: ids, anchor: { xMm: point.x, yMm: point.y } }], 'Move components') },
+      nudgeItems: (ids, delta) => { if (ids.length) applyOperations([{ type: 'nudge_components', variantId: activeVariantId(), componentIds: ids, delta: { xMm: delta.x, yMm: delta.y } }], 'Nudge components') },
+      rotateItems: (ids, deltaDeg = 90) => { if (ids.length) applyOperations([{ type: 'rotate_components', variantId: activeVariantId(), componentIds: ids, deltaDeg }], 'Rotate components') },
+      resizeItem: (id, size) => { applyOperations([{ type: 'resize_component', variantId: activeVariantId(), componentId: id, dimensions: size }], 'Resize component') },
+      setDimensionsLocked: (id, locked) => { applyOperations([{ type: 'set_component_dimensions_lock', variantId: activeVariantId(), componentId: id, locked }], 'Set component dimension lock') },
+      updateItem: (id, patch) => {
+        const current = getActiveItem(get(), id)
+        const operations: unknown[] = []
+        if (patch.widthMm !== undefined || patch.depthMm !== undefined) operations.push({
+          type: 'resize_component', variantId: activeVariantId(), componentId: id,
+          dimensions: { widthMm: patch.widthMm ?? current.widthMm, depthMm: patch.depthMm ?? current.depthMm, ...(patch.heightMm !== undefined ? { heightMm: patch.heightMm } : {}) },
+        })
+        if (patch.rotationDeg !== undefined && patch.rotationDeg !== current.rotationDeg) operations.push({ type: 'rotate_components', variantId: activeVariantId(), componentIds: [id], deltaDeg: patch.rotationDeg - current.rotationDeg })
+        const componentPatch = Object.fromEntries(Object.entries(patch).filter(([key, value]) => value !== undefined && ['label', 'category', 'heightMm', 'capabilities', 'clearance', 'approximate', 'notes'].includes(key)))
+        if (Object.keys(componentPatch).length) operations.push({ type: 'update_component', variantId: activeVariantId(), componentId: id, patch: componentPatch })
+        if (operations.length) applyOperations(operations, 'Update component')
+      },
       applyEquipmentConfiguration: (id, configurationId) => {
         let configured: EquipmentItem
         try {
@@ -136,65 +151,66 @@ export function createProjectStore(initialProject: KitchenProject): ProjectStore
         } catch {
           return false
         }
-        return dispatch({ type: 'update-item', id, patch: configured }).ok
+        void configured
+        return applyOperations([{ type: 'configure_component', variantId: activeVariantId(), componentId: id, configurationId }], 'Configure component').ok
       },
       addCustomItem: (input) => {
         const id = makeId('custom')
-        const item: EquipmentItem = {
-          id,
-          label: input.label.trim() || 'Custom item',
-          category: 'custom',
-          widthMm: Math.max(100, input.widthMm),
-          depthMm: Math.max(100, input.depthMm),
-          heightMm: Math.max(100, input.heightMm ?? 850),
-          xMm: 1500,
-          yMm: 3500,
-          rotationDeg: 0,
-          dimensionsLocked: false,
-          movable: true,
-          removable: true,
-          capabilities: [],
-        }
-        const result = dispatch({ type: 'add-item', item })
+        const result = applyOperations([{ type: 'add_custom_component', variantId: activeVariantId(), componentId: id, label: input.label.trim() || 'Custom item', position: { xMm: 1500, yMm: 3500 }, dimensions: { widthMm: Math.max(100, input.widthMm), depthMm: Math.max(100, input.depthMm), heightMm: Math.max(100, input.heightMm ?? 850) } }], 'Add custom component')
         if (result.ok) set({ selectedIds: [id] })
         return id
       },
       duplicateItem: (id) => {
         const source = getActiveItem(get(), id)
         const duplicateId = makeId(source.category)
-        const result = dispatch({ type: 'duplicate-item', id, duplicateId, patch: { approximate: false } })
+        const result = applyOperations([{ type: 'duplicate_components', variantId: activeVariantId(), components: [{ componentId: id, duplicateId }] }], 'Duplicate component')
         if (result.ok) {
           set({ selectedIds: [duplicateId] })
         }
         return duplicateId
       },
       removeItems: (ids) => {
-        const result = ids.length ? dispatch({ type: 'remove-items', ids }) : null
+        const result = ids.length ? applyOperations([{ type: 'remove_components', variantId: activeVariantId(), componentIds: ids }], 'Remove components') : null
         if (result?.ok) set((state) => ({ selectedIds: state.selectedIds.filter((id) => !ids.includes(id)) }))
       },
-      setDisplayUnit: (unit) => { dispatch({ type: 'set-display-unit', unit }) },
-      setSnapMm: (intervalMm) => { dispatch({ type: 'set-snap', intervalMm }) },
-      setArchitectureLocked: (locked) => { dispatch({ type: 'set-architecture-lock', locked }) },
+      setDisplayUnit: (unit) => { applyOperations([{ type: 'update_workspace_settings', variantId: activeVariantId(), patch: { displayUnit: unit } }], 'Set display unit') },
+      setSnapMm: (intervalMm) => { applyOperations([{ type: 'update_workspace_settings', variantId: activeVariantId(), patch: { snapMm: intervalMm } }], 'Set snap interval') },
+      setArchitectureLocked: (locked) => { applyOperations([{ type: 'update_architecture', variantId: activeVariantId(), patch: { locked } }], 'Set architecture lock') },
       createVariant: (name) => {
         const id = makeId('variant')
-        const now = new Date().toISOString()
-        dispatch({ type: 'create-variant', id, name: name.trim() || 'Untitled layout', now })
+        applyOperations([{ type: 'create_layout', variantId: id, parentVariantId: activeVariantId(), name: name.trim() || 'Untitled layout', equipmentMode: 'duplicate' }], 'Create layout')
         return id
       },
       activateVariant: (id) => {
-        const result = dispatch({ type: 'activate-variant', id })
+        const result = applyOperations([{ type: 'activate_layout', variantId: id }], 'Activate layout')
         if (result.ok) set({ selectedIds: [] })
       },
-      renameVariant: (id, name) => { dispatch({ type: 'rename-variant', id, name: name.trim() || get().project.variants.find((variant) => variant.id === id)?.name || 'Untitled layout' }) },
+      renameVariant: (id, name) => { applyOperations([{ type: 'rename_layout', variantId: id, name: name.trim() || get().project.variants.find((variant) => variant.id === id)?.name || 'Untitled layout' }], 'Rename layout') },
       deleteVariant: (id) => {
-        const result = dispatch({ type: 'remove-variant', id })
+        const result = applyOperations([{ type: 'remove_layout', variantId: id }], 'Remove layout')
         if (result.ok) set({ selectedIds: [] })
       },
-      updateScenario: (id, patch) => commitProject((project) => ({
-        ...project,
-        scenarios: project.scenarios.map((scenario) => scenario.id === id ? { ...scenario, ...patch, id: scenario.id } : scenario),
-      })),
-      replaceProject: (project) => set({ project: structuredClone(project), revision: 0, selectedIds: [], past: [], future: [] }),
+      updateScenario: (id, patch) => {
+        const { id: _ignoredId, ...scenarioPatch } = patch as Partial<SimulationScenario> & { id?: string }
+        void _ignoredId
+        applyOperations([{ type: 'update_scenario', variantId: activeVariantId(), scenarioId: id, patch: scenarioPatch }], 'Update scenario')
+      },
+      commitProjectCandidate: (project, expectedRevision, expectedDocumentId) => {
+        const state = get()
+        if (state.documentId !== expectedDocumentId) return { ok: false, revision: state.revision, code: 'wrong-document', message: 'The open project was replaced after this candidate was prepared.' }
+        if (state.revision !== expectedRevision) return { ok: false, revision: state.revision, code: 'stale-revision', message: `Expected revision ${expectedRevision}, received ${state.revision}.` }
+        const parsed = projectSchema.safeParse(project)
+        if (!parsed.success) return { ok: false, revision: state.revision, code: 'invalid-project', message: 'Project candidate is invalid.', issues: parsed.error.issues }
+        set({
+          project: structuredClone(parsed.data),
+          revision: state.revision + 1,
+          past: appendHistory(state.past, state.project),
+          future: [],
+          selectedIds: state.selectedIds.filter((id) => parsed.data.variants.some((variant) => variant.equipment.some((item) => item.id === id))),
+        })
+        return { ok: true, revision: state.revision + 1 }
+      },
+      replaceProject: (project) => set({ project: structuredClone(project), documentId: makeId('document'), revision: 0, selectedIds: [], past: [], future: [] }),
       undo: () => set((state) => {
         const previous = state.past.at(-1)
         if (!previous) return state
@@ -207,6 +223,8 @@ export function createProjectStore(initialProject: KitchenProject): ProjectStore
       }),
     }
   })
+  workspaceFacade.current = createWorkspaceFacade({ store })
+  return store
 }
 
 const isStorage = (value: unknown): value is Storage => {

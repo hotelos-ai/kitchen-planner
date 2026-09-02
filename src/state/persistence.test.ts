@@ -1,6 +1,15 @@
 import { describe, expect, it } from 'vitest'
 import { createSeedProject } from '../domain/seed-project'
-import { CURRENT_PROJECT_KEY, exportProject, importProject, loadProject, saveProject } from './persistence'
+import {
+  CURRENT_PROJECT_KEY,
+  LAST_GOOD_PROJECT_KEY,
+  LEGACY_CURRENT_PROJECT_KEY,
+  LEGACY_LAST_GOOD_PROJECT_KEY,
+  exportProject,
+  importProject,
+  loadProject,
+  saveProject,
+} from './persistence'
 
 function memoryStorage(initial: Record<string, string> = {}): Storage {
   const values = new Map(Object.entries(initial))
@@ -20,11 +29,35 @@ describe('project persistence', () => {
     expect(importProject(exportProject(project))).toEqual(project)
   })
 
+  it('round-trips multiple layouts with independent architecture and planning metadata', () => {
+    const project = createSeedProject()
+    const alternative = structuredClone(project.variants[0])
+    alternative.id = 'courtyard-option'
+    alternative.name = 'Courtyard option'
+    alternative.parentId = project.variants[0].id
+    alternative.architecture.widthMm = 5200
+    alternative.architecture.roomPolygon = [{ x: 0, y: 0 }, { x: 5200, y: 0 }, { x: 5200, y: 6650 }, { x: 0, y: 6650 }]
+    alternative.equipment[0].appearanceSkinId = 'blackened-steel'
+    alternative.operationalProfile = { covers: 72, arrivalPattern: 'steady', staff: [{ role: 'head-chef', count: 1 }] }
+    alternative.layoutConstraints = { lockedComponentIds: ['tandoor'], minimumAisleMm: 1000 }
+    alternative.adoptedExperimentManifest = {
+      id: 'run-1', baselineVariantId: project.variants[0].id, finalistId: 'fastest-service',
+      createdAt: '2026-09-02T00:00:00.000Z', scenarioIds: ['dinner-peak'], seeds: [3],
+      confirmationSeeds: [13], permissions: { placement: true, equipmentRedesign: false, architecture: false },
+      budget: { maxEvaluations: 100 }, objective: 'fastest-service', resultMetrics: { throughput: 42 },
+    }
+    project.variants.push(alternative)
+    project.activeVariantId = alternative.id
+    project.architecture = structuredClone(alternative.architecture)
+
+    expect(importProject(exportProject(project))).toEqual(project)
+  })
+
   it('falls back to the last good snapshot when current JSON is corrupt', () => {
     const project = createSeedProject()
     const storage = memoryStorage({
-      'manta-raja:project:v1': '{broken',
-      'manta-raja:project:last-good:v1': JSON.stringify(project),
+      [CURRENT_PROJECT_KEY]: '{broken',
+      [LAST_GOOD_PROJECT_KEY]: JSON.stringify(project),
     })
     expect(loadProject(storage)).toEqual(project)
   })
@@ -44,11 +77,44 @@ describe('project persistence', () => {
     const legacy = structuredClone(createSeedProject()) as unknown as Record<string, unknown>
     legacy.schemaVersion = 0
     const architecture = legacy.architecture as Record<string, unknown>
+    const variants = legacy.variants as Array<Record<string, unknown>>
     delete architecture.wallHeightMm
+    variants.forEach((variant) => { delete variant.architecture })
     const migrated = importProject(JSON.stringify(legacy))
-    expect(migrated.schemaVersion).toBe(1)
+    expect(migrated.schemaVersion).toBe(2)
     expect(migrated.architecture.wallHeightMm).toBe(2800)
+    expect(migrated.variants[0].architecture).toEqual(migrated.architecture)
     expect(() => importProject('{"schemaVersion":99}')).toThrow(/unsupported future schema version 99/i)
+  })
+
+  it('migrates v1 global architecture into independent variant-owned copies', () => {
+    const current = createSeedProject()
+    const legacy = structuredClone(current) as unknown as Record<string, unknown>
+    legacy.schemaVersion = 1
+    const variants = legacy.variants as Array<Record<string, unknown>>
+    variants.push({ ...structuredClone(variants[0]), id: 'legacy-option', name: 'Legacy option' })
+    variants.forEach((variant) => { delete variant.architecture })
+
+    const migrated = importProject(JSON.stringify(legacy))
+
+    expect(migrated.schemaVersion).toBe(2)
+    expect(migrated.variants).toHaveLength(2)
+    expect(migrated.variants[0].architecture).toEqual(migrated.architecture)
+    expect(migrated.variants[1].architecture).toEqual(migrated.architecture)
+    expect(migrated.variants[0].architecture).not.toBe(migrated.variants[1].architecture)
+  })
+
+  it('reads legacy Manta storage keys only as fallback and saves generic product keys', () => {
+    const project = createSeedProject()
+    const legacyStorage = memoryStorage({ [LEGACY_CURRENT_PROJECT_KEY]: JSON.stringify(project) })
+    expect(loadProject(legacyStorage)).toEqual(project)
+
+    const storage = memoryStorage({ [LEGACY_LAST_GOOD_PROJECT_KEY]: JSON.stringify(project) })
+    saveProject(storage, project)
+    expect(storage.getItem(CURRENT_PROJECT_KEY)).toBeTruthy()
+    expect(storage.getItem(LAST_GOOD_PROJECT_KEY)).toBeTruthy()
+    expect(CURRENT_PROJECT_KEY).toMatch(/^kitchen-planner:/)
+    expect(LAST_GOOD_PROJECT_KEY).toMatch(/^kitchen-planner:/)
   })
 
   it('restores presentation presets in schema-valid projects saved before equipment skins existed', () => {

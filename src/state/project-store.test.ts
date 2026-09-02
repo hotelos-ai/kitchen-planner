@@ -97,4 +97,43 @@ describe('project store', () => {
     expect(store.getState().applyEquipmentConfiguration('two-door-fridge', 'hot-tandoor')).toBe(false)
     expect(store.getState()).toMatchObject({ revision: 0, past: [] })
   })
+
+  it('commits a validated candidate as one revision and one undo checkpoint', () => {
+    const store = createProjectStore(createSeedProject())
+    const { documentId } = store.getState()
+    const candidate = structuredClone(store.getState().project)
+    candidate.name = 'Atomic candidate'
+    candidate.variants[0].equipment.find((item) => item.id === 'tandoor')!.xMm = 2200
+
+    expect(store.getState().commitProjectCandidate(candidate, 0, documentId)).toEqual({ ok: true, revision: 1 })
+    expect(store.getState()).toMatchObject({ revision: 1, past: [{ name: 'Manta Raja Kitchen Lab' }], future: [] })
+    expect(store.getState().project).toMatchObject({ name: 'Atomic candidate' })
+    expect(getActiveItem(store.getState(), 'tandoor').xMm).toBe(2200)
+
+    store.getState().undo()
+    expect(store.getState().project.name).toBe('Manta Raja Kitchen Lab')
+    expect(getActiveItem(store.getState(), 'tandoor').xMm).toBe(2400)
+  })
+
+  it('rejects stale, wrong-document, and invalid candidate commits', () => {
+    const store = createProjectStore(createSeedProject())
+    const candidate = structuredClone(store.getState().project)
+    const documentId = store.getState().documentId
+
+    expect(store.getState().commitProjectCandidate(candidate, 1, documentId)).toMatchObject({ ok: false, code: 'stale-revision', revision: 0 })
+    expect(store.getState().commitProjectCandidate(candidate, 0, 'different-document')).toMatchObject({ ok: false, code: 'wrong-document', revision: 0 })
+
+    const invalid = structuredClone(candidate) as unknown as Record<string, unknown>
+    invalid.activeVariantId = 'missing'
+    expect(store.getState().commitProjectCandidate(invalid, 0, documentId)).toMatchObject({ ok: false, code: 'invalid-project', revision: 0 })
+    expect(store.getState()).toMatchObject({ revision: 0, past: [] })
+  })
+
+  it('rotates document identity on replacement even for the same project id', () => {
+    const store = createProjectStore(createSeedProject())
+    const previousDocumentId = store.getState().documentId
+    store.getState().replaceProject(createSeedProject())
+    expect(store.getState().documentId).not.toBe(previousDocumentId)
+    expect(store.getState()).toMatchObject({ revision: 0, past: [], future: [] })
+  })
 })
