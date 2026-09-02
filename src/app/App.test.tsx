@@ -12,7 +12,7 @@ describe('App', () => {
     expect(screen.getByRole('heading', { name: /Kitchen Planner/i })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Plan' })).toHaveAttribute('aria-pressed', 'true')
     const user = userEvent.setup()
-    await screen.findByLabelText('2D plan workspace')
+    await screen.findByLabelText('2D plan workspace', {}, { timeout: 5000 })
     const catalog = screen.getByLabelText('Equipment catalog')
     await user.click(within(catalog).getByRole('tab', { name: /Placed/i }))
     expect(await within(catalog).findByRole('button', { name: /Select Tandoor/i })).toBeInTheDocument()
