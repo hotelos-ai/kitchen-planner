@@ -1,15 +1,25 @@
 import { RoundedBox } from '@react-three/drei'
-import type { ReactNode } from 'react'
-import { KITCHEN_MATERIALS, resolveKitchenMaterial, type KitchenMaterialDescriptor, type KitchenMaterialName } from './materials'
+import { createContext, useContext, type ReactNode } from 'react'
+import { KITCHEN_MATERIALS, resolveAppearanceSkinMaterial, resolveKitchenMaterial, type KitchenMaterialDescriptor, type KitchenMaterialName } from './materials'
 
 export const STEEL = KITCHEN_MATERIALS.brushedSteel.color
 export const DARK_STEEL = KITCHEN_MATERIALS.darkSteel.color
 export const BLACK = KITCHEN_MATERIALS.blackEnamel.color
 
+const AppearanceSkinContext = createContext<Partial<KitchenMaterialDescriptor>>({})
+
+export function AppearanceSkinProvider({ skinId, children }: { skinId?: string; children: ReactNode }) {
+  return <AppearanceSkinContext.Provider value={resolveAppearanceSkinMaterial(skinId)}>{children}</AppearanceSkinContext.Provider>
+}
+
 export function KitchenSurfaceMaterial({ material = 'brushedSteel', ...overrides }: {
   material?: KitchenMaterialName
 } & Partial<KitchenMaterialDescriptor>) {
-  const descriptor = resolveKitchenMaterial(material, overrides)
+  const skinOverrides = useContext(AppearanceSkinContext)
+  const descriptor = resolveKitchenMaterial(material, material === 'brushedSteel' ? skinOverrides : {})
+  Object.entries(overrides).forEach(([key, value]) => {
+    if (value !== undefined) Object.assign(descriptor, { [key]: value })
+  })
   return <meshPhysicalMaterial {...descriptor} />
 }
 

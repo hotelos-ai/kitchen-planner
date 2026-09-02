@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { createSeedProject } from './seed-project'
+import { createCatalogEquipmentItem } from './catalog/kitchen-catalog'
 import {
   applyEquipmentConfiguration,
   EQUIPMENT_CONFIGURATIONS,
@@ -74,5 +75,28 @@ describe('equipment configurations', () => {
       visualPreset: 'landing-table',
       capabilities: [],
     })).toBeUndefined()
+  })
+
+  it('offers catalog-owned physical presets separately from appearance skins', () => {
+    const shelf = createCatalogEquipmentItem({
+      catalogId: 'storage-wall-shelf',
+      componentId: 'shelf-1',
+      position: { xMm: 200, yMm: 300 },
+      skinId: 'powder-black',
+    })
+    const configurations = listCompatibleConfigurations(shelf)
+    expect(configurations.map((configuration) => configuration.id)).toEqual([
+      'wall-shelf-one-tier', 'wall-shelf-two-tier', 'wall-shelf-three-tier',
+    ])
+
+    const configured = applyEquipmentConfiguration(shelf, 'wall-shelf-two-tier')
+    expect(configured).toMatchObject({
+      id: shelf.id,
+      catalogId: shelf.catalogId,
+      configurationPreset: 'wall-shelf-two-tier',
+      appearanceSkinId: 'powder-black',
+      visualPreset: 'storage-wall-shelf',
+    })
+    expect(configured.widthMm).not.toBe(shelf.widthMm)
   })
 })

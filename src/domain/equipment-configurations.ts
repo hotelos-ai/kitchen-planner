@@ -4,6 +4,7 @@ import type {
   EquipmentItem,
   StationCapability,
 } from './project'
+import { getCatalogEntry } from './catalog/kitchen-catalog'
 
 export type EquipmentConfigurationFamily =
   | 'refrigeration'
@@ -11,6 +12,7 @@ export type EquipmentConfigurationFamily =
   | 'prep-landing'
   | 'washing'
   | 'ventilation'
+  | 'catalog'
 
 export type EquipmentConfiguration = {
   id: string
@@ -129,7 +131,38 @@ const sameClearance = (left: ClearanceSpec | undefined, right: ClearanceSpec) =>
 
 const cloneConfiguration = (value: EquipmentConfiguration): EquipmentConfiguration => structuredClone(value)
 
+const titleCaseId = (value: string) => value.split('-').map((part) => part.charAt(0).toUpperCase() + part.slice(1)).join(' ')
+
+function catalogConfigurations(item: EquipmentItem): EquipmentConfiguration[] {
+  const entry = item.catalogId ? getCatalogEntry(item.catalogId) : undefined
+  if (!entry) return []
+  return entry.configurationIds.map((id, index) => {
+    const denominator = Math.max(1, entry.configurationIds.length - 1)
+    const ratio = index === 0 ? 0 : index / denominator
+    const dimension = (axis: 'widthMm' | 'depthMm' | 'heightMm') => Math.round(
+      (entry.typicalDimensions[axis] + (entry.maximumDimensions[axis] - entry.typicalDimensions[axis]) * ratio) / 10,
+    ) * 10
+    return {
+      id,
+      family: 'catalog',
+      label: `${entry.displayName} · ${titleCaseId(id)}`,
+      description: `${titleCaseId(id)} physical configuration for ${entry.displayName}.`,
+      category: item.category,
+      widthMm: dimension('widthMm'),
+      depthMm: dimension('depthMm'),
+      heightMm: dimension('heightMm'),
+      capabilities: [...item.capabilities],
+      clearance: structuredClone(item.clearance ?? { kind: 'work', frontMm: entry.clearance.frontMm }),
+      visualPreset: entry.constructorKey,
+    }
+  })
+}
+
 export function inferEquipmentConfiguration(item: EquipmentItem): string | undefined {
+  if (item.catalogId) {
+    const catalogIds = catalogConfigurations(item).map((configuration) => configuration.id)
+    if (item.configurationPreset && catalogIds.includes(item.configurationPreset)) return item.configurationPreset
+  }
   if (item.configurationPreset && CONFIGURATION_BY_ID.has(item.configurationPreset)) return item.configurationPreset
   const seeded = CONFIGURATION_BY_SEED_ID[item.id]
   if (seeded) return seeded
@@ -148,6 +181,8 @@ export function inferEquipmentConfiguration(item: EquipmentItem): string | undef
 }
 
 export function listCompatibleConfigurations(item: EquipmentItem): EquipmentConfiguration[] {
+  const catalogOwned = catalogConfigurations(item)
+  if (catalogOwned.length) return catalogOwned.map(cloneConfiguration)
   if (item.category === 'custom') return EQUIPMENT_CONFIGURATIONS.map(cloneConfiguration)
   const selected = item.configurationPreset ? CONFIGURATION_BY_ID.get(item.configurationPreset) : undefined
   const family = selected?.family ?? FAMILY_BY_CATEGORY[item.category]
@@ -157,13 +192,16 @@ export function listCompatibleConfigurations(item: EquipmentItem): EquipmentConf
 
 export function applyEquipmentConfiguration(item: EquipmentItem, configurationId: string): EquipmentItem {
   const selected = CONFIGURATION_BY_ID.get(configurationId)
+    ?? catalogConfigurations(item).find((configuration) => configuration.id === configurationId)
   if (!selected) throw new Error(`Unknown equipment configuration: ${configurationId}`)
-  const compatible = item.category === 'custom'
+  const compatible = item.catalogId
+    ? catalogConfigurations(item).some((value) => value.id === configurationId)
+    : item.category === 'custom'
     || listCompatibleConfigurations(item).some((value) => value.id === configurationId)
   if (!compatible) throw new Error(`Equipment configuration ${configurationId} is not compatible with ${item.category}`)
   return {
     ...item,
-    label: selected.label,
+    label: item.catalogId ? item.label : selected.label,
     category: selected.category,
     widthMm: selected.widthMm,
     depthMm: selected.depthMm,
@@ -179,6 +217,7 @@ export function applyEquipmentConfiguration(item: EquipmentItem, configurationId
 export function isEquipmentConfigurationModified(item: EquipmentItem): boolean {
   if (!item.configurationPreset) return false
   const selected = CONFIGURATION_BY_ID.get(item.configurationPreset)
+    ?? catalogConfigurations(item).find((configuration) => configuration.id === item.configurationPreset)
   if (!selected) return false
   return item.label !== selected.label
     || item.category !== selected.category

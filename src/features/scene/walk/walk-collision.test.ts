@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { pointInPolygon } from '../../../domain/geometry'
 import { createSeedProject } from '../../../domain/seed-project'
-import type { Architecture, PointMm } from '../../../domain/project'
-import { buildWalkColliders, cameraYawForHeading, findJumpObstacle, resolveWalkSpawn, resolveWalkStep, supportHeightAt, type WalkCollider } from './walk-collision'
+import type { Architecture, EquipmentItem, PointMm } from '../../../domain/project'
+import { buildWalkColliders, cameraYawForHeading, findJumpObstacle, resolveWalkSpawn, resolveWalkStep, supportHeightAt, walkCollisionPolicyForEquipment, type WalkCollider } from './walk-collision'
 
 const solidCollider = (id: string, polygon: PointMm[]): WalkCollider => ({
   id,
@@ -41,6 +41,32 @@ describe('walk collision', () => {
     expect(colliders.find((collider) => collider.kind === 'wall')).toMatchObject({ topMm: 2800, jumpable: false, landable: false })
     expect(colliders.find((collider) => collider.kind === 'pillar')).toMatchObject({ topMm: 2800, jumpable: false, landable: false })
     expect(colliders.find((collider) => collider.kind === 'pass-ledge')).toMatchObject({ topMm: 950, jumpable: true, landable: true })
+  })
+
+  it('collides with floor storage while elevated storage remains pass-through', () => {
+    const base = project.variants[0].equipment[0]
+    const floorPresets = [
+      'storage-rack', 'storage-mobile-rack', 'storage-dunnage', 'storage-bin',
+      'storage-pot-rack', 'storage-dish-rack', 'storage-tray-rack',
+    ]
+    const elevatedPresets = ['storage-wall-shelf', 'storage-overshelf', 'storage-overhead']
+    const storage = [...floorPresets, ...elevatedPresets].map((visualPreset, index): EquipmentItem => ({
+      ...base,
+      id: visualPreset,
+      category: 'storage',
+      visualPreset,
+      xMm: 400 + index * 100,
+      yMm: 400,
+    }))
+
+    floorPresets.forEach((visualPreset) => expect(walkCollisionPolicyForEquipment(storage.find((item) => item.id === visualPreset)!)).toBe('floor-obstacle'))
+    elevatedPresets.forEach((visualPreset) => expect(walkCollisionPolicyForEquipment(storage.find((item) => item.id === visualPreset)!)).toBe('elevated-pass-through'))
+
+    const storageColliderIds = buildWalkColliders(project.architecture, storage)
+      .filter((collider) => collider.kind === 'equipment')
+      .map((collider) => collider.id)
+    expect(storageColliderIds).toEqual(expect.arrayContaining(floorPresets))
+    elevatedPresets.forEach((visualPreset) => expect(storageColliderIds).not.toContain(visualPreset))
   })
 
   it('falls back to a valid interior spawn when no staff entry is declared', () => {

@@ -79,6 +79,7 @@ export interface ClearanceSpec {
 
 export interface EquipmentItem {
   id: string
+  catalogId?: string
   label: string
   category: EquipmentCategory
   widthMm: Millimetres

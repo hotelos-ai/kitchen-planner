@@ -72,6 +72,15 @@ describe('executeWorkspaceBatch', () => {
     })
   })
 
+  it('rejects unknown or catalog-incompatible appearance skins', () => {
+    const project = createSeedProject()
+    expect(executeWorkspaceBatch({
+      project,
+      revision: 0,
+      operations: [{ type: 'skin_component', variantId: 'baseline-trace', componentId: 'tandoor', skinId: 'unknown-finish' }],
+    })).toMatchObject({ ok: false, causeCode: 'invalid-candidate', operationIndex: 0 })
+  })
+
   it('rejects stale revisions and malformed batches before mutation', () => {
     const project = createSeedProject()
     expect(executeWorkspaceBatch({ project, revision: 2, expectedRevision: 1, operations: [{ type: 'activate_layout', variantId: 'baseline-trace' }] })).toMatchObject({ ok: false, code: 'stale-revision', revision: 2 })

@@ -228,6 +228,18 @@ button { cursor: pointer; }
 .inspector-collapsed .inspector-drawer { visibility: hidden; transform: translateX(100%); pointer-events: none; }
 .equipment-library, .right-panel { min-height: 0; background: var(--paper); }
 .equipment-library { width: 100%; height: 100%; display: flex; flex-direction: column; border-right: 1px solid #d8d2c7; padding: 15px 12px 12px; box-shadow: 8px 0 24px rgba(32,41,38,.11); }
+.equipment-library > label, .equipment-library .field-pair label { display: grid; gap: 4px; color: #756e64; font-size: 8px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; }
+.equipment-library input, .equipment-library select { width: 100%; min-width: 0; min-height: 31px; border: 1px solid #d5cec2; border-radius: 6px; padding: 5px 7px; color: #35403c; background: white; font-size: 9px; letter-spacing: normal; text-transform: none; }
+.equipment-library > .field-pair { grid-template-columns: 1fr; margin-top: 7px; }
+.catalog-grid { flex: 1 1 190px; min-height: 120px; display: grid; align-content: start; gap: 7px; margin-top: 9px; overflow-y: auto; border-top: 1px solid #e4ded4; padding: 8px 2px 8px 0; }
+.catalog-card { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 7px; border: 1px solid #ded8cd; border-radius: 7px; padding: 8px; background: #fff; }
+.catalog-card[draggable="true"] { cursor: grab; }
+.catalog-card h3 { margin: 2px 0 3px; color: #303a36; font-size: 10px; }
+.catalog-card p { display: -webkit-box; margin: 0 0 5px; overflow: hidden; color: #767067; font-size: 7px; line-height: 1.35; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
+.catalog-card small { color: #6c7772; font-size: 7px; font-weight: 750; }
+.catalog-card > button { align-self: end; min-height: 29px; border: 1px solid #c6d3ce; border-radius: 6px; padding: 5px 7px; color: #315f58; background: #edf4f1; font-size: 8px; font-weight: 850; }
+.equipment-library > details { flex: 0 0 auto; max-height: 32%; overflow: auto; border-top: 1px solid #ddd7cc; padding-top: 7px; }
+.equipment-library > details summary { color: #59645f; font-size: 8px; font-weight: 850; cursor: pointer; }
 .right-panel { display: flex; flex-direction: column; border-left: 1px solid #d8d2c7; overflow-y: auto; }
 .panel-heading { margin-bottom: 10px; }
 .panel-heading h2, .empty-inspector h2 { margin: 2px 0 0; font-size: 14px; }
@@ -240,7 +252,7 @@ button { cursor: pointer; }
 .equipment-row strong { color: #333a37; font-size: 10px; }
 .equipment-row small { margin-top: 2px; color: #817a70; font-size: 8px; }
 .category-dot { width: 7px; height: 7px; border-radius: 50%; background: #807568; }
-.category-dot.cooking { background: var(--copper); }.category-dot.cold { background: var(--cold); }.category-dot.prep { background: #718368; }.category-dot.washing, .category-dot.landing { background: var(--wash); }.category-dot.custom { background: #79648c; }
+.category-dot.cooking { background: var(--copper); }.category-dot.cold { background: var(--cold); }.category-dot.prep { background: #718368; }.category-dot.washing, .category-dot.landing { background: var(--wash); }.category-dot.storage { background: #7e6954; }.category-dot.hood { background: #52615d; }.category-dot.custom { background: #79648c; }
 .add-custom-button { margin-top: 9px; border: 1px dashed #bf765e; border-radius: 8px; padding: 8px; color: #9e4e38; background: #fff7f3; font-size: 10px; font-weight: 800; }
 .custom-item-form { display: grid; gap: 9px; margin-top: 10px; padding-top: 10px; border-top: 1px solid #e4ded3; }
 .field-pair { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; }

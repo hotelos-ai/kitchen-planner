@@ -38,9 +38,8 @@ describe('component editing overlays', () => {
 
     rerender(<QuickConfigurationPopover item={item} store={store} mode="skin" position={{ x: 10, y: 10 }} onClose={vi.fn()} onSkinChange={onSkinChange} />)
     expect(screen.getByRole('dialog', { name: /Choose skin for Tandoor/i })).toBeInTheDocument()
-    await user.clear(screen.getByLabelText('Appearance skin'))
-    await user.type(screen.getByLabelText('Appearance skin'), 'stainless-worn')
+    await user.selectOptions(screen.getByLabelText('Appearance skin'), 'stainless-polished')
     await user.click(screen.getByRole('button', { name: 'Apply skin' }))
-    expect(onSkinChange).toHaveBeenCalledWith('tandoor', 'stainless-worn')
+    expect(onSkinChange).toHaveBeenCalledWith('tandoor', 'stainless-polished')
   })
 })

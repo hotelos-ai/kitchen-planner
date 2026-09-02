@@ -1,10 +1,13 @@
 /* eslint-disable react-refresh/only-export-components */
 import type { ComponentType } from 'react'
+import { KITCHEN_CATALOG } from '../../../domain/catalog/kitchen-catalog'
 import type { EquipmentItem } from '../../../domain/project'
 import { BoxPart } from './parts'
+import { CatalogEquipmentVisual } from './CatalogVisuals'
 import { ChestFreezerVisual, PrepFridgeVisual, TwoDoorFridgeVisual, UndercounterFridgeVisual, UprightFreezerVisual } from './ColdVisuals'
 import { CanopyHoodVisual, FlatTopFryerVisual, FlatTopVisual, FourBurnerVisual, FryerBankVisual, IslandHoodVisual, RangeOvenVisual, SixBurnerVisual, TandoorVisual } from './HotLineVisuals'
 import { EnclosedBenchVisual, IngredientCounterVisual, LandingTableVisual, MixerVisual, OpenTableVisual } from './PrepVisuals'
+import { StorageBinVisual, StorageDishRackVisual, StorageDunnageVisual, StorageMobileRackVisual, StorageOverheadVisual, StorageOvershelfVisual, StoragePotRackVisual, StorageRackVisual, StorageTrayRackVisual, StorageWallShelfVisual } from './StorageVisuals'
 import type { EquipmentVisualDescriptor, EquipmentVisualProps } from './types'
 import { DishwasherVisual, DoubleSinkVisual, HandwashVisual, PassThroughDishwasherVisual, PreRinseVisual, SingleSinkVisual } from './WashVisuals'
 
@@ -20,7 +23,30 @@ const registry = new Map<string, ComponentType<EquipmentVisualProps>>([
   ['double-sink', DoubleSinkVisual], ['single-sink', SingleSinkVisual], ['handwash-sink', HandwashVisual], ['pre-rinse-sink', PreRinseVisual], ['dishwasher', DishwasherVisual], ['pass-through-dishwasher', PassThroughDishwasherVisual],
   ['open-table', OpenTableVisual], ['enclosed-bench', EnclosedBenchVisual], ['ingredient-counter', IngredientCounterVisual], ['landing-table', LandingTableVisual], ['mixer', MixerVisual],
   ['canopy-hood', CanopyHoodVisual], ['island-hood', IslandHoodVisual],
+  ['storage-wall-shelf', StorageWallShelfVisual], ['storage-overshelf', StorageOvershelfVisual],
+  ['storage-rack', StorageRackVisual], ['storage-mobile-rack', StorageMobileRackVisual],
+  ['storage-dunnage', StorageDunnageVisual], ['storage-bin', StorageBinVisual],
+  ['storage-pot-rack', StoragePotRackVisual], ['storage-dish-rack', StorageDishRackVisual],
+  ['storage-tray-rack', StorageTrayRackVisual], ['storage-overhead', StorageOverheadVisual],
 ])
+
+const catalogAliases = new Map<string, ComponentType<EquipmentVisualProps>>([
+  ['range-six-burner', SixBurnerVisual], ['range-four-burner', FourBurnerVisual],
+  ['fryer-twin-basket', FryerBankVisual], ['griddle-flat-top', FlatTopVisual], ['tandoor-round', TandoorVisual],
+  ['cold-upright-fridge', UprightFreezerVisual], ['cold-upright-freezer', UprightFreezerVisual],
+  ['cold-undercounter-fridge', UndercounterFridgeVisual], ['cold-prep-counter', PrepFridgeVisual], ['cold-chest-freezer', ChestFreezerVisual],
+  ['prep-work-table', OpenTableVisual], ['prep-chef-table', EnclosedBenchVisual], ['prep-planetary-mixer', MixerVisual],
+  ['wash-pre-rinse-sink', PreRinseVisual], ['wash-undercounter-dishwasher', DishwasherVisual], ['wash-hood-dishwasher', PassThroughDishwasherVisual],
+  ['wash-dirty-landing', LandingTableVisual], ['wash-clean-landing', LandingTableVisual], ['sanitation-hand-sink', HandwashVisual],
+  ['utility-canopy-hood', CanopyHoodVisual],
+  ['storage-wall-shelf', StorageWallShelfVisual], ['storage-overshelf', StorageOvershelfVisual],
+  ['storage-freestanding-shelf', StorageRackVisual], ['storage-mobile-rack', StorageMobileRackVisual],
+  ['storage-dunnage-rack', StorageDunnageVisual], ['storage-ingredient-bins', StorageBinVisual],
+  ['storage-pot-rack', StoragePotRackVisual], ['storage-dish-rack', StorageDishRackVisual],
+  ['storage-tray-rack', StorageTrayRackVisual], ['storage-overhead-rack', StorageOverheadVisual],
+])
+
+KITCHEN_CATALOG.forEach((entry) => registry.set(entry.constructorKey, catalogAliases.get(entry.constructorKey) ?? CatalogEquipmentVisual))
 
 const descriptors: Record<string, string[]> = {
   'flat-top-fryer': ['griddle', 'fryer-well', 'fryer-basket', 'control-knob', 'rear-guard', 'under-storage'],
@@ -48,7 +74,21 @@ const descriptors: Record<string, string[]> = {
   mixer: ['pedestal', 'bowl', 'mixer-head', 'beater'],
   'canopy-hood': ['canopy', 'baffle-filter', 'underside-light'],
   'island-hood': ['canopy', 'baffle-filter', 'underside-light', 'suspension-rod'],
+  'storage-wall-shelf': ['elevated-shelf', 'wall-bracket', 'raised-lip'],
+  'storage-overshelf': ['overshelf-deck', 'support-post', 'raised-lip'],
+  'storage-rack': ['shelf-tier', 'upright-post', 'adjustable-foot'],
+  'storage-mobile-rack': ['shelf-tier', 'upright-post', 'caster'],
+  'storage-dunnage': ['raised-platform', 'support-rail', 'slat'],
+  'storage-bin': ['ingredient-bin', 'hinged-lid', 'pull-handle'],
+  'storage-pot-rack': ['pot-rail', 'hanging-hook', 'shelf-tier'],
+  'storage-dish-rack': ['dish-divider', 'drain-tray', 'rack-frame'],
+  'storage-tray-rack': ['tray-runner', 'upright-frame', 'shelf-tier'],
+  'storage-overhead': ['overhead-deck', 'suspension-rod', 'raised-lip'],
 }
+
+KITCHEN_CATALOG.forEach((entry) => {
+  descriptors[entry.constructorKey] ??= [entry.familyId, entry.footprint.shape, ...entry.tags.slice(0, 3)]
+})
 
 export function registerEquipmentVisual(preset: string, component: ComponentType<EquipmentVisualProps>): void { registry.set(preset, component) }
 export function getEquipmentVisual(item: EquipmentItem): ComponentType<EquipmentVisualProps> { return registry.get(item.visualPreset ?? '') ?? GenericEquipmentVisual }

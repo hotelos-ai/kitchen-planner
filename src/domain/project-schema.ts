@@ -25,6 +25,7 @@ const clearanceSchema = z.object({
 
 export const equipmentSchema = z.object({
   id: z.string().min(1),
+  catalogId: z.string().min(1).optional(),
   label: z.string().min(1),
   category: z.enum(['cooking', 'cold', 'prep', 'washing', 'landing', 'storage', 'hood', 'custom']),
   widthMm: z.number().positive().finite(),

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { KITCHEN_MATERIALS, resolveKitchenMaterial } from './materials'
+import { KITCHEN_MATERIALS, resolveAppearanceSkinMaterial, resolveKitchenMaterial } from './materials'
 
 describe('kitchen PBR materials', () => {
   it('defines visibly distinct physical surfaces', () => {
@@ -17,5 +17,14 @@ describe('kitchen PBR materials', () => {
       metalness: KITCHEN_MATERIALS.brushedSteel.metalness,
       roughness: .4,
     })
+  })
+
+  it('maps an appearance skin to material-only overrides', () => {
+    expect(resolveAppearanceSkinMaterial('stainless-polished')).toEqual({
+      color: '#d8dcdd',
+      metalness: .95,
+      roughness: .18,
+    })
+    expect(resolveAppearanceSkinMaterial('missing-skin')).toEqual({})
   })
 })

@@ -4,6 +4,7 @@ import * as THREE from 'three'
 import type { EquipmentItem } from '../../domain/project'
 import { toWorld } from './ArchitectureMesh'
 import { getEquipmentVisual } from './equipment/equipment-visual-registry'
+import { AppearanceSkinProvider } from './equipment/parts'
 import { equipmentSelectionDescriptor } from './equipment-selection'
 
 type Props = {
@@ -28,7 +29,9 @@ export function EquipmentMesh({ item, selected, wallHeightMm, onSelect }: Props)
       userData={{ itemId: item.id }}
     >
       <group position={[widthM / 2, baseY, depthM / 2]}>
-        {createElement(getEquipmentVisual(item), { item, widthM, depthM, heightM })}
+        <AppearanceSkinProvider skinId={item.appearanceSkinId}>
+          {createElement(getEquipmentVisual(item), { item, widthM, depthM, heightM })}
+        </AppearanceSkinProvider>
         <mesh position={[0, heightM / 2, 0]} visible={selected}>
           <boxGeometry args={[widthM + .025, heightM + .025, depthM + .025]} />
           <meshBasicMaterial transparent opacity={0} depthWrite={false} />

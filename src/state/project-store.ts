@@ -11,6 +11,7 @@ import type {
   PointMm,
   SimulationScenario,
 } from '../domain/project'
+import { createCatalogEquipmentItem, getCatalogEntry } from '../domain/catalog/kitchen-catalog'
 import { applyEquipmentConfiguration as configureEquipmentItem } from '../domain/equipment-configurations'
 import { projectSchema } from '../domain/project-schema'
 import { createSeedProject } from '../domain/seed-project'
@@ -48,6 +49,7 @@ export interface ProjectState {
   updateItem(id: string, patch: Partial<EquipmentItem>): void
   applyEquipmentConfiguration(id: string, configurationId: string): boolean
   addCustomItem(input: CustomItemInput): string
+  addCatalogItem(catalogId: string, position: { xMm: number; yMm: number }): string | null
   duplicateItem(id: string): string
   removeItems(ids: string[]): void
   setDisplayUnit(unit: DisplayUnit): void
@@ -164,6 +166,25 @@ export function createProjectStore(initialProject: KitchenProject): ProjectStore
         if (result.ok) set({ selectedIds: [id] })
         return id
       },
+      addCatalogItem: (catalogId, position) => {
+        const entry = getCatalogEntry(catalogId)
+        if (!entry) return null
+        const id = makeId(entry.catalogId)
+        const configurationId = entry.configurationIds[0]
+        const skinId = entry.appearanceSkinIds[0]
+        const result = applyOperations([{
+          type: 'add_component',
+          variantId: activeVariantId(),
+          componentId: id,
+          catalogId,
+          position,
+          ...(configurationId ? { configurationId } : {}),
+          ...(skinId ? { skinId } : {}),
+        }], 'Add catalog component')
+        if (!result.ok) return null
+        set({ selectedIds: [id] })
+        return id
+      },
       duplicateItem: (id) => {
         const source = getActiveItem(get(), id)
         const duplicateId = makeId(source.category)
@@ -227,7 +248,18 @@ export function createProjectStore(initialProject: KitchenProject): ProjectStore
       }),
     }
   })
-  workspaceFacade.current = createWorkspaceFacade({ store })
+  workspaceFacade.current = createWorkspaceFacade({
+    store,
+    resolveCatalogComponent: (operation) => createCatalogEquipmentItem({
+      catalogId: operation.catalogId,
+      componentId: operation.componentId,
+      position: operation.position,
+      ...(operation.dimensions ? { dimensions: operation.dimensions } : {}),
+      ...(operation.rotationDeg === undefined ? {} : { rotationDeg: operation.rotationDeg }),
+      ...(operation.configurationId ? { configurationId: operation.configurationId } : {}),
+      ...(operation.skinId ? { skinId: operation.skinId } : {}),
+    }),
+  })
   return store
 }
 

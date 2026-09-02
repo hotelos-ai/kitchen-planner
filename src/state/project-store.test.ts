@@ -64,6 +64,24 @@ describe('project store', () => {
     expect(getActiveItem(store.getState(), duplicateId).label).toBe('Rice warmer copy')
   })
 
+  it('adds a catalog component through one public workspace transaction', () => {
+    const project = createSeedProject()
+    project.variants[0].equipment = []
+    const store = createProjectStore(project)
+
+    const id = store.getState().addCatalogItem('prep-work-table', { xMm: 100, yMm: 200 })
+
+    expect(id).toBeTruthy()
+    expect(getActiveItem(store.getState(), id!)).toMatchObject({
+      catalogId: 'prep-work-table',
+      configurationPreset: 'work-table-open-base',
+      xMm: 100,
+      yMm: 200,
+    })
+    expect(store.getState()).toMatchObject({ revision: 1, selectedIds: [id] })
+    expect(store.getState().past).toHaveLength(1)
+  })
+
   it('duplicates a variant without mutating its parent', () => {
     const store = createProjectStore(createSeedProject())
     const childId = store.getState().createVariant('Hot line option')

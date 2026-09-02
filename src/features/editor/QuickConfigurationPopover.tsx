@@ -1,4 +1,6 @@
 import { useEffect, useState } from 'react'
+import { APPEARANCE_SKINS } from '../../domain/catalog/appearance-skins'
+import { getCatalogEntry } from '../../domain/catalog/kitchen-catalog'
 import type { EquipmentItem } from '../../domain/project'
 import type { ProjectStore } from '../../state/project-store'
 import { EquipmentConfigurationField } from './EquipmentConfigurationField'
@@ -14,7 +16,11 @@ export function QuickConfigurationPopover({ item, store, mode, position, onClose
   onClose(): void
   onSkinChange?(itemId: string, skinId: string): void
 }) {
-  const [skinId, setSkinId] = useState(item.appearanceSkinId ?? '')
+  const entry = item.catalogId ? getCatalogEntry(item.catalogId) : undefined
+  const compatibleSkins = APPEARANCE_SKINS.filter((skin) => !entry || entry.appearanceSkinIds.includes(skin.skinId))
+  const [skinId, setSkinId] = useState(() => compatibleSkins.some((skin) => skin.skinId === item.appearanceSkinId)
+    ? item.appearanceSkinId!
+    : compatibleSkins[0]?.skinId ?? '')
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -40,7 +46,9 @@ export function QuickConfigurationPopover({ item, store, mode, position, onClose
       <button type="button" aria-label="Close quick configuration" onClick={onClose}>×</button>
     </div>
     {configuring ? <EquipmentConfigurationField item={item} store={store} /> : <>
-      <label>Appearance skin<input aria-label="Appearance skin" value={skinId} onChange={(event) => setSkinId(event.target.value)} /></label>
+      <label>Appearance skin<select aria-label="Appearance skin" value={skinId} onChange={(event) => setSkinId(event.target.value)}>
+        {compatibleSkins.map((skin) => <option key={skin.skinId} value={skin.skinId}>{skin.displayName}</option>)}
+      </select></label>
       <button type="button" disabled={!skinId.trim()} onClick={() => {
         onSkinChange?.(item.id, skinId.trim())
         onClose()

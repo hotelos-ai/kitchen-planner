@@ -1,5 +1,5 @@
 import { analyzeLayout } from '../../domain/layout-diagnostics'
-import type { KitchenProject } from '../../domain/project'
+import type { EquipmentItem, KitchenProject } from '../../domain/project'
 import type { ProjectStore } from '../../state/project-store'
 import { executeWorkspaceBatch } from './execute-workspace-batch'
 import { createPreviewRegistry } from './preview-registry'
@@ -22,6 +22,10 @@ type FacadeDependencies = {
   runSimulation?: (input: unknown) => unknown
   runAutoLayout?: (input: unknown) => unknown
   cancelRun?: (input: { runId: string }) => unknown
+  resolveCatalogComponent?: (
+    operation: Extract<WorkspaceOperation, { type: 'add_component' }>,
+    project: KitchenProject,
+  ) => EquipmentItem
 }
 
 const diagnosticsFor = (project: KitchenProject) => {
@@ -39,6 +43,7 @@ export function createWorkspaceFacade(dependencies: FacadeDependencies) {
       revision: state.revision,
       expectedRevision: input.expectedRevision,
       operations: input.operations,
+      resolveCatalogComponent: dependencies.resolveCatalogComponent,
     })
     if (!result.ok) return {
       ok: false as const,

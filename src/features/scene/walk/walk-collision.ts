@@ -19,6 +19,15 @@ export type WalkSpawnResolution =
 
 const PLAYER_RADIUS_MM = 260
 const SPAWN_SEARCH_STEP_MM = 100
+const ELEVATED_STORAGE_PRESETS = new Set(['storage-wall-shelf', 'storage-overshelf', 'storage-overhead'])
+
+export type WalkCollisionPolicy = 'floor-obstacle' | 'elevated-pass-through'
+
+export function walkCollisionPolicyForEquipment(item: EquipmentItem): WalkCollisionPolicy {
+  return item.category === 'hood' || ELEVATED_STORAGE_PRESETS.has(item.visualPreset ?? '')
+    ? 'elevated-pass-through'
+    : 'floor-obstacle'
+}
 
 export const cameraYawForHeading = (headingRad: number) => -Math.PI / 2 - headingRad
 
@@ -51,7 +60,7 @@ export function buildWalkColliders(architecture: Architecture, equipment: readon
       landable: false,
     }]
   })
-  const equipmentColliders: WalkCollider[] = equipment.filter((item) => item.category !== 'hood').map((item) => ({
+  const equipmentColliders: WalkCollider[] = equipment.filter((item) => walkCollisionPolicyForEquipment(item) === 'floor-obstacle').map((item) => ({
     id: item.id,
     kind: 'equipment',
     polygon: rotatedFootprint(item),

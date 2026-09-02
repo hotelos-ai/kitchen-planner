@@ -1,9 +1,10 @@
-import { render, screen } from '@testing-library/react'
+import { fireEvent, render, screen } from '@testing-library/react'
 import type { ReactNode } from 'react'
 import userEvent from '@testing-library/user-event'
 import { beforeAll, describe, expect, it, vi } from 'vitest'
 import { createSeedProject } from '../../domain/seed-project'
 import { createProjectStore, getActiveItem } from '../../state/project-store'
+import { CATALOG_DRAG_MIME } from '../../domain/catalog/catalog-drag'
 
 type LayerHarnessProps = {
   onQuickConfigure(id: string, position: { x: number; y: number }): void
@@ -60,10 +61,9 @@ describe('PlanCanvas component gestures', () => {
 
     await user.click(screen.getByRole('button', { name: 'Open component menu' }))
     await user.click(screen.getByRole('menuitem', { name: 'Skin' }))
-    await user.clear(screen.getByLabelText('Appearance skin'))
-    await user.type(screen.getByLabelText('Appearance skin'), 'stainless-worn')
+    await user.selectOptions(screen.getByLabelText('Appearance skin'), 'stainless-polished')
     await user.click(screen.getByRole('button', { name: 'Apply skin' }))
-    expect(onSkinChange).toHaveBeenCalledWith('tandoor', 'stainless-worn')
+    expect(onSkinChange).toHaveBeenCalledWith('tandoor', 'stainless-polished')
 
     await user.click(screen.getByRole('button', { name: 'Open component menu' }))
     await user.click(screen.getByRole('menuitem', { name: 'Duplicate' }))
@@ -77,5 +77,31 @@ describe('PlanCanvas component gestures', () => {
     await user.click(screen.getByRole('button', { name: 'Open component menu' }))
     await user.click(screen.getByRole('menuitem', { name: 'Remove' }))
     expect(store.getState().project.variants[0].equipment.some((item) => item.id === 'tandoor')).toBe(false)
+  })
+
+  it('turns a catalog drop into a preferred-point public catalog add', () => {
+    const project = createSeedProject()
+    project.variants[0].equipment = []
+    const store = createProjectStore(project)
+    const addCatalogItem = vi.spyOn(store.getState(), 'addCatalogItem')
+    render(<PlanCanvas store={store} showReference={false} />)
+    const getData = vi.fn((type: string) => type === CATALOG_DRAG_MIME ? JSON.stringify({
+      catalogId: 'prep-work-table',
+      dimensions: { widthMm: 1500, depthMm: 700, heightMm: 850 },
+      placement: 'preferred-point',
+    }) : '')
+
+    fireEvent.drop(screen.getByTestId('plan-canvas'), {
+      clientX: 300,
+      clientY: 220,
+      dataTransfer: { getData },
+    })
+
+    expect(getData).toHaveBeenCalledWith(CATALOG_DRAG_MIME)
+    expect(addCatalogItem).toHaveBeenCalledWith('prep-work-table', expect.objectContaining({ xMm: expect.any(Number), yMm: expect.any(Number) }))
+    expect(addCatalogItem.mock.results[0]?.value).not.toBeNull()
+    expect(store.getState().project.variants[0].equipment).toHaveLength(1)
+    expect(store.getState().project.variants[0].equipment[0]).toMatchObject({ catalogId: 'prep-work-table' })
+    expect(store.getState().selectedIds).toHaveLength(1)
   })
 })

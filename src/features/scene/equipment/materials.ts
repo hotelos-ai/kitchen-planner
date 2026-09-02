@@ -67,3 +67,9 @@ export function resolveKitchenMaterial(
   })
   return resolved
 }
+
+export function resolveAppearanceSkinMaterial(skinId: string | undefined): Partial<KitchenMaterialDescriptor> {
+  const skin = APPEARANCE_SKINS.find((candidate) => candidate.skinId === skinId)
+  return skin ? { color: skin.colorHex, metalness: skin.metalness, roughness: skin.roughness } : {}
+}
+import { APPEARANCE_SKINS } from '../../../domain/catalog/appearance-skins'

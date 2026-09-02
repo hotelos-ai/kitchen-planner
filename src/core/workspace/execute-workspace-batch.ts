@@ -1,4 +1,6 @@
 import { applyEquipmentConfiguration } from '../../domain/equipment-configurations'
+import { APPEARANCE_SKINS } from '../../domain/catalog/appearance-skins'
+import { getCatalogEntry } from '../../domain/catalog/kitchen-catalog'
 import { normalizeRotation, snapMm } from '../../domain/geometry'
 import type { Architecture, EquipmentItem, KitchenProject, LayoutVariant, PointMm, StationCapability } from '../../domain/project'
 import { architectureSchema, projectSchema, scenarioSchema } from '../../domain/project-schema'
@@ -185,6 +187,9 @@ export function executeWorkspaceBatch(options: BatchOptions): WorkspaceBatchResu
       case 'skin_component': {
         const item = requireComponents(variant, [operation.componentId])?.[0]
         if (!item) return fail('missing-component', `Component ${operation.componentId} does not exist in layout ${variant.id}.`)
+        if (!APPEARANCE_SKINS.some((skin) => skin.skinId === operation.skinId)) return fail('invalid-candidate', `Unknown appearance skin: ${operation.skinId}.`)
+        const catalogEntry = item.catalogId ? getCatalogEntry(item.catalogId) : undefined
+        if (catalogEntry && !catalogEntry.appearanceSkinIds.includes(operation.skinId)) return fail('invalid-candidate', `Appearance skin ${operation.skinId} is not compatible with ${catalogEntry.displayName}.`)
         variant.equipment = variant.equipment.map((candidate) => candidate.id === item.id ? { ...candidate, appearanceSkinId: operation.skinId } : candidate)
         changedIds.push(item.id)
         return

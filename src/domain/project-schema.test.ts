@@ -56,6 +56,13 @@ describe('project schema', () => {
     expect(projectSchema.safeParse(configured).success).toBe(true)
   })
 
+  it('preserves the originating catalog identifier for editable instances', () => {
+    const catalogItem = structuredClone(validProject)
+    Object.assign(catalogItem.variants[0].equipment[0], { catalogId: 'hot-tandoor' })
+    const parsed = projectSchema.parse(catalogItem)
+    expect(parsed.variants[0].equipment[0].catalogId).toBe('hot-tandoor')
+  })
+
   it('rejects an empty equipment configuration identifier', () => {
     const configured = structuredClone(validProject)
     Object.assign(configured.variants[0].equipment[0], { configurationPreset: '' })

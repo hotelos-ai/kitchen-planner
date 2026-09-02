@@ -1,6 +1,9 @@
-import { useLayoutEffect, useRef, useState } from 'react'
+import { useLayoutEffect, useRef, useState, type DragEvent } from 'react'
 import { Stage } from 'react-konva'
 import { useStore } from 'zustand'
+import { CATALOG_DRAG_MIME, parseCatalogDragPayload } from '../../domain/catalog/catalog-drag'
+import { getCatalogEntry } from '../../domain/catalog/kitchen-catalog'
+import { suggestCatalogPlacement } from '../../domain/catalog/suggest-placement'
 import type { ProjectStore } from '../../state/project-store'
 import { getActiveVariant } from '../../state/project-store'
 import { analyzeLayout } from '../../domain/layout-diagnostics'
@@ -54,6 +57,25 @@ export function PlanCanvas({ store, showReference, onInspectComponentIn3D, onCom
   const originX = (size.width - planWidth) / 2
   const originY = (size.height - planHeight) / 2
 
+  const addDroppedCatalogItem = (event: DragEvent<HTMLDivElement>) => {
+    event.preventDefault()
+    const payload = parseCatalogDragPayload(event.dataTransfer.getData(CATALOG_DRAG_MIME))
+    const entry = payload ? getCatalogEntry(payload.catalogId) : undefined
+    if (!payload || !entry) return
+    const bounds = event.currentTarget.getBoundingClientRect()
+    const placement = suggestCatalogPlacement({
+      architecture: variant.architecture,
+      equipment: variant.equipment,
+      entry,
+      snapMm: project.snapMm,
+      preferredPoint: {
+        xMm: (event.clientX - bounds.left - originX) / pixelsPerMm,
+        yMm: (event.clientY - bounds.top - originY) / pixelsPerMm,
+      },
+    })
+    if (placement) store.getState().addCatalogItem(entry.catalogId, { xMm: placement.xMm, yMm: placement.yMm })
+  }
+
   const selectForOverlay = (itemId: string) => store.getState().selectItems([itemId])
   const openQuick = (itemId: string, position: OverlayPosition, mode: QuickConfigurationMode = 'configure') => {
     selectForOverlay(itemId)
@@ -85,7 +107,7 @@ export function PlanCanvas({ store, showReference, onInspectComponentIn3D, onCom
   }
 
   return (
-    <div ref={containerRef} className="plan-canvas" data-testid="plan-canvas">
+    <div ref={containerRef} className="plan-canvas" data-testid="plan-canvas" onDragOver={(event) => event.preventDefault()} onDrop={addDroppedCatalogItem}>
       {showReference && <img className="source-reference" src="/reference/manta-raja-layout.png" alt="Original graph-paper kitchen layout reference" />}
       <Stage width={size.width} height={size.height} onMouseDown={(event) => {
         if (event.target === event.target.getStage()) {
