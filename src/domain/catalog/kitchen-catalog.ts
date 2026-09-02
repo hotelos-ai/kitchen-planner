@@ -20,6 +20,7 @@ type EntryOptions = {
   clearanceKind?: 'work' | 'service' | 'heat' | 'door-swing' | 'maintenance' | 'storage' | 'none'
   approach?: 'front' | 'back' | 'left' | 'right' | 'either-side' | 'none'
   mounting?: 'floor' | 'wall' | 'overhead' | 'counter' | 'architectural'
+  mountingHeightMm?: number
   requiresWall?: boolean
   requiresHood?: boolean
   utilities?: Array<'electricity' | 'gas' | 'water' | 'drainage' | 'ventilation' | 'compressed-air'>
@@ -80,7 +81,7 @@ const entry = (options: EntryOptions) => {
       keepClearOfOpeningsMm: 600,
     },
     configurationIds,
-    physicalConfigurations: createPhysicalConfigurationPresets({ configurationIds, displayName: options.name, typicalDimensions: options.dimensions, maximumDimensions, capabilities: options.capabilities, capacity, clearance, mounting, tags: options.tags }),
+    physicalConfigurations: createPhysicalConfigurationPresets({ configurationIds, displayName: options.name, typicalDimensions: options.dimensions, maximumDimensions, capabilities: options.capabilities, capacity, clearance, mounting, mountingHeightMm: options.mountingHeightMm, tags: options.tags }),
     appearanceSkinIds: options.skins ?? ['stainless-brushed', 'stainless-polished', 'powder-black'],
     footprint: { shape: 'rectangle', cornerRadiusMm: 12 },
     tags: options.tags,
@@ -147,7 +148,7 @@ const rawKitchenEquipment = [
   entry({ id: 'wash-flight-dishwasher', familyId: 'dishwasher', name: 'Flight conveyor dishwasher', category: 'warewashing-sanitation', description: 'Continuous conveyor dishwashing system for institutional volumes.', synonyms: ['rack conveyor', 'flight machine'], dimensions: { widthMm: 3600, depthMm: 1000, heightMm: 1800 }, capabilities: ['dish-wash'], concurrentUnits: 12, utilities: ['electricity', 'water', 'drainage', 'ventilation'], tags: ['floor-mounted', 'warewashing', 'conveyor'], constructorKey: 'wash-flight-dishwasher' }),
   entry({ id: 'wash-dirty-landing', familyId: 'landing-table', name: 'Dirty landing table', category: 'warewashing-sanitation', description: 'Receiving and sorting table for incoming soiled dishes and trays.', synonyms: ['soil table', 'dirty dish table'], dimensions: { widthMm: 1200, depthMm: 750, heightMm: 900 }, capabilities: ['dirty-window', 'dirty-landing'], workPositions: 2, tags: ['warewashing', 'dirty-side', 'landing'], constructorKey: 'wash-dirty-landing' }),
   entry({ id: 'wash-clean-landing', familyId: 'landing-table', name: 'Clean landing table', category: 'warewashing-sanitation', description: 'Drainable table for clean rack landing and unloading.', synonyms: ['clean dish table', 'outfeed table'], dimensions: { widthMm: 1200, depthMm: 750, heightMm: 900 }, capabilities: ['clean-landing'], workPositions: 2, tags: ['warewashing', 'clean-side', 'landing'], constructorKey: 'wash-clean-landing' }),
-  entry({ id: 'sanitation-hand-sink', familyId: 'hand-sink', name: 'Handwash sink', category: 'warewashing-sanitation', description: 'Dedicated compact handwashing basin with splashback.', synonyms: ['hand basin', 'handwash station'], dimensions: { widthMm: 450, depthMm: 400, heightMm: 850 }, capabilities: ['hand-wash'], mounting: 'wall', requiresWall: true, utilities: ['water', 'drainage'], tags: ['wall-mounted', 'sanitation', 'sink'], constructorKey: 'sanitation-hand-sink' }),
+  entry({ id: 'sanitation-hand-sink', familyId: 'hand-sink', name: 'Handwash sink', category: 'warewashing-sanitation', description: 'Dedicated compact handwashing basin with splashback.', synonyms: ['hand basin', 'handwash station'], dimensions: { widthMm: 450, depthMm: 400, heightMm: 850 }, capabilities: ['hand-wash'], mounting: 'wall', mountingHeightMm: 850, requiresWall: true, utilities: ['water', 'drainage'], tags: ['wall-mounted', 'sanitation', 'sink'], constructorKey: 'sanitation-hand-sink' }),
   entry({ id: 'sanitation-sterilizer', familyId: 'sterilizer', name: 'Knife sterilizer', category: 'warewashing-sanitation', description: 'Wall-mounted hot-water or UV cabinet for knife sanitation.', synonyms: ['knife sanitiser', 'utensil sterilizer'], dimensions: { widthMm: 500, depthMm: 200, heightMm: 700 }, capabilities: ['sanitation'], mounting: 'wall', requiresWall: true, utilities: ['electricity', 'water'], tags: ['wall-mounted', 'sanitation'], constructorKey: 'sanitation-knife-sterilizer' }),
   entry({ id: 'sanitation-chemical-dispenser', familyId: 'chemical-system', name: 'Chemical dosing station', category: 'warewashing-sanitation', description: 'Wall-mounted controlled dispenser for cleaning chemicals.', synonyms: ['soap dosing', 'chemical pump'], dimensions: { widthMm: 400, depthMm: 250, heightMm: 600 }, capabilities: ['sanitation'], mounting: 'wall', requiresWall: true, utilities: ['water'], tags: ['wall-mounted', 'chemical'], constructorKey: 'sanitation-chemical-dispenser' }),
 
@@ -228,18 +229,20 @@ const stationCapabilities = new Set<StationCapability>([
 export function createCatalogEquipmentItem(input: CreateCatalogEquipmentInput): EquipmentItem {
   const catalogEntry = getCatalogEntry(input.catalogId)
   if (!catalogEntry) throw new Error(`Unknown catalog component: ${input.catalogId}`)
-  const dimensions = { ...catalogEntry.typicalDimensions, ...input.dimensions }
+  const configurationId = input.configurationId ?? catalogEntry.configurationIds[0]
+  if (!catalogEntry.configurationIds.includes(configurationId)) throw new Error(`Configuration ${configurationId} is not supported by ${catalogEntry.displayName}.`)
+  const physicalConfiguration = catalogEntry.physicalConfigurations.find((preset) => preset.id === configurationId)
+  if (!physicalConfiguration) throw new Error(`Physical configuration ${configurationId} is unavailable for ${catalogEntry.displayName}.`)
+  const dimensions = { ...physicalConfiguration.dimensions, ...input.dimensions }
   ;(['widthMm', 'depthMm', 'heightMm'] as const).forEach((axis) => {
     if (dimensions[axis] < catalogEntry.minimumDimensions[axis] || dimensions[axis] > catalogEntry.maximumDimensions[axis]) {
       throw new Error(`${axis} is outside the supported range for ${catalogEntry.displayName}.`)
     }
   })
-  const configurationId = input.configurationId ?? catalogEntry.configurationIds[0]
-  if (!catalogEntry.configurationIds.includes(configurationId)) throw new Error(`Configuration ${configurationId} is not supported by ${catalogEntry.displayName}.`)
   const skinId = input.skinId ?? catalogEntry.appearanceSkinIds[0]
   if (!catalogEntry.appearanceSkinIds.includes(skinId)) throw new Error(`Skin ${skinId} is not supported by ${catalogEntry.displayName}.`)
-  const clearanceKind = ['door-swing', 'heat', 'service'].includes(catalogEntry.clearance.kind)
-    ? catalogEntry.clearance.kind as 'door-swing' | 'heat' | 'service'
+  const clearanceKind = ['door-swing', 'heat', 'service'].includes(physicalConfiguration.clearance.kind)
+    ? physicalConfiguration.clearance.kind as 'door-swing' | 'heat' | 'service'
     : 'work'
   return {
     id: input.componentId,
@@ -253,8 +256,8 @@ export function createCatalogEquipmentItem(input: CreateCatalogEquipmentInput): 
     dimensionsLocked: false,
     movable: catalogEntry.category !== 'architecture',
     removable: true,
-    capabilities: catalogEntry.capabilities.filter((capability): capability is StationCapability => stationCapabilities.has(capability as StationCapability)),
-    clearance: { frontMm: catalogEntry.clearance.frontMm, leftMm: catalogEntry.clearance.leftMm, rightMm: catalogEntry.clearance.rightMm, backMm: catalogEntry.clearance.backMm, kind: clearanceKind },
+    capabilities: physicalConfiguration.capabilities.filter((capability): capability is StationCapability => stationCapabilities.has(capability as StationCapability)),
+    clearance: { frontMm: physicalConfiguration.clearance.frontMm, leftMm: physicalConfiguration.clearance.leftMm, rightMm: physicalConfiguration.clearance.rightMm, backMm: physicalConfiguration.clearance.backMm, kind: clearanceKind },
     visualPreset: catalogEntry.constructorKey,
     configurationPreset: configurationId,
     appearanceSkinId: skinId,

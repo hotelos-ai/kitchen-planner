@@ -38,7 +38,7 @@ function CameraRig({ mode, fitSignal, architecture }: { mode: CameraMode; fitSig
   return null
 }
 
-function WebGLContextGuard({ onLost, onRestored }: { onLost(): void; onRestored(): void }) {
+export function WebGLContextGuard({ onLost, onRestored }: { onLost(): void; onRestored(): void }) {
   const gl = useThree((state) => state.gl)
   useEffect(() => {
     const canvas = gl.domElement

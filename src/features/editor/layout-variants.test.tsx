@@ -91,9 +91,35 @@ describe('layout variant tabs', () => {
     expect(onClosed).toHaveBeenCalledOnce()
     expect(onClosed.mock.calls[0][0]).toMatchObject({ id: 'layout-b', name: 'Layout B' })
 
-    onClosed.mock.calls[0][0].undo()
+    expect(onClosed.mock.calls[0][0].undo()).toBe(true)
     expect(store.getState().project.variants.map((variant) => variant.id)).toEqual(['layout-a', 'layout-b', 'layout-c'])
     expect(store.getState().project.activeVariantId).toBe('layout-b')
+  })
+
+  it('activates the nearest survivor when closing an inactive tab', async () => {
+    const user = userEvent.setup()
+    const store = createProjectStore(projectWithLayouts('layout-a'))
+    render(<LayoutVariants store={store} />)
+
+    await user.click(screen.getByRole('button', { name: 'Close Layout C' }))
+
+    expect(store.getState().project.variants.map((variant) => variant.id)).toEqual(['layout-a', 'layout-b'])
+    expect(store.getState().project.activeVariantId).toBe('layout-b')
+    expect(store.getState().past).toHaveLength(1)
+  })
+
+  it('refuses close Undo after an intervening workspace revision', async () => {
+    const user = userEvent.setup()
+    const store = createProjectStore(projectWithLayouts())
+    const onClosed = vi.fn<(closed: ClosedLayout) => void>()
+    render(<LayoutVariants store={store} onClosed={onClosed} />)
+
+    await user.click(screen.getByRole('button', { name: 'Close Layout B' }))
+    store.getState().renameVariant('layout-c', 'Edited after close')
+
+    expect(onClosed.mock.calls[0][0].undo()).toBe(false)
+    expect(store.getState().project.variants.map((variant) => variant.id)).toEqual(['layout-a', 'layout-c'])
+    expect(store.getState().project.variants.find((variant) => variant.id === 'layout-c')?.name).toBe('Edited after close')
   })
 
   it('protects the last layout and delegates the plus action when supplied', async () => {

@@ -15,29 +15,41 @@ type Props = {
   store?: ProjectStore
   showCanvas?: boolean
   compact?: boolean
+  shortcutEnabled?: boolean
   onInspectComponentIn3D?(itemId: string): void
 }
 
-export function PlanWorkspace({ store = projectStore, showCanvas = typeof ResizeObserver !== 'undefined', compact = false, onInspectComponentIn3D }: Props) {
+const drawersInitiallyOpen = () => typeof globalThis.matchMedia !== 'function' || !globalThis.matchMedia('(max-width: 760px)').matches
+
+const duplicateId = (sourceId: string, index: number) => `${sourceId}-copy-${globalThis.crypto?.randomUUID?.() ?? Math.random().toString(36).slice(2)}-${index + 1}`
+
+export function PlanWorkspace({ store = projectStore, showCanvas = typeof ResizeObserver !== 'undefined', compact = false, shortcutEnabled = true, onInspectComponentIn3D }: Props) {
   const [showReference, setShowReference] = useState(false)
-  const [catalogOpen, setCatalogOpen] = useState(true)
-  const [inspectorOpen, setInspectorOpen] = useState(true)
+  const [catalogOpen, setCatalogOpen] = useState(drawersInitiallyOpen)
+  const [inspectorOpen, setInspectorOpen] = useState(drawersInitiallyOpen)
   const [wizardOpen, setWizardOpen] = useState(false)
   const [wizardStartsAtRoom, setWizardStartsAtRoom] = useState(false)
   const [essentialsOpen, setEssentialsOpen] = useState(false)
-  const [closedLayout, setClosedLayout] = useState<{ name: string; undo(): void } | null>(null)
+  const [closedLayout, setClosedLayout] = useState<{ name: string; revision: number; undo(): boolean } | null>(null)
   const selectedIds = useStore(store, (state) => state.selectedIds)
+  const revision = useStore(store, (state) => state.revision)
   const canUndo = useStore(store, (state) => state.past.length > 0)
   const canRedo = useStore(store, (state) => state.future.length > 0)
   const selectedItem = useStore(store, (state) => getActiveVariant(state).equipment.find((item) => item.id === state.selectedIds[0]))
   const dragResizeEnabled = Boolean(selectedItem && !selectedItem.dimensionsLocked)
 
   useWorkspaceShortcuts({
+    enabled: shortcutEnabled,
     selectedIds,
     getSnapMm: () => store.getState().project.snapMm,
     undo: () => store.getState().undo(),
     redo: () => store.getState().redo(),
-    duplicate: (id) => { store.getState().duplicateItem(id) },
+    duplicate: (ids) => {
+      const variantId = store.getState().project.activeVariantId
+      const components = ids.map((componentId, index) => ({ componentId, duplicateId: duplicateId(componentId, index) }))
+      const result = store.getState().applyWorkspaceOperations([{ type: 'duplicate_components', variantId, components }], 'Duplicate components')
+      if (result.ok) store.getState().selectItems(components.map((component) => component.duplicateId))
+    },
     remove: (ids) => store.getState().removeItems(ids),
     nudge: (ids, delta) => store.getState().nudgeItems(ids, delta),
     rotate: (ids, deltaDeg) => store.getState().rotateItems(ids, deltaDeg),
@@ -82,7 +94,7 @@ export function PlanWorkspace({ store = projectStore, showCanvas = typeof Resize
         {!compact && <div key="inspector" className="editor-drawer right-panel inspector-drawer" data-editor-drawer="inspector" aria-hidden={!inspectorOpen}><EquipmentInspector store={store} /><LayoutDiagnostics store={store} /><ProjectSettings store={store} /></div>}
       </div>
     </section>
-    {!compact && closedLayout && <div className="workspace-toast" role="status"><span>{closedLayout.name} closed.</span><button type="button" aria-label={`Undo close ${closedLayout.name}`} onClick={() => { closedLayout.undo(); setClosedLayout(null) }}>Undo</button><button type="button" aria-label="Dismiss closed layout message" onClick={() => setClosedLayout(null)}>×</button></div>}
+    {!compact && closedLayout && <div className="workspace-toast" role="status"><span>{closedLayout.name} closed.</span><button type="button" aria-label={`Undo close ${closedLayout.name}`} disabled={revision !== closedLayout.revision} title={revision === closedLayout.revision ? 'Restore the closed layout' : 'Undo is unavailable after another edit'} onClick={() => { if (closedLayout.undo()) setClosedLayout(null) }}>Undo</button><button type="button" aria-label="Dismiss closed layout message" onClick={() => setClosedLayout(null)}>×</button></div>}
     {!compact && wizardOpen && <LayoutWizard
       store={store}
       initialStep={wizardStartsAtRoom ? 1 : 0}

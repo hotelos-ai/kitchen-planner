@@ -41,8 +41,9 @@ function RackFrame({ widthM, depthM, heightM, tiers = 4, mobile = false }: {
 }
 
 export function StorageWallShelfVisual({ item, widthM, depthM, heightM }: EquipmentVisualProps) {
-  const shelfY = Math.max(.45, heightM - .05)
-  const tiers = physicalConfigurationDetails(item).tierCount ?? 1
+  const configuration = physicalConfigurationDetails(item)
+  const shelfY = Math.max(.45, (configuration.elevationMm ?? heightM * 1000) / 1000)
+  const tiers = configuration.tierCount ?? 1
   return <group>
     {positions(tiers).map((index) => <ShelfDeck key={index} widthM={widthM} depthM={depthM} y={shelfY - index * .28} />)}
     {[-1, 1].map((side) => <group key={side} position={[side * widthM * .35, shelfY - .12, -depthM / 2]}>
@@ -54,9 +55,10 @@ export function StorageWallShelfVisual({ item, widthM, depthM, heightM }: Equipm
 StorageWallShelfVisual.displayName = 'StorageWallShelfVisual'
 
 export function StorageOvershelfVisual({ item, widthM, depthM, heightM }: EquipmentVisualProps) {
-  const shelfY = Math.max(.45, heightM - .05)
+  const configuration = physicalConfigurationDetails(item)
+  const shelfY = Math.max(.45, (configuration.elevationMm ?? heightM * 1000) / 1000)
   const postHeight = Math.max(.3, shelfY)
-  const tiers = physicalConfigurationDetails(item).tierCount ?? 1
+  const tiers = configuration.tierCount ?? 1
   return <group>
     {positions(tiers).map((index) => <ShelfDeck key={index} widthM={widthM} depthM={depthM} y={shelfY - index * .3} />)}
     {[-1, 1].map((side) => <TubularLeg key={side} x={side * (widthM / 2 - .05)} z={0} height={postHeight} radius={.018} />)}
@@ -141,8 +143,8 @@ export function StorageTrayRackVisual({ widthM, depthM, heightM }: EquipmentVisu
 }
 StorageTrayRackVisual.displayName = 'StorageTrayRackVisual'
 
-export function StorageOverheadVisual({ widthM, depthM, heightM }: EquipmentVisualProps) {
-  const deckY = Math.max(.65, heightM * .7)
+export function StorageOverheadVisual({ item, widthM, depthM, heightM }: EquipmentVisualProps) {
+  const deckY = Math.max(.65, (physicalConfigurationDetails(item).elevationMm ?? heightM * 700) / 1000)
   const rodHeight = Math.max(.12, heightM - deckY)
   return <group>
     <ShelfDeck widthM={widthM} depthM={depthM} y={deckY} thickness={.055} />

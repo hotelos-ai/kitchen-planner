@@ -29,6 +29,13 @@ describe('navigation grid', () => {
     expect(() => findRoute(grid, { x: 100, y: 1000 }, { x: 1900, y: 1000 })).toThrow(/unreachable/i)
   })
 
+  it('does not relocate a blocked intended goal to an arbitrary nearby cell', () => {
+    const grid = buildNavGrid(room, 100, { bodyRadiusMm: 0 })
+
+    expect(grid.isWalkable({ x: 950, y: 1050 })).toBe(false)
+    expect(() => findRoute(grid, { x: 100, y: 100 }, { x: 950, y: 1050 })).toThrow(/unreachable/i)
+  })
+
   it('closes bottlenecks narrower than the body diameter or user minimum aisle', () => {
     const bottleneck = structuredClone(room)
     bottleneck.architecture.widthMm = 2400

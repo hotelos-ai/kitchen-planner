@@ -118,4 +118,17 @@ describe('commercial kitchen catalog', () => {
     expect(() => createCatalogEquipmentItem({ catalogId: 'missing', componentId: 'x', position: { xMm: 0, yMm: 0 } })).toThrow(/unknown catalog/i)
     expect(() => createCatalogEquipmentItem({ catalogId: 'hot-six-burner-range', componentId: 'x', position: { xMm: 0, yMm: 0 }, skinId: 'wood-maple' })).toThrow(/skin/i)
   })
+
+  it('initializes a requested physical preset with that preset dimensions and capabilities', () => {
+    const entry = getCatalogEntry('storage-wall-shelf')!
+    const preset = entry.physicalConfigurations.find((candidate) => candidate.id === 'wall-shelf-three-tier')!
+    const item = createCatalogEquipmentItem({
+      catalogId: entry.catalogId,
+      componentId: 'configured-shelf',
+      position: { xMm: 0, yMm: 0 },
+      configurationId: preset.id,
+    })
+
+    expect(item).toMatchObject({ configurationPreset: preset.id, ...preset.dimensions })
+  })
 })

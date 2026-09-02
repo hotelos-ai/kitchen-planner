@@ -2,11 +2,12 @@ import { useEffect, useRef } from 'react'
 import type { PointMm } from '../../domain/project'
 
 export type WorkspaceShortcutOptions = {
+  enabled?: boolean
   selectedIds: readonly string[]
   getSnapMm(): number
   undo(): void
   redo(): void
-  duplicate(id: string): void
+  duplicate(ids: string[]): void
   remove(ids: string[]): void
   nudge(ids: string[], delta: PointMm): void
   rotate(ids: string[], deltaDeg: number): void
@@ -50,9 +51,9 @@ export function useWorkspaceShortcuts(options: WorkspaceShortcutOptions): void {
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
-      if (isWorkspaceShortcutTarget(event.target) && event.key !== 'Escape') return
-
       const current = optionsRef.current
+      if (current.enabled === false || isWorkspaceShortcutTarget(event.target)) return
+
       const key = event.key.toLowerCase()
       const command = event.metaKey || event.ctrlKey
       const selectedIds = [...current.selectedIds]
@@ -70,9 +71,9 @@ export function useWorkspaceShortcuts(options: WorkspaceShortcutOptions): void {
         return
       }
 
-      if (command && key === 'd' && selectedIds[0]) {
+      if (command && key === 'd' && selectedIds.length) {
         event.preventDefault()
-        current.duplicate(selectedIds[0])
+        current.duplicate(selectedIds)
         return
       }
 

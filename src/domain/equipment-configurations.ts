@@ -32,6 +32,7 @@ export type EquipmentConfiguration = {
 export type PhysicalConfigurationDetails = {
   configurationId?: string
   tierCount?: number
+  elevationMm?: number
   mounting: 'floor' | 'wall' | 'overhead' | 'counter' | 'architectural'
   mobile: boolean
 }
@@ -43,6 +44,7 @@ export function physicalConfigurationDetails(item: EquipmentItem): PhysicalConfi
   return {
     ...(configurationId ? { configurationId } : {}),
     ...(preset?.tierCount ? { tierCount: preset.tierCount } : {}),
+    ...(preset?.elevationMm !== undefined ? { elevationMm: preset.elevationMm } : {}),
     mounting: preset?.mounting ?? entry?.placementRules.mounting ?? 'floor',
     mobile: preset?.mobile ?? false,
   }

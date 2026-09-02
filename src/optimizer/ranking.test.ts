@@ -28,13 +28,20 @@ describe('optimizer ranking', () => {
     expect(paretoFinalists([fastest, leastTravel, dominated]).map((item) => item.id)).toEqual(['fastest', 'travel'])
   })
 
-  it('uses the frozen priority deterministically after service viability', () => {
+  it('never lets priority outrank service viability, P90 wait, or backlog', () => {
     const fast = candidate('fast', { p90WaitSeconds: 300, totalTravelMm: 30_000, changeCost: 8 })
     const short = candidate('short', { p90WaitSeconds: 600, totalTravelMm: 5_000, changeCost: 5 })
     const minimal = candidate('minimal', { p90WaitSeconds: 700, totalTravelMm: 10_000, changeCost: 0 })
 
     expect([minimal, short, fast].sort((left, right) => lexicographicCompare(left, right, 'service')).map((item) => item.id)).toEqual(['fast', 'short', 'minimal'])
-    expect([minimal, short, fast].sort((left, right) => lexicographicCompare(left, right, 'travel')).map((item) => item.id)).toEqual(['short', 'minimal', 'fast'])
-    expect([minimal, short, fast].sort((left, right) => lexicographicCompare(left, right, 'minimal-change')).map((item) => item.id)).toEqual(['minimal', 'short', 'fast'])
+    expect([minimal, short, fast].sort((left, right) => lexicographicCompare(left, right, 'travel')).map((item) => item.id)).toEqual(['fast', 'short', 'minimal'])
+    expect([minimal, short, fast].sort((left, right) => lexicographicCompare(left, right, 'minimal-change')).map((item) => item.id)).toEqual(['fast', 'short', 'minimal'])
+
+    const tiedForService = [
+      candidate('travel', { totalTravelMm: 5_000, changeCost: 5 }),
+      candidate('change', { totalTravelMm: 10_000, changeCost: 0 }),
+    ]
+    expect([...tiedForService].sort((left, right) => lexicographicCompare(left, right, 'travel')).map((item) => item.id)).toEqual(['travel', 'change'])
+    expect([...tiedForService].sort((left, right) => lexicographicCompare(left, right, 'minimal-change')).map((item) => item.id)).toEqual(['change', 'travel'])
   })
 })

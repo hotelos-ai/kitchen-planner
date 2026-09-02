@@ -19,12 +19,26 @@
 | Auto-layout | A/B/C are independent permissions with component/architecture locks and hard rules. The cancellable Worker freezes document/revision/scenarios/seeds/budget, uses deterministic seeded multi-item neighborhoods, family substitution, capacity-deficit additions, architecture/opening/storage-zone neighborhoods, canonical deduplication, feasibility filtering, weighted pruning, common/held-out seeds, caches, priority-aware lexicographic/Pareto ranking, and actionable no-feasible diagnostics. Results show baseline, named finalists, service/completion/throughput/travel/congestion/change metrics, manifests, and read-only spatial inspect/compare views. Adoption is stale-safe, single-use, atomic, parented, and one history entry. |
 | Persistence and export | Schema-v0/v1 migrations and schema-v2 validation preserve stable IDs, multiple variant-owned architectures, configurations, skins, profiles, scenarios, settings, locks, active IDs, and adopted experiment manifests. Cross-document references and duplicate architecture IDs are validated. Export normalizes the top-level active-architecture compatibility mirror without mutating the source. Unit and browser round trips pass. |
 
+## Second-pass audit corrections (2026-09-02)
+
+A requirement-level re-audit against the specification found and closed the following gaps after the first completion claim:
+
+- **Single mutation boundary:** the legacy `executeCommand` executor was removed; the application service now routes every mutation and auto-layout run through the store-owned workspace facade, reads scenario/layout data from the requested variant's own architecture, and advertises only strict variant-targeted operations (`e90f5dc`).
+- **Catalog preset semantics:** `createCatalogEquipmentItem` now derives dimensions, capabilities, clearance, and station capacity from the selected physical preset (not the base entry); preset dimensions are clamped to the entry's supported range. Wall/overhead presets carry explicit mounting heights (hand sink 850 mm, salamander 1200 mm, table overshelf 1 450 mm, wall storage ≥1 500 mm, overhead storage ≥2 000 mm), and floor-obstacle behavior follows the preset's walk-under clearance with entry-level fallback for presetless items.
+- **Navigation semantics:** `findRoute` no longer silently relocates a blocked goal to an arbitrary nearby cell; station approach points are offset by the body-radius/aisle-aware clearance; wall openings (service windows, doors) resolve through an explicit bounded nearest-walkable relocation (`resolveNominalGoal`) because their interior markers legitimately sit inside clearance bands and station footprints.
+- **Hard feasibility:** candidates are rejected for hard violations they introduce relative to the frozen baseline; pre-existing baseline violations remain diagnosable but do not disqualify the reference layout. Absolute rejection made the seeded Manta Raja kitchen infeasible and contradicted the required baseline-plus-finalists presentation.
+- **Ranking:** service viability (unfinished orders, P90 wait, backlog) strictly outranks the run's priority key in every lexicographic order.
+- **Atomic editor operations:** closing a layout tab and duplicating a multi-selection now commit as single workspace-operation revisions (one undo entry), with revision-guarded tab-close Undo.
+- **Shortcut scoping:** editing shortcuts are enabled only in Plan/3D/Split views; all workspace chunks preload at startup so a Suspense transition can never leave stale shortcut handlers active.
+- **Viewport fit:** the Plan and 3D workspace sections now use explicit `minmax(0, 1fr)` column tracks, and the 2D stage treats its size floors as zero-guards; the narrow-viewport canvas previously exceeded the phone viewport (631 px and 436 px wide at 390 px) and is now pixel-exact.
+- **New coverage:** WebGL context-guard native events, rendered first-person hands behavior, real simulation Walk spawn integration, storage visual elevation model, seeded large-neighborhood determinism, and shortcut enable/disable scoping.
+
 ## Final verification
 
-- `pnpm test`: 89 files, 443 tests passed.
+- `pnpm test`: 93 files, 465 tests passed.
 - `pnpm run lint`: passed with 0 errors and the existing 5 Fast Refresh warnings.
 - `pnpm run build`: TypeScript and production Vite build passed.
 - `pnpm run e2e`: 11 Chromium scenarios passed.
-- Visual inspection: Plan at 1440×900 and 390×844, plus overview 3D at 1440×900; no clipping or unusable control/canvas state found.
+- Visual verification: DOM-measured layout at 1440×900 and 390×844 across Plan and 3D — zero horizontal/vertical overflow, canvases exactly within viewports, non-overlapping visible drawers, narrow-viewport drawers closed by default, working toggles, and zero console errors.
 - `git diff --check`: passed.
 - Tracked prohibited-identity search: no matches.

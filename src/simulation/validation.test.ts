@@ -1,9 +1,18 @@
 import { describe, expect, it } from 'vitest'
 import { createSeedProject } from '../domain/seed-project'
+import { createCatalogEquipmentItem, getCatalogEntry } from '../domain/catalog/kitchen-catalog'
 import { evaluateOperationalRequirements } from '../domain/requirements/operational-requirements'
-import { validateSimulationInput } from './validation'
+import { physicalStationCapacity, validateSimulationInput } from './validation'
 
 describe('simulation input validation', () => {
+  it('derives physical station capacity from the selected catalog preset', () => {
+    const entry = getCatalogEntry('prep-work-table')!
+    const preset = entry.physicalConfigurations.at(-1)!
+    const item = createCatalogEquipmentItem({ catalogId: entry.catalogId, componentId: 'configured-prep', position: { xMm: 0, yMm: 0 }, configurationId: preset.id })
+
+    expect(physicalStationCapacity(item)).toBe(Math.max(1, preset.capacity.workPositions))
+  })
+
   it('accepts the seeded Manta Raja scenario', () => {
     const project = createSeedProject()
     expect(validateSimulationInput({ architecture: project.architecture, equipment: project.variants[0].equipment, scenario: project.scenarios[0] })).toEqual([])

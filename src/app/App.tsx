@@ -13,6 +13,12 @@ const AutoLayoutWorkspace = lazy(() => import('../features/optimizer/AutoLayoutW
 
 export type WorkspaceView = 'plan' | 'scene' | 'split' | 'simulate' | 'compare' | 'auto-layout'
 
+void Promise.all([
+  import('../features/simulation/SimulationWorkspace'),
+  import('../features/compare/CompareWorkspace'),
+  import('../features/optimizer/AutoLayoutWorkspace'),
+])
+
 const VIEW_LABELS: Record<WorkspaceView, string> = {
   plan: 'Plan',
   scene: '3D',
@@ -72,7 +78,7 @@ export function App() {
               data-workspace-surface="plan"
               aria-hidden={view !== 'plan' && view !== 'split'}
             >
-              <PlanWorkspace compact={view === 'split'} onInspectComponentIn3D={() => setView('scene')} />
+              <PlanWorkspace compact={view === 'split'} shortcutEnabled={view === 'plan' || view === 'scene' || view === 'split'} onInspectComponentIn3D={() => setView('scene')} />
             </div>
             <div
               className={`workspace-surface scene-surface${view === 'scene' || view === 'split' ? ' active' : ''}`}

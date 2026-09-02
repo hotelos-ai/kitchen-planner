@@ -35,7 +35,12 @@ export function SimulationWorkspace({ store = projectStore, run = runSimulation,
     layoutConstraints: variant.layoutConstraints,
   }), [scenario, variant.architecture, variant.equipment, variant.layoutConstraints])
   const hasValidationErrors = validationErrors.length > 0
-  const simulationInput = useMemo(() => ({ architecture: variant.architecture, equipment: variant.equipment, scenario }), [scenario, variant.architecture, variant.equipment])
+  const simulationInput = useMemo(() => ({
+    architecture: variant.architecture,
+    equipment: variant.equipment,
+    scenario,
+    layoutConstraints: variant.layoutConstraints,
+  }), [scenario, variant.architecture, variant.equipment, variant.layoutConstraints])
   const session = useSimulationSession({ input: simulationInput, run })
   const { result, liveState, elapsedSeconds, playing, speed } = session
 

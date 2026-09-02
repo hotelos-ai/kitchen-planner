@@ -127,13 +127,17 @@ export function createPhysicalConfigurationPresets(input: {
   capacity: z.infer<typeof catalogCapacitySchema>
   clearance: z.infer<typeof catalogClearanceSchema>
   mounting: z.infer<typeof placementRulesSchema>['mounting']
+  mountingHeightMm?: number
   tags: readonly string[]
 }) {
   return input.configurationIds.map((id, index) => {
     const ratio = index / Math.max(1, input.configurationIds.length - 1)
-    const dimension = (axis: keyof CatalogDimensions) => Math.round(
-      (input.typicalDimensions[axis] + (input.maximumDimensions[axis] - input.typicalDimensions[axis]) * ratio) / 10,
-    ) * 10
+    const dimension = (axis: keyof CatalogDimensions) => {
+      const interpolated = Math.round(
+        (input.typicalDimensions[axis] + (input.maximumDimensions[axis] - input.typicalDimensions[axis]) * ratio) / 10,
+      ) * 10
+      return Math.max(input.typicalDimensions[axis], Math.min(input.maximumDimensions[axis], interpolated))
+    }
     const tierToken = id.split('-').find((token) => numberWords[token] !== undefined || /^\d+$/.test(token))
     const tierCount = tierToken ? numberWords[tierToken] ?? Number(tierToken) : undefined
     return {
@@ -146,7 +150,8 @@ export function createPhysicalConfigurationPresets(input: {
       mounting: input.mounting,
       mobile: input.tags.includes('mobile') || id.includes('mobile'),
       ...(tierCount ? { tierCount } : {}),
-      ...(input.mounting === 'wall' || input.mounting === 'overhead' ? { elevationMm: input.typicalDimensions.heightMm } : {}),
+      ...(input.mounting === 'wall' ? { elevationMm: Math.max(input.mountingHeightMm ?? 1_500, input.typicalDimensions.heightMm) } : {}),
+      ...(input.mounting === 'overhead' ? { elevationMm: Math.max(input.mountingHeightMm ?? 2_000, input.typicalDimensions.heightMm) } : {}),
     }
   })
 }

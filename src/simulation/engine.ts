@@ -1,7 +1,7 @@
 import type { EquipmentItem, PointMm, StaffRole } from '../domain/project'
 import { pointInPolygon, rotatedFootprint } from '../domain/geometry'
 import { doorSwingEnvelopes, UNKNOWN_PROFESSIONAL_CONSTRAINTS } from '../domain/layout-diagnostics'
-import { buildNavGrid, findRoute, routeDistanceMm, stationApproachPoints } from './nav-grid'
+import { buildNavGrid, findRoute, navigationApproachOffsetMm, resolveNominalGoal, routeDistanceMm, stationApproachPoints } from './nav-grid'
 import { aggregateMetrics } from './metrics'
 import { createRng } from './rng'
 import { generateServiceTasks } from './tasks'
@@ -103,10 +103,11 @@ export function runSimulation(input: SimulationInput): SimulationRunResult {
   const validationErrors = validateSimulationInput(input)
   if (validationErrors.length) throw new Error(`Simulation input is invalid: ${validationErrors.map((validationError) => validationError.code).join(', ')}`)
   const equipment = input.equipment.map((item) => structuredClone(item))
-  const grid = buildNavGrid({ architecture: input.architecture, equipment, layoutConstraints: input.layoutConstraints }, 100, {
+  const navigationClearance = {
     bodyRadiusMm: input.navigationBodyRadiusMm,
     minimumAisleMm: input.layoutConstraints?.minimumAisleMm,
-  })
+  }
+  const grid = buildNavGrid({ architecture: input.architecture, equipment, layoutConstraints: input.layoutConstraints }, 100, navigationClearance)
   const rng = createRng(input.scenario.seed)
   const windowStations = serviceWindowStations(input)
   const stations = [...equipment, ...windowStations]
@@ -122,8 +123,12 @@ export function runSimulation(input: SimulationInput): SimulationRunResult {
   const taskFinished = new Map<string, number>()
   const stationAvailable = new Map<string, number[]>()
   const stationById = new Map(stations.map((item) => [item.id, item]))
-  const stationGoals = new Map(stations.map((item) => [item.id, stationApproachPoints(item)]))
-  windowStations.forEach((station) => stationGoals.set(station.id, [openingInteriorPoint(input, station.id)]))
+  const stationApproachOffsetMm = navigationApproachOffsetMm(navigationClearance, input.layoutConstraints?.minimumAisleMm, 100)
+  const stationGoals = new Map(stations.map((item) => [item.id, stationApproachPoints(item, undefined, stationApproachOffsetMm)]))
+  windowStations.forEach((station) => {
+    const nominal = openingInteriorPoint(input, station.id)
+    stationGoals.set(station.id, [resolveNominalGoal(grid, nominal) ?? nominal])
+  })
   const routeCache = new Map<string, PointMm[] | null>()
   const taskById = new Map(tasks.map((task) => [task.id, task]))
   const hasSuccessor = new Set(tasks.flatMap((task) => task.predecessorId ? [task.predecessorId] : []))

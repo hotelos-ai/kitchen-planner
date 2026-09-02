@@ -10,7 +10,7 @@ import type {
   StaffRole,
   StationCapability,
 } from '../project'
-import { buildNavGrid, findRoute, stationApproachPoints } from '../../simulation/nav-grid'
+import { buildNavGrid, findRoute, navigationApproachOffsetMm, resolveNominalGoal, stationApproachPoints } from '../../simulation/nav-grid'
 
 export type OperationalRequirementSeverity = 'blocker' | 'warning' | 'professional-review'
 
@@ -192,16 +192,21 @@ const routeDefinition: OperationalRequirementDefinition = {
     try {
       const grid = buildNavGrid(input, 100)
       const start = openingPoint(input.architecture, entry)
+      const approachOffsetMm = navigationApproachOffsetMm({}, input.layoutConstraints?.minimumAisleMm, 100)
       const evidence: RequirementEvidence[] = []
       stations.forEach((station) => {
         try {
-          const goals = stationApproachPoints(station)
+          const goals = stationApproachPoints(station, undefined, approachOffsetMm)
           if (!goals.some((goal) => { try { findRoute(grid, start, goal); return true } catch { return false } })) throw new Error('unreachable')
         }
         catch { evidence.push({ reason: `${station.label} cannot be reached from the staff entry on the modeled circulation grid.`, itemIds: [station.id] }) }
       })
       openings.forEach((opening) => {
-        try { findRoute(grid, start, openingPoint(input.architecture, opening)) }
+        try {
+          const goal = resolveNominalGoal(grid, openingPoint(input.architecture, opening))
+          if (!goal) throw new Error('unreachable')
+          findRoute(grid, start, goal)
+        }
         catch { evidence.push({ reason: `${opening.label} cannot be reached from the staff entry on the modeled circulation grid.`, itemIds: [opening.id] }) }
       })
       return evidence

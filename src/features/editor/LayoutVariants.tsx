@@ -5,7 +5,8 @@ import type { ProjectStore } from '../../state/project-store'
 export type ClosedLayout = {
   id: string
   name: string
-  undo(): void
+  revision: number
+  undo(): boolean
 }
 
 type Props = {
@@ -72,12 +73,26 @@ export function LayoutVariants({ store, onAdd, onClosed }: Props) {
     if (!closing) return
     const nearest = project.variants[index + 1] ?? project.variants[index - 1]
     pendingFocusId.current = nearest?.id ?? null
-    store.getState().deleteVariant(id)
-    if (store.getState().project.variants.some((variant) => variant.id === id)) {
+    const result = store.getState().applyWorkspaceOperations([
+      { type: 'remove_layout', variantId: id },
+      { type: 'activate_layout', variantId: nearest.id },
+    ], 'Close layout')
+    if (!result.ok) {
       pendingFocusId.current = null
       return
     }
-    onClosed?.({ id: closing.id, name: closing.name, undo: () => store.getState().undo() })
+    store.getState().clearSelection()
+    const revision = store.getState().revision
+    onClosed?.({
+      id: closing.id,
+      name: closing.name,
+      revision,
+      undo: () => {
+        if (store.getState().revision !== revision) return false
+        store.getState().undo()
+        return true
+      },
+    })
   }
 
   const add = () => {

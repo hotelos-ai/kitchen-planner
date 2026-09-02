@@ -1,12 +1,13 @@
-import { act, render, screen } from '@testing-library/react'
+import { act, fireEvent, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createSeedProject } from '../../domain/seed-project'
 import { createProjectStore, getActiveItem, projectStore } from '../../state/project-store'
 import { PlanWorkspace } from './PlanWorkspace'
 
 describe('plan workspace', () => {
   beforeEach(() => projectStore.getState().replaceProject(createSeedProject()))
+  afterEach(() => vi.unstubAllGlobals())
 
   it('selects an item and exposes editable dimensions in the inspector', async () => {
     const user = userEvent.setup()
@@ -73,6 +74,23 @@ describe('plan workspace', () => {
     expect(screen.getByRole('button', { name: /Select Rice warmer copy/i })).toBeInTheDocument()
   })
 
+  it('duplicates the complete multi-selection in one workspace revision', () => {
+    const store = createProjectStore(createSeedProject())
+    const before = store.getState().project.variants[0].equipment
+    const sourceIds = before.slice(0, 2).map((item) => item.id)
+    store.getState().selectItems(sourceIds)
+    render(<PlanWorkspace store={store} showCanvas={false} />)
+
+    fireEvent.keyDown(window, { key: 'd', ctrlKey: true })
+
+    const state = store.getState()
+    expect(state.project.variants[0].equipment).toHaveLength(before.length + 2)
+    expect(state.selectedIds).toHaveLength(2)
+    expect(state.selectedIds).not.toEqual(sourceIds)
+    expect(state.past).toHaveLength(1)
+    expect(state.revision).toBe(1)
+  })
+
   it('opens the layout wizard and atomically switches to its new variant', async () => {
     const user = userEvent.setup()
     render(<PlanWorkspace showCanvas={false} />)
@@ -107,6 +125,16 @@ describe('plan workspace', () => {
     expect(inspectorDrawer).toHaveAttribute('aria-hidden', 'true')
   })
 
+  it('starts narrow overlay drawers closed while retaining desktop-open defaults', () => {
+    vi.stubGlobal('matchMedia', vi.fn(() => ({ matches: true })))
+    const { container } = render(<PlanWorkspace showCanvas={false} />)
+
+    expect(screen.getByRole('button', { name: 'Toggle equipment catalog' })).toHaveAttribute('aria-pressed', 'false')
+    expect(screen.getByRole('button', { name: 'Toggle inspector' })).toHaveAttribute('aria-pressed', 'false')
+    expect(container.querySelector('[data-editor-drawer="catalog"]')).toHaveAttribute('aria-hidden', 'true')
+    expect(container.querySelector('[data-editor-drawer="inspector"]')).toHaveAttribute('aria-hidden', 'true')
+  })
+
   it('opens operational essentials from the workspace toolbar', async () => {
     const user = userEvent.setup()
     render(<PlanWorkspace showCanvas={false} />)
@@ -123,6 +151,7 @@ describe('plan workspace', () => {
     render(<PlanWorkspace showCanvas={false} />)
     await user.click(screen.getByRole('button', { name: /Select Tandoor/i }))
     await user.click(screen.getByRole('button', { name: 'Check essentials' }))
+    ;(document.activeElement as HTMLElement).blur()
 
     await user.keyboard('{Escape}')
 

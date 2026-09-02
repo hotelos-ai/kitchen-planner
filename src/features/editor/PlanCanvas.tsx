@@ -40,7 +40,7 @@ export function PlanCanvas({ store, showReference, onInspectComponentIn3D, onCom
   useLayoutEffect(() => {
     const element = containerRef.current
     if (!element) return
-    const update = () => setSize({ width: Math.max(360, element.clientWidth), height: Math.max(560, element.clientHeight) })
+    const update = () => setSize({ width: element.clientWidth || 360, height: element.clientHeight || 560 })
     update()
     const observer = new ResizeObserver(update)
     observer.observe(element)

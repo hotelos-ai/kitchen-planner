@@ -19,6 +19,20 @@ export type IntendedApproachFace = CatalogEntry['intendedApproachFace']
 // legacy traced layouts. New planning rules can supply the actual body radius.
 export const DEFAULT_NAVIGATION_BODY_RADIUS_MM = 50
 
+export const navigationObstacleClearanceMm = (
+  clearance: NavigationClearance = {},
+  configuredMinimumAisleMm = 0,
+) => Math.max(
+  Math.max(0, clearance.bodyRadiusMm ?? DEFAULT_NAVIGATION_BODY_RADIUS_MM),
+  Math.max(0, clearance.minimumAisleMm ?? configuredMinimumAisleMm) / 2,
+)
+
+export const navigationApproachOffsetMm = (
+  clearance: NavigationClearance = {},
+  configuredMinimumAisleMm = 0,
+  cellSizeMm = 100,
+) => Math.max(150, navigationObstacleClearanceMm(clearance, configuredMinimumAisleMm) + cellSizeMm / 2)
+
 const rectPolygon = (rect: RectMm): PointMm[] => [
   { x: rect.xMm, y: rect.yMm },
   { x: rect.xMm + rect.widthMm, y: rect.yMm },
@@ -76,9 +90,7 @@ export function buildNavGrid(input: GridInput, cellSizeMm = 100, clearance: Navi
   const blocked = new Set<string>()
   const key = (cell: NavCell) => `${cell.x},${cell.y}`
   const toPointMm = (cell: NavCell) => ({ x: cell.x * cellSizeMm + cellSizeMm / 2, y: cell.y * cellSizeMm + cellSizeMm / 2 })
-  const bodyRadiusMm = Math.max(0, clearance.bodyRadiusMm ?? DEFAULT_NAVIGATION_BODY_RADIUS_MM)
-  const minimumAisleMm = Math.max(0, clearance.minimumAisleMm ?? input.layoutConstraints?.minimumAisleMm ?? 0)
-  const obstacleClearanceMm = Math.max(bodyRadiusMm, minimumAisleMm / 2)
+  const obstacleClearanceMm = navigationObstacleClearanceMm(clearance, input.layoutConstraints?.minimumAisleMm)
   const equipmentPolygons = input.equipment.filter(isFloorObstacle).map(rotatedFootprint)
   const pillarPolygons = input.architecture.pillars.map(rectPolygon)
   const noGoPolygons = (input.layoutConstraints?.noGoZones ?? []).map(rectPolygon)
@@ -110,9 +122,26 @@ export function buildNavGrid(input: GridInput, cellSizeMm = 100, clearance: Navi
   }
 }
 
-export function findRoute(grid: NavGrid, startMm: PointMm, goalMm: PointMm): PointMm[] {
-  const start = grid.nearestWalkable(grid.toCell(startMm))
-  const goal = grid.nearestWalkable(grid.toCell(goalMm))
+export const NOMINAL_GOAL_RELOCATION_MM = 900
+
+export function resolveNominalGoal(grid: NavGrid, pointMm: PointMm, maxRelocationMm = NOMINAL_GOAL_RELOCATION_MM): PointMm | undefined {
+  if (grid.isWalkable(pointMm)) return pointMm
+  const origin = grid.toCell(pointMm)
+  const maxRadius = Math.max(0, Math.floor(maxRelocationMm / grid.cellSizeMm))
+  for (let radius = 1; radius <= maxRadius; radius += 1) {
+    for (let y = origin.y - radius; y <= origin.y + radius; y += 1) {
+      for (let x = origin.x - radius; x <= origin.x + radius; x += 1) {
+        const onRing = Math.abs(x - origin.x) === radius || Math.abs(y - origin.y) === radius
+        if (onRing && grid.isWalkable(grid.toPointMm({ x, y }))) return grid.toPointMm({ x, y })
+      }
+    }
+  }
+  return undefined
+}
+
+export function findRoute(grid: NavGrid, startMm: PointMm, goalMm: PointMm): PointMm[] {  const start = grid.nearestWalkable(grid.toCell(startMm))
+  if (!grid.isWalkable(goalMm)) throw new Error('Required station is unreachable')
+  const goal = grid.toCell(goalMm)
   const frontier: { cell: NavCell; priority: number }[] = [{ cell: start, priority: 0 }]
   const cameFrom = new Map<string, NavCell>()
   const cost = new Map<string, number>([[grid.key(start), 0]])

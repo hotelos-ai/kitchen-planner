@@ -7,8 +7,8 @@ type OptimizerPriority = 'balanced' | 'service' | 'travel' | 'minimal-change'
 const orders: Record<OptimizerPriority, Array<keyof OptimizerScore>> = {
   balanced: ['unfinishedOrders', 'p90WaitSeconds', 'peakBacklog', 'totalTravelMm', 'congestionEvents', 'changeCost'],
   service: ['unfinishedOrders', 'p90WaitSeconds', 'peakBacklog', 'congestionEvents', 'totalTravelMm', 'changeCost'],
-  travel: ['unfinishedOrders', 'totalTravelMm', 'p90WaitSeconds', 'peakBacklog', 'congestionEvents', 'changeCost'],
-  'minimal-change': ['unfinishedOrders', 'changeCost', 'p90WaitSeconds', 'peakBacklog', 'totalTravelMm', 'congestionEvents'],
+  travel: ['unfinishedOrders', 'p90WaitSeconds', 'peakBacklog', 'totalTravelMm', 'congestionEvents', 'changeCost'],
+  'minimal-change': ['unfinishedOrders', 'p90WaitSeconds', 'peakBacklog', 'changeCost', 'totalTravelMm', 'congestionEvents'],
 }
 
 export function lexicographicCompare(left: RankedCandidate, right: RankedCandidate, priority: OptimizerPriority = 'balanced'): number {

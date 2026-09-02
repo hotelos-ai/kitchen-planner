@@ -50,7 +50,7 @@ describe('useWorkspaceShortcuts', () => {
     fireEvent.keyDown(window, { key: '[' })
     fireEvent.keyDown(window, { key: ']' })
 
-    expect(options.duplicate).toHaveBeenCalledWith('range-1')
+    expect(options.duplicate).toHaveBeenCalledWith(['range-1', 'prep-1'])
     expect(options.remove).toHaveBeenNthCalledWith(1, ['range-1', 'prep-1'])
     expect(options.remove).toHaveBeenNthCalledWith(2, ['range-1', 'prep-1'])
     expect(options.rotate).toHaveBeenNthCalledWith(1, ['range-1', 'prep-1'], -90)
@@ -116,10 +116,29 @@ describe('useWorkspaceShortcuts', () => {
     fireEvent.keyDown(target!, { key: 'z', ctrlKey: true })
     fireEvent.keyDown(target!, { key: 'Delete' })
     fireEvent.keyDown(target!, { key: ']' })
+    fireEvent.keyDown(target!, { key: 'Escape' })
 
     expect(options.undo).not.toHaveBeenCalled()
     expect(options.remove).not.toHaveBeenCalled()
     expect(options.rotate).not.toHaveBeenCalled()
+    expect(options.clearSelection).not.toHaveBeenCalled()
+  })
+
+  it('does not handle shortcuts while the workspace mode is disabled', () => {
+    const options = makeOptions({ enabled: false })
+    render(<Harness options={options} />)
+
+    fireEvent.keyDown(window, { key: 'z', ctrlKey: true })
+    fireEvent.keyDown(window, { key: 'd', ctrlKey: true })
+    fireEvent.keyDown(window, { key: 'Delete' })
+    fireEvent.keyDown(window, { key: 'ArrowRight' })
+    fireEvent.keyDown(window, { key: 'Escape' })
+
+    expect(options.undo).not.toHaveBeenCalled()
+    expect(options.duplicate).not.toHaveBeenCalled()
+    expect(options.remove).not.toHaveBeenCalled()
+    expect(options.nudge).not.toHaveBeenCalled()
+    expect(options.clearSelection).not.toHaveBeenCalled()
   })
 
   it('does not intercept selection commands when nothing is selected', () => {

@@ -2,7 +2,7 @@ import { pointInPolygon, polygonsOverlap, rotatedFootprint } from '../domain/geo
 import { isFloorObstacle } from '../domain/catalog/floor-obstacle'
 import { analyzeLayout, doorSwingEnvelopes } from '../domain/layout-diagnostics'
 import type { Architecture, EquipmentItem, LayoutVariant, Opening, PointMm, RectMm, StationCapability } from '../domain/project'
-import { buildNavGrid, stationApproachPoints } from '../simulation/nav-grid'
+import { buildNavGrid, navigationApproachOffsetMm, stationApproachPoints } from '../simulation/nav-grid'
 import { physicalStationCapacity } from '../simulation/validation'
 import type { OptimizerManifest } from './types'
 
@@ -91,9 +91,13 @@ const reachableStationIds = (variant: LayoutVariant, manifest: OptimizerManifest
   })
   const existing = reachabilityCache.get(variant)?.get(cacheKey)
   if (existing) return existing
-  const stations = variant.equipment.filter((item) => item.capabilities.length > 0 && stationApproachPoints(item).length > 0)
-  if (!stations.length) return new Set()
   const clearanceMm = Math.max(manifest.hardRules.bodyRadiusMm ?? 50, manifest.hardRules.minimumAisleMm / 2)
+  const approachOffsetMm = navigationApproachOffsetMm({
+    bodyRadiusMm: manifest.hardRules.bodyRadiusMm,
+    minimumAisleMm: manifest.hardRules.minimumAisleMm,
+  }, manifest.hardRules.minimumAisleMm, 100)
+  const stations = variant.equipment.filter((item) => item.capabilities.length > 0 && stationApproachPoints(item, undefined, approachOffsetMm).length > 0)
+  if (!stations.length) return new Set()
   const entry = variant.architecture.openings.find((opening) => opening.kind === 'door' && opening.flow === 'entry')
   const start = entry ? openingInteriorPoint(variant.architecture, entry, clearanceMm + 50) : {
     x: variant.architecture.roomPolygon.reduce((sum, point) => sum + point.x, 0) / variant.architecture.roomPolygon.length,
@@ -119,9 +123,8 @@ const reachableStationIds = (variant: LayoutVariant, manifest: OptimizerManifest
       })
     }
     stations.forEach((station) => {
-      const canReach = stationApproachPoints(station).some((goal) => {
-        try { return connected.has(grid.key(grid.nearestWalkable(grid.toCell(goal)))) } catch { return false }
-      })
+      const canReach = stationApproachPoints(station, undefined, approachOffsetMm)
+        .some((goal) => grid.isWalkable(goal) && connected.has(grid.key(grid.toCell(goal))))
       if (canReach) reachable.add(station.id)
     })
   } catch { /* No station is reachable on an unusable grid. */ }
@@ -211,7 +214,7 @@ export function checkCandidateFeasibility(baseline: LayoutVariant, candidate: La
 
   const baselineDoorOverlaps = doorOverlapIds(baseline)
   const candidateDoorOverlaps = doorOverlapIds(candidate)
-  if ([...candidateDoorOverlaps].some((id) => !baselineDoorOverlaps.has(id))) add('door-swing-overlap', 'Equipment overlaps a modeled door swing.')
+  if ([...candidateDoorOverlaps].some((id) => !baselineDoorOverlaps.has(id))) add('door-swing-overlap', 'Equipment newly overlaps a modeled door swing.')
 
   Object.entries(manifest.hardRules.requiredCapacityByCapability ?? {}).forEach(([capability, required]) => {
     const actual = capabilityCapacity(candidate.equipment, capability as StationCapability)
@@ -221,7 +224,7 @@ export function checkCandidateFeasibility(baseline: LayoutVariant, candidate: La
   const baselineReachable = reachableStationIds(baseline, manifest)
   const candidateReachable = reachableStationIds(candidate, manifest)
   candidate.equipment.filter((item) => item.capabilities.length > 0).forEach((station) => {
-    if (baselineReachable.has(station.id) && !candidateReachable.has(station.id)) add('station-unreachable', `Station ${station.label} is unreachable with the frozen circulation clearances.`)
+    if (baselineReachable.has(station.id) && !candidateReachable.has(station.id)) add('station-unreachable', `Station ${station.label} became unreachable with the frozen circulation clearances.`)
   })
 
   return { feasible: codes.length === 0, codes, reasons }

@@ -11,9 +11,27 @@ const manifest = (tier: 'A' | 'B' | 'C', lockedComponentIds: string[] = []): Opt
 })
 
 describe('candidate feasibility', () => {
-  it('accepts the frozen baseline when it does not introduce a new hard violation', () => {
-    const baseline = createSeedProject().variants[0]
-    expect(checkCandidateFeasibility(baseline, baseline, manifest('A'))).toEqual({ feasible: true, codes: [], reasons: [] })
+  it('always accepts the frozen baseline itself, even with pre-existing hard violations', () => {
+    const baseline = simpleVariant()
+    expect(checkCandidateFeasibility(baseline, baseline, { ...manifest('A'), hardRules: { minimumAisleMm: 0, noGoZones: [] } })).toEqual({ feasible: true, codes: [], reasons: [] })
+
+    const cluttered = simpleVariant()
+    cluttered.equipment.push(item('clearance-blocker', 500, 1000))
+    expect(checkCandidateFeasibility(cluttered, cluttered, manifest('A')).codes).not.toContain('clearance-obstructed')
+  })
+
+  it('rejects candidates that introduce a new clearance or door-swing violation', () => {
+    const clearanceBaseline = simpleVariant()
+    const clearanceCandidate = structuredClone(clearanceBaseline)
+    clearanceCandidate.equipment.push(item('clearance-blocker', 500, 1000))
+    expect(checkCandidateFeasibility(clearanceBaseline, clearanceCandidate, manifest('A')).codes).toContain('clearance-obstructed')
+
+    const doorBaseline = simpleVariant()
+    const doorCandidate = structuredClone(doorBaseline)
+    doorCandidate.architecture.openings = [{
+      id: 'door', label: 'Door', kind: 'door', wall: 'top', offsetMm: 500, widthMm: 500, flow: 'entry', swingDepthMm: 1200,
+    }]
+    expect(checkCandidateFeasibility(doorBaseline, doorCandidate, manifest('A')).codes).toContain('door-swing-overlap')
   })
 
   it('enforces locks before scoring', () => {
@@ -94,6 +112,10 @@ describe('candidate feasibility', () => {
     })
     expect(result.codes).toContain('station-unreachable')
     expect(result.reasons.join(' ')).toMatch(/station/i)
+    expect(checkCandidateFeasibility(blocked, blocked, {
+      ...manifest('B'),
+      hardRules: { minimumAisleMm: 400, bodyRadiusMm: 200, noGoZones: [] },
+    }).codes).not.toContain('station-unreachable')
   })
 
   it('enforces intrinsic move, dimension, removal and exact architecture-element locks', () => {

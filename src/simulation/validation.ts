@@ -31,7 +31,10 @@ const error = (code: string, message: string, itemIds: string[], details: Partia
 
 export const physicalStationCapacity = (item: EquipmentItem): number => {
   const catalog = item.catalogId ? getCatalogEntry(item.catalogId) : undefined
-  if (catalog) return Math.max(1, catalog.capacity.workPositions)
+  if (catalog) {
+    const configured = catalog.physicalConfigurations.find((preset) => preset.id === item.configurationPreset)
+    return Math.max(1, (configured ?? catalog).capacity.workPositions)
+  }
   return Math.max(1, Math.floor(item.widthMm / 600))
 }
 

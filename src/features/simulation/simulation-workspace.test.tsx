@@ -41,16 +41,20 @@ describe('simulation workspace', () => {
     expect(run).toHaveBeenCalledOnce()
   })
 
-  it('validates and runs the active variant architecture rather than the compatibility mirror', async () => {
+  it('validates and runs the active variant architecture and layout constraints rather than the compatibility mirror', async () => {
     const project = createSeedProject()
     project.architecture.wallHeightMm = 2100
     project.variants[0].architecture.wallHeightMm = 4700
+    project.variants[0].layoutConstraints = { minimumAisleMm: 0, noGoZones: [] }
     const store = createProjectStore(project)
     const run = vi.fn(runSimulation)
 
     render(<SimulationWorkspace store={store} run={run} />)
     await userEvent.click(screen.getByRole('button', { name: /Run 60-minute service/i }))
 
-    expect(run).toHaveBeenCalledWith(expect.objectContaining({ architecture: expect.objectContaining({ wallHeightMm: 4700 }) }))
+    expect(run).toHaveBeenCalledWith(expect.objectContaining({
+      architecture: expect.objectContaining({ wallHeightMm: 4700 }),
+      layoutConstraints: { minimumAisleMm: 0, noGoZones: [] },
+    }))
   })
 })

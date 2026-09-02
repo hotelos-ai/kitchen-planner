@@ -2,14 +2,14 @@ import { useFrame, useThree } from '@react-three/fiber'
 import { useEffect, useRef } from 'react'
 import type { Group } from 'three'
 import type { WalkPlayerPose } from './types'
-import { firstPersonViewModel, type FirstPersonPartTransform } from './first-person-view-model'
+import { firstPersonViewModel, type FirstPersonPartTransform, type FirstPersonViewModel } from './first-person-view-model'
 import { SpatulaModel } from './SpatulaModel'
 import { walkActionForKeyboardEvent, walkActionForPrimaryPointerEvent } from './walk-input'
 
 type HandsPose = Pick<WalkPlayerPose, 'locomotion' | 'grounded' | 'verticalVelocityMps'>
 
 const applyTransform = (group: Group | null, transform: FirstPersonPartTransform) => {
-  if (!group) return
+  if (!group?.position?.set || !group.rotation?.set) return
   group.position.set(...transform.position)
   group.rotation.set(...transform.rotation)
 }
@@ -32,7 +32,11 @@ function HandModel({ dominant = false }: { dominant?: boolean }) {
   </group>
 }
 
-export function FirstPersonHands({ pose, reducedMotion = false }: { pose?: HandsPose; reducedMotion?: boolean }) {
+export function FirstPersonHands({ pose, reducedMotion = false, onViewModelChange }: {
+  pose?: HandsPose
+  reducedMotion?: boolean
+  onViewModelChange?(model: FirstPersonViewModel): void
+}) {
   const anchor = useRef<Group>(null)
   const root = useRef<Group>(null)
   const supportHand = useRef<Group>(null)
@@ -78,7 +82,8 @@ export function FirstPersonHands({ pose, reducedMotion = false }: { pose?: Hands
       reducedMotion,
       swingStartedAtSeconds: swingStartedAtSeconds.current,
     })
-    if (anchor.current) {
+    onViewModelChange?.(model)
+    if (anchor.current?.position?.copy && anchor.current.quaternion?.copy) {
       anchor.current.position.copy(camera.position)
       anchor.current.quaternion.copy(camera.quaternion)
     }
