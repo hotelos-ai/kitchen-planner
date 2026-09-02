@@ -51,7 +51,7 @@ describe('simulation 3D recovery', () => {
         result={result}
         liveState={liveState}
         elapsedSeconds={900}
-        layers={{ heatmap: true, trails: true, queues: true, clearances: false, flows: true }}
+        layers={{ heatmap: true, trails: true, queues: true, clearances: false, flows: true, labels: true }}
         followRole="overview"
         onExitWalk={onExitWalk}
         webglSupported

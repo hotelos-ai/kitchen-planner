@@ -50,7 +50,7 @@ describe('project exchange', () => {
     await userEvent.click(screen.getByRole('button', { name: /Export all layouts/i }))
     expect(createObjectURL).toHaveBeenCalledOnce()
     expect(exportedBlob).toBeInstanceOf(Blob)
-    expect(clickedDownload).toBe('manta-raja-kitchen-lab.json')
+    expect(clickedDownload).toBe('hotelos-kitchen-planner.json')
     expect(screen.getByRole('status')).toHaveTextContent(/all layouts exported/i)
   })
 

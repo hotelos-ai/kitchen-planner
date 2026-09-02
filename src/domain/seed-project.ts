@@ -40,7 +40,7 @@ function equipment(
     xMm,
     yMm,
     rotationDeg: options.rotationDeg ?? 0,
-    dimensionsLocked: true,
+    dimensionsLocked: false,
     movable: true,
     removable: true,
     capabilities: options.capabilities ?? [],
@@ -153,7 +153,7 @@ export function createSeedProject(): KitchenProject {
   }
 
   return {
-    schemaVersion: 2,
+    schemaVersion: 3,
     id: 'manta-raja-kitchen-lab',
     name: 'Manta Raja Kitchen Lab',
     displayUnit: 'mm',

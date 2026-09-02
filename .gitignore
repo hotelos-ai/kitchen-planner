@@ -10,3 +10,5 @@ output/
 test-results/
 playwright-report/
 blob-report/
+.omo/
+.playwright-mcp/

@@ -192,7 +192,7 @@ export interface SimulationScenario {
 }
 
 export interface KitchenProject {
-  schemaVersion: 2
+  schemaVersion: 3
   id: string
   name: string
   displayUnit: DisplayUnit

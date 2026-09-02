@@ -14,15 +14,14 @@ describe('plan workspace', () => {
     render(<PlanWorkspace showCanvas={false} />)
     await user.click(screen.getByRole('button', { name: /Select Tandoor, 700 mm by 700 mm/i }))
     expect(screen.getByRole('textbox', { name: /Equipment label/i })).toHaveValue('Tandoor')
-    expect(screen.getByLabelText(/Lock dimensions/i)).toBeChecked()
-    expect(screen.getByLabelText(/^Width/i)).toBeDisabled()
+    expect(screen.getByLabelText(/Lock dimensions/i)).not.toBeChecked()
+    expect(screen.getByLabelText(/^Width/i)).toBeEnabled()
   })
 
-  it('unlocks and changes dimensions without changing units internally', async () => {
+  it('changes dimensions without changing units internally', async () => {
     const user = userEvent.setup()
     render(<PlanWorkspace showCanvas={false} />)
     await user.click(screen.getByRole('button', { name: /Select Tandoor/i }))
-    await user.click(screen.getByLabelText(/Lock dimensions/i))
     const width = screen.getByLabelText(/^Width/i)
     await user.clear(width)
     await user.type(width, '750')
@@ -46,11 +45,11 @@ describe('plan workspace', () => {
     expect(getActiveItem(projectStore.getState(), 'tandoor').rotationDeg).toBe(0)
   })
 
-  it('enables drag resize and keeps inspector dimensions synchronized', async () => {
+  it('enables drag resize on selection and keeps inspector dimensions synchronized', async () => {
     const user = userEvent.setup()
     render(<PlanWorkspace showCanvas={false} />)
     await user.click(screen.getByRole('button', { name: /Select Tandoor/i }))
-    await user.click(screen.getByRole('button', { name: /Enable drag resize/i }))
+    expect(screen.getByRole('button', { name: /Disable drag resize/i })).toHaveAttribute('aria-pressed', 'true')
     expect(screen.getByLabelText(/Lock dimensions/i)).not.toBeChecked()
 
     act(() => projectStore.getState().updateItem('tandoor', { widthMm: 900, depthMm: 800 }))

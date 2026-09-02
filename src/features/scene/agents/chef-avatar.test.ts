@@ -7,7 +7,7 @@ describe('ChefAvatar', () => {
     expect(descriptor.parts).toEqual(expect.arrayContaining([
       'toque-band', 'toque-crown', 'eyes', 'eyebrows', 'smile', 'cheeks', 'ears',
       'nose', 'pupils', 'double-breasted-jacket', 'collar', 'apron', 'neckerchief',
-      'cuffed-sleeves', 'trousers', 'non-slip-shoes',
+      'cuffed-sleeves', 'trousers', 'non-slip-shoes', 'spatula', 'whisk',
     ]))
     expect(descriptor.proportions).toEqual({ heightM: 1.82, headToHeightRatio: .1, shoulderToHeightRatio: .36 })
     expect(descriptor.visualRegressionViews).toEqual(['front', 'three-quarter'])

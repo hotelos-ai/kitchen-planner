@@ -43,7 +43,7 @@ describe('simulation walk camera switching', () => {
       result={result}
       liveState={liveState}
       elapsedSeconds={900}
-      layers={{ heatmap: true, trails: true, queues: true, clearances: false, flows: true }}
+      layers={{ heatmap: true, trails: true, queues: true, clearances: false, flows: true, labels: true }}
       followRole="overview"
       onExitWalk={vi.fn()}
       webglSupported

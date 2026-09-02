@@ -64,7 +64,7 @@ describe('project persistence', () => {
     const exported = exportProject(project)
     const decoded = JSON.parse(exported)
     expect(decoded).toMatchObject({
-      schemaVersion: 2,
+      schemaVersion: 3,
       activeVariantId: 'courtyard-option',
       activeScenarioId: 'lunch-steady',
       displayUnit: 'cm',
@@ -137,10 +137,26 @@ describe('project persistence', () => {
     delete architecture.wallHeightMm
     variants.forEach((variant) => { delete variant.architecture })
     const migrated = importProject(JSON.stringify(legacy))
-    expect(migrated.schemaVersion).toBe(2)
+    expect(migrated.schemaVersion).toBe(3)
     expect(migrated.architecture.wallHeightMm).toBe(2800)
     expect(migrated.variants[0].architecture).toEqual(migrated.architecture)
     expect(() => importProject('{"schemaVersion":99}')).toThrow(/unsupported future schema version 99/i)
+  })
+
+  it('migrates v2 lock-by-default dimensions to drag-resize on load', () => {
+    const legacy = structuredClone(createSeedProject()) as unknown as Record<string, unknown>
+    legacy.schemaVersion = 2
+    const variants = legacy.variants as Array<Record<string, unknown>>
+    variants.forEach((variant) => {
+      (variant.equipment as Array<Record<string, unknown>>).forEach((item) => { item.dimensionsLocked = true })
+    })
+
+    const migrated = importProject(JSON.stringify(legacy))
+
+    expect(migrated.schemaVersion).toBe(3)
+    migrated.variants.forEach((variant) => {
+      variant.equipment.forEach((item) => expect(item.dimensionsLocked).toBe(false))
+    })
   })
 
   it('migrates v1 global architecture into independent variant-owned copies', () => {
@@ -153,7 +169,7 @@ describe('project persistence', () => {
 
     const migrated = importProject(JSON.stringify(legacy))
 
-    expect(migrated.schemaVersion).toBe(2)
+    expect(migrated.schemaVersion).toBe(3)
     expect(migrated.variants).toHaveLength(2)
     expect(migrated.variants[0].architecture).toEqual(migrated.architecture)
     expect(migrated.variants[1].architecture).toEqual(migrated.architecture)

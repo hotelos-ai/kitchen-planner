@@ -21,7 +21,7 @@ vi.mock('react-konva', async () => {
     >{props.children as React.ReactNode}</div>
   })
   const Transformer = React.forwardRef((props: Record<string, unknown>, ref) => {
-    React.useImperativeHandle(ref, () => ({ nodes: vi.fn(), getLayer: () => ({ batchDraw: vi.fn() }) }))
+    React.useImperativeHandle(ref, () => ({ nodes: vi.fn(), forceUpdate: vi.fn(), getLayer: () => ({ batchDraw: vi.fn() }) }))
     return <div data-testid="transformer" data-rotate-enabled={String(props.rotateEnabled)} data-rotation-snaps={props.rotationSnaps ? 'present' : 'absent'} />
   })
   const Primitive = ({ children }: { children?: React.ReactNode }) => <div>{children}</div>
@@ -69,5 +69,13 @@ describe('EquipmentNode gestures', () => {
     render(<EquipmentNode {...requiredProps} item={{ ...item, dimensionsLocked: false }} selected onSelect={vi.fn()} onQuickConfigure={vi.fn()} onOpenContextMenu={vi.fn()} />)
     expect(screen.getByTestId('transformer')).toHaveAttribute('data-rotate-enabled', 'false')
     expect(screen.getByTestId('transformer')).toHaveAttribute('data-rotation-snaps', 'absent')
+  })
+
+  it('shows resize handles on selection and hides them only when dimensions are locked', () => {
+    const { unmount } = render(<EquipmentNode {...requiredProps} selected onSelect={vi.fn()} onQuickConfigure={vi.fn()} onOpenContextMenu={vi.fn()} />)
+    expect(screen.getByTestId('transformer')).toBeInTheDocument()
+    unmount()
+    render(<EquipmentNode {...requiredProps} item={{ ...item, dimensionsLocked: true }} selected onSelect={vi.fn()} onQuickConfigure={vi.fn()} onOpenContextMenu={vi.fn()} />)
+    expect(screen.queryByTestId('transformer')).not.toBeInTheDocument()
   })
 })

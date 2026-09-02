@@ -29,6 +29,8 @@ describe('executeLayoutCommand', () => {
 
   it('enforces item locks and exact identifiers', () => {
     const project = createSeedProject()
+    const tandoor = project.variants[0].equipment.find((item) => item.id === 'tandoor')
+    if (tandoor) tandoor.dimensionsLocked = true
     expect(executeLayoutCommand({
       envelope: { project, revision: 0 }, adapter: kitchenSpatialAdapter,
       command: { type: 'resize-item', id: 'tandoor', widthMm: 900, depthMm: 700 },

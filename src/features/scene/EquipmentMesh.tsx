@@ -11,10 +11,11 @@ type Props = {
   item: EquipmentItem
   selected: boolean
   wallHeightMm: number
+  showLabels?: boolean
   onSelect(id: string): void
 }
 
-export function EquipmentMesh({ item, selected, wallHeightMm, onSelect }: Props) {
+export function EquipmentMesh({ item, selected, wallHeightMm, showLabels = true, onSelect }: Props) {
   const selection = equipmentSelectionDescriptor(item)
   const widthM = selection.widthM
   const heightM = selection.heightM
@@ -37,9 +38,9 @@ export function EquipmentMesh({ item, selected, wallHeightMm, onSelect }: Props)
           <meshBasicMaterial transparent opacity={0} depthWrite={false} />
           <Edges color="#ff8c63" threshold={12} />
         </mesh>
-        <Html position={[0, heightM + .13, 0]} center distanceFactor={8} className={`scene-label${selected ? ' selected' : ''}`}>
+        {showLabels && <Html position={[0, heightM + .13, 0]} center distanceFactor={8} className={`scene-label${selected ? ' selected' : ''}`}>
           <button type="button" onClick={(event) => { event.stopPropagation(); onSelect(item.id) }} aria-label={`Select ${item.label} in 3D`}>{item.label}</button>
-        </Html>
+        </Html>}
       </group>
     </group>
   )

@@ -68,6 +68,14 @@ describe('rendered FirstPersonHands', () => {
     expect(models.at(-1)?.swing).toMatchObject({ active: true })
   })
 
+  it('equips the dominant hand with a slotted spatula and the support hand with a wired whisk', () => {
+    const { container } = render(<FirstPersonHands pose={{ locomotion: 'idle', grounded: true, verticalVelocityMps: 0 }} />)
+    const hands = container.querySelectorAll('group')
+    expect(hands.length).toBeGreaterThanOrEqual(2)
+    expect(container.querySelectorAll('torusGeometry')).toHaveLength(3)
+    expect(container.querySelectorAll('boxGeometry')).toHaveLength(4)
+  })
+
   it('removes continuous reduced-motion transforms while retaining deliberate swing', () => {
     let now = 3000
     vi.spyOn(performance, 'now').mockImplementation(() => now)

@@ -65,6 +65,7 @@ describe('project store', () => {
 
   it('does not resize a locked item until it is unlocked', () => {
     const store = createProjectStore(createSeedProject())
+    store.getState().setDimensionsLocked('tandoor', true)
     store.getState().resizeItem('tandoor', { widthMm: 900, depthMm: 900 })
     expect(getActiveItem(store.getState(), 'tandoor').widthMm).toBe(700)
     store.getState().setDimensionsLocked('tandoor', false)

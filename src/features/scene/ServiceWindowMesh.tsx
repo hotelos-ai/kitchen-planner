@@ -3,7 +3,7 @@ import type { ServiceWindowFixture } from './wall-geometry'
 
 const toWorld = (millimetres: number) => millimetres / 1000
 
-export function ServiceWindowMesh({ fixture }: { fixture: ServiceWindowFixture }) {
+export function ServiceWindowMesh({ fixture, showLabels = true }: { fixture: ServiceWindowFixture; showLabels?: boolean }) {
   const width = toWorld(fixture.widthMm)
   const openingHeight = toWorld(fixture.openingHeightMm)
   const isClean = fixture.flow === 'clean-out'
@@ -30,9 +30,9 @@ export function ServiceWindowMesh({ fixture }: { fixture: ServiceWindowFixture }
         <mesh position={[0, -.12 * direction, 0]}><boxGeometry args={[.09, .32, .025]} /><meshBasicMaterial color={color} /></mesh>
         <mesh position={[0, -.31 * direction, 0]} rotation={[0, 0, direction > 0 ? Math.PI : 0]}><coneGeometry args={[.16, .28, 3]} /><meshBasicMaterial color={color} /></mesh>
       </group>
-      <Html position={[0, openingHeight + .18, 0]} center distanceFactor={7} className={`pass-label ${isClean ? 'clean' : 'dirty'}`}>
+      {showLabels && <Html position={[0, openingHeight + .18, 0]} center distanceFactor={7} className={`pass-label ${isClean ? 'clean' : 'dirty'}`}>
         <span>{isClean ? 'Clean pass · orders out' : 'Dirty return · dishes in'}</span>
-      </Html>
+      </Html>}
     </group>
   )
 }

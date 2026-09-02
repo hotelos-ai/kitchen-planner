@@ -37,7 +37,7 @@ const renderSimulationWalk = (variant: LayoutVariant) => {
   return render(<SimulationThreeScene
     view="walk" project={project} variant={variant} result={result}
     liveState={deriveLiveServiceState(result, 900)} elapsedSeconds={900}
-    layers={{ heatmap: true, trails: true, queues: true, clearances: false, flows: true }}
+    layers={{ heatmap: true, trails: true, queues: true, clearances: false, flows: true, labels: true }}
     followRole="overview" onExitWalk={vi.fn()} webglSupported
   />)
 }

@@ -93,13 +93,13 @@ function WallMesh({ panel, transparent: outlineOnly }: { panel: WallPanel; trans
 
 export { wallSurfaceRenderState } from './wall-material'
 
-export function ArchitectureMesh({ architecture, wallsTransparent = false }: { architecture: Architecture; wallsTransparent?: boolean }) {
+export function ArchitectureMesh({ architecture, wallsTransparent = false, showLabels = true }: { architecture: Architecture; wallsTransparent?: boolean; showLabels?: boolean }) {
   const heightM = toWorld(architecture.wallHeightMm)
   return (
     <group>
       <FloorMesh polygon={architecture.roomPolygon} />
       {buildWallPanels(architecture).map((panel) => <WallMesh key={panel.id} panel={panel} transparent={wallsTransparent} />)}
-      {serviceWindowFixtures(architecture).map((fixture) => <ServiceWindowMesh key={fixture.id} fixture={fixture} />)}
+      {serviceWindowFixtures(architecture).map((fixture) => <ServiceWindowMesh key={fixture.id} fixture={fixture} showLabels={showLabels} />)}
       {architecture.pillars.map((pillar) => (
         <mesh key={pillar.id} position={[toWorld(pillar.xMm + pillar.widthMm / 2), heightM / 2, toWorld(pillar.yMm + pillar.depthMm / 2)]} castShadow receiveShadow>
           <boxGeometry args={[toWorld(pillar.widthMm), heightM, toWorld(pillar.depthMm)]} />

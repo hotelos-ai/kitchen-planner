@@ -23,7 +23,7 @@ const zeroTransform = (): FirstPersonPartTransform => ({ position: [0, 0, 0], ro
 
 export function firstPersonVisualDescriptor() {
   return {
-    parts: ['support-hand', 'dominant-hand', 'dominant-hand-spatula'] as const,
+    parts: ['support-hand', 'support-hand-whisk', 'dominant-hand', 'dominant-hand-spatula'] as const,
     cameraRelative: true as const,
     swingInputs: ['primary-click', 'f'] as const,
     reducedMotion: 'deliberate-only' as const,
@@ -61,10 +61,10 @@ export function firstPersonViewModel(input: FirstPersonViewModelInput): FirstPer
   const arc = active ? Math.sin(progress * Math.PI) : 0
   return {
     root: continuousRoot(input),
-    supportHand: { position: [-.22, -.3, -.46], rotation: [.18, .08, .12] },
+    supportHand: { position: [-.17, -.12, -.42], rotation: [.16, .07, .1] },
     dominantHand: {
-      position: [.22 - arc * .035, -.31 + arc * .055, -.45 - arc * .075],
-      rotation: [.18 - arc * .9, -.08 + arc * .28, -.12 - arc * .18],
+      position: [.17 - arc * .04, -.13 + arc * .05, -.42 - arc * .06],
+      rotation: [.16 - arc * .46, -.06 + arc * .22, -.1 - arc * .1],
     },
     swing: { active, progress },
   }

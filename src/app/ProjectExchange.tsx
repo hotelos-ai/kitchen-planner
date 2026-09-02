@@ -14,7 +14,7 @@ export function ProjectExchange({ store = projectStore }: { store?: ProjectStore
       const revoke = URL.revokeObjectURL.bind(URL)
       const link = document.createElement('a')
       link.href = url
-      link.download = `${project.name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}.json`
+      link.download = 'hotelos-kitchen-planner.json'
       link.click()
       setTimeout(() => revoke(url), 0)
       setMessage({ kind: 'status', text: 'All layouts exported.' })

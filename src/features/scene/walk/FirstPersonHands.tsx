@@ -4,6 +4,7 @@ import type { Group } from 'three'
 import type { WalkPlayerPose } from './types'
 import { firstPersonViewModel, type FirstPersonPartTransform, type FirstPersonViewModel } from './first-person-view-model'
 import { SpatulaModel } from './SpatulaModel'
+import { WhiskModel } from './WhiskModel'
 import { walkActionForKeyboardEvent, walkActionForPrimaryPointerEvent } from './walk-input'
 
 type HandsPose = Pick<WalkPlayerPose, 'locomotion' | 'grounded' | 'verticalVelocityMps'>
@@ -14,23 +15,30 @@ const applyTransform = (group: Group | null, transform: FirstPersonPartTransform
   group.rotation.set(...transform.rotation)
 }
 
-function HandModel({ dominant = false }: { dominant?: boolean }) {
+function HandModel() {
   return <group>
-    <mesh position={[0, .11, 0]} castShadow>
-      <capsuleGeometry args={[.058, .22, 5, 10]} />
-      <meshStandardMaterial color="#f8f4eb" roughness={.64} depthTest={false} />
-    </mesh>
-    <mesh position={[0, -.035, 0]} castShadow>
-      <cylinderGeometry args={[.064, .061, .055, 12]} />
-      <meshStandardMaterial color="#b95f47" roughness={.56} depthTest={false} />
-    </mesh>
-    <mesh position={[0, -.1, 0]} scale={[.92, 1.08, .8]} castShadow>
-      <sphereGeometry args={[.067, 14, 10]} />
+    <mesh position={[0, 0, 0]} castShadow>
+      <sphereGeometry args={[.062, 14, 10]} />
       <meshStandardMaterial color="#bd8767" roughness={.78} depthTest={false} />
     </mesh>
-    {dominant && <group position={[0, -.125, -.025]} rotation={[0, 0, -.08]}><SpatulaModel /></group>}
+    <mesh position={[0, -.12, 0]} castShadow>
+      <cylinderGeometry args={[.06, .056, .05, 12]} />
+      <meshStandardMaterial color="#b95f47" roughness={.56} depthTest={false} />
+    </mesh>
+    <mesh position={[0, -.33, 0]} castShadow>
+      <capsuleGeometry args={[.054, .18, 5, 10]} />
+      <meshStandardMaterial color="#f8f4eb" roughness={.64} depthTest={false} />
+    </mesh>
   </group>
 }
+
+// Upright weapon mount: the internal PI/2 of each tool model points the head forward,
+// the wrapper's PI/2 pitches it up so the tool reads like a first-person weapon.
+const weaponMount = (cant: number, scale: number, inset: number): { position: [number, number, number]; rotation: [number, number, number]; scale: [number, number, number] } => ({
+  position: [inset, .02, -.05],
+  rotation: [Math.PI / 2 + .12, 0, cant],
+  scale: [scale, scale, scale],
+})
 
 export function FirstPersonHands({ pose, reducedMotion = false, onViewModelChange }: {
   pose?: HandsPose
@@ -95,8 +103,14 @@ export function FirstPersonHands({ pose, reducedMotion = false, onViewModelChang
 
   return <group ref={anchor} renderOrder={20}>
     <group ref={root}>
-      <group ref={supportHand}><HandModel /></group>
-      <group ref={dominantHand}><HandModel dominant /></group>
+      <group ref={supportHand}>
+        <HandModel />
+        <group {...weaponMount(.15, .68, .05)}><WhiskModel /></group>
+      </group>
+      <group ref={dominantHand}>
+        <HandModel />
+        <group {...weaponMount(-.15, .6, -.05)}><SpatulaModel /></group>
+      </group>
     </group>
   </group>
 }

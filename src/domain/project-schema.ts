@@ -162,7 +162,7 @@ export const scenarioSchema = z.object({
 }).strict()
 
 export const projectSchema = z.object({
-  schemaVersion: z.literal(2),
+  schemaVersion: z.literal(3),
   id: z.string().min(1),
   name: z.string().min(1),
   displayUnit: z.enum(['mm', 'cm', 'in', 'ft']),

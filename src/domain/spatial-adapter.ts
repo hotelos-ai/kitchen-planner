@@ -30,7 +30,7 @@ export const kitchenSpatialAdapter: SpatialDocumentAdapter<KitchenProject, Equip
     const project: KitchenProject = {
       ...structuredClone(source),
       ...structuredClone(spatial),
-      schemaVersion: 2,
+      schemaVersion: 3,
       architecture: structuredClone(activeArchitecture) as KitchenProject['architecture'],
       variants,
       scenarios: structuredClone(spatial.scenarios),

@@ -1,11 +1,12 @@
 import { describe, expect, it } from 'vitest'
 import { spatulaVisualDescriptor } from './SpatulaModel'
+import { whiskVisualDescriptor } from './WhiskModel'
 import { firstPersonViewModel, firstPersonVisualDescriptor } from './first-person-view-model'
 
 describe('first-person view model', () => {
-  it('describes two camera-relative hands and one reusable dominant-hand spatula', () => {
+  it('describes two camera-relative hands with a dominant spatula and a support whisk', () => {
     expect(firstPersonVisualDescriptor()).toEqual({
-      parts: ['support-hand', 'dominant-hand', 'dominant-hand-spatula'],
+      parts: ['support-hand', 'support-hand-whisk', 'dominant-hand', 'dominant-hand-spatula'],
       cameraRelative: true,
       swingInputs: ['primary-click', 'f'],
       reducedMotion: 'deliberate-only',
@@ -13,6 +14,10 @@ describe('first-person view model', () => {
     expect(spatulaVisualDescriptor()).toMatchObject({
       reusable: true,
       parts: ['grip', 'tang', 'blade', 'blade-slots'],
+    })
+    expect(whiskVisualDescriptor()).toMatchObject({
+      reusable: true,
+      parts: ['grip', 'tang', 'wires', 'tip'],
     })
   })
 

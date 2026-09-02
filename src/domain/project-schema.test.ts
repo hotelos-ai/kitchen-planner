@@ -3,7 +3,7 @@ import type { KitchenProject } from './project'
 import { projectSchema } from './project-schema'
 
 const validProject = {
-  schemaVersion: 2,
+  schemaVersion: 3,
   id: 'manta-raja',
   name: 'Manta Raja Kitchen Lab',
   displayUnit: 'mm',

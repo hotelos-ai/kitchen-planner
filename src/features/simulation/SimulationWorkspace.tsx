@@ -18,13 +18,13 @@ import { WaitTimeDistribution } from './WaitTimeDistribution'
 import { useSimulationSession } from './useSimulationSession'
 
 type Props = { store?: ProjectStore; run?: (input: SimulationInput) => SimulationResult; threeRenderer?: ComponentType<SimulationThreeSceneProps> }
-type Layers = { heatmap: boolean; trails: boolean; queues: boolean; clearances: boolean; flows: boolean }
+type Layers = { heatmap: boolean; trails: boolean; queues: boolean; clearances: boolean; flows: boolean; labels: boolean }
 
 export function SimulationWorkspace({ store = projectStore, run = runSimulation, threeRenderer: ThreeRenderer = SimulationThreeScene }: Props) {
   const project = useStore(store, (state) => state.project)
   const variant = useStore(store, getActiveVariant)
   const scenario = project.scenarios.find((value) => value.id === project.activeScenarioId) ?? project.scenarios[0]
-  const [layers, setLayers] = useState<Layers>({ heatmap: true, trails: true, queues: true, clearances: false, flows: true })
+  const [layers, setLayers] = useState<Layers>({ heatmap: true, trails: true, queues: true, clearances: false, flows: true, labels: true })
   const [followRole, setFollowRole] = useState<StaffRole | 'overview'>('overview')
   const [view, setView] = useState<SimulationView>('operations-2d')
   const staffCount = scenario.staff.reduce((sum, entry) => sum + entry.count, 0)

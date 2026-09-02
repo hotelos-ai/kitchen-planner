@@ -18,7 +18,7 @@ import { SimulationSpatialOverlays3D } from './SimulationSpatialOverlays3D'
 import type { SimulationView } from './SimulationViewSwitcher'
 
 type LiveState = ReturnType<typeof deriveLiveServiceState>
-type Layers = { heatmap: boolean; trails: boolean; queues: boolean; clearances: boolean; flows: boolean }
+type Layers = { heatmap: boolean; trails: boolean; queues: boolean; clearances: boolean; flows: boolean; labels: boolean }
 
 export type SimulationThreeSceneProps = {
   view: Exclude<SimulationView, 'operations-2d'>
@@ -57,12 +57,12 @@ export function SimulationThreeScene({ view, project, variant, result, liveState
   return <div className={`simulation-three-scene${walkMode ? ' walk-active walk-pointer-lock-target' : ''}`} data-testid="simulation-3d-scene" data-view={view} data-walk-view={walkMode ? walkView : undefined} data-staff-count={poses.length} data-staff-positions={staffPositionSignature} data-player-position={playerPosition ? `${Math.round(playerPosition.x)},${Math.round(playerPosition.y)},${Math.round(playerPosition.elevationMm)}` : undefined} data-player-x-mm={playerPosition?.x} data-player-y-mm={playerPosition?.y} data-player-elevation-mm={playerPosition?.elevationMm} data-player-grounded={playerPosition?.grounded} data-player-vertical-velocity={playerPosition?.verticalVelocityMps}>
     <ResilientSceneBoundary status={supportStatus} resetKey={rendererKey} onRetry={restartRenderer}>
       <SceneCanvas architecture={variant.architecture} cameraMode="perspective" fitSignal={0} walkMode={walkMode} onContextLost={() => setContextLost(true)} onContextRestored={() => setContextLost(false)}>
-        <KitchenScene project={project} variant={variant} selectedIds={[]} showClearances={layers.clearances} wallsTransparent onSelect={() => undefined} onClearSelection={() => undefined} />
+        <KitchenScene project={project} variant={variant} selectedIds={[]} showClearances={layers.clearances} wallsTransparent showLabels={layers.labels} onSelect={() => undefined} onClearSelection={() => undefined} />
         <SimulationSpatialOverlays3D result={result} liveState={liveState} elapsedSeconds={elapsedSeconds} equipment={variant.equipment} layers={layers} followRole={followRole} />
-        <SimulatedStaff frames={result.frames} elapsedSeconds={elapsedSeconds} followRole={followRole} reducedMotion={Boolean(reducedMotion)} />
+        <SimulatedStaff frames={result.frames} elapsedSeconds={elapsedSeconds} followRole={followRole} reducedMotion={Boolean(reducedMotion)} showLabels={layers.labels} />
         <CompletedOrderFlow3D architecture={variant.architecture} liveState={liveState} elapsedSeconds={elapsedSeconds} />
         <WalkScene active={walkMode} view={walkView} architecture={variant.architecture} equipment={variant.equipment} staff={poses} reducedMotion={Boolean(reducedMotion)} retrySignal={walkRetrySignal} onAvailabilityChange={setWalkAvailability} onLockedChange={setWalkLocked} onNearbyChange={setWalkNearby} onPositionChange={setPlayerPosition} />
-        {!walkMode && playerPosition && <group position={[playerPosition.x / 1000, playerPosition.elevationMm / 1000, playerPosition.y / 1000]}><ChefAvatar player reducedMotion={Boolean(reducedMotion)} pose={{ agentId: 'player-chef', role: 'head-chef', xMm: playerPosition.x, yMm: playerPosition.y, state: 'waiting', headingRad: 0, moving: false }} label="You · walkthrough position" /></group>}
+        {!walkMode && playerPosition && <group position={[playerPosition.x / 1000, playerPosition.elevationMm / 1000, playerPosition.y / 1000]}><ChefAvatar player reducedMotion={Boolean(reducedMotion)} pose={{ agentId: 'player-chef', role: 'head-chef', xMm: playerPosition.x, yMm: playerPosition.y, state: 'waiting', headingRad: 0, moving: false }} label={layers.labels ? 'You · walkthrough position' : undefined} /></group>}
       </SceneCanvas>
     </ResilientSceneBoundary>
     {contextLost && <div role="alert" className="scene-context-message"><strong>Live 3D rendering paused</strong><p>The browser interrupted the graphics context. It may restore automatically, or restart it without losing this service run or playback position.</p><button type="button" onClick={restartRenderer}>Restart live 3D</button></div>}

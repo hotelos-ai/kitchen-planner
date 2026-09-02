@@ -4,7 +4,7 @@ import type { Architecture, DisplayUnit, EquipmentItem } from '../../domain/proj
 import { buildClearanceDescriptors, type ArcClearanceDescriptor, type RectClearanceDescriptor } from './clearance-geometry'
 import { toWorld } from './ArchitectureMesh'
 
-function RectClearance({ zone }: { zone: RectClearanceDescriptor }) {
+function RectClearance({ zone, showLabels }: { zone: RectClearanceDescriptor; showLabels: boolean }) {
   const width = toWorld(zone.widthMm)
   const depth = toWorld(zone.depthMm)
   const frontOffset = toWorld(zone.frontOffsetMm)
@@ -22,14 +22,14 @@ function RectClearance({ zone }: { zone: RectClearanceDescriptor }) {
         const half = Math.min(.16, depth * .22)
         return <Line key={index} points={[[x - half, .027, frontOffset + depth * .32], [x + half, .027, frontOffset + depth * .68]]} color={zone.hatch} lineWidth={1.1} transparent opacity={.7} raycast={() => null} />
       })}
-      <Html position={[width / 2, .045, frontOffset + depth / 2]} center distanceFactor={8} className={`clearance-label ${zone.kind}`}>
+      {showLabels && <Html position={[width / 2, .045, frontOffset + depth / 2]} center distanceFactor={8} className={`clearance-label ${zone.kind}`}>
         <span>{zone.label}</span>
-      </Html>
+      </Html>}
     </group>
   )
 }
 
-function ArcClearance({ zone }: { zone: ArcClearanceDescriptor }) {
+function ArcClearance({ zone, showLabels }: { zone: ArcClearanceDescriptor; showLabels: boolean }) {
   const radius = toWorld(zone.radiusMm)
   return (
     <group position={[toWorld(zone.xMm), 0, toWorld(zone.yMm)]} rotation={[0, -THREE.MathUtils.degToRad(zone.rotationDeg), 0]}>
@@ -44,12 +44,12 @@ function ArcClearance({ zone }: { zone: ArcClearanceDescriptor }) {
       <Line points={[[0, .03, 0], [radius, .03, 0]]} color={zone.outline} lineWidth={2} raycast={() => null} />
       <Line points={[[0, .03, 0], [0, .03, radius]]} color={zone.outline} lineWidth={2} raycast={() => null} />
       <mesh position={[0, .04, 0]} raycast={() => null}><cylinderGeometry args={[.045, .045, .035, 16]} /><meshBasicMaterial color={zone.outline} /></mesh>
-      <Html position={[radius * .58, .06, radius * .58]} center distanceFactor={8} className="clearance-label door-swing"><span>{zone.label}</span></Html>
+      {showLabels && <Html position={[radius * .58, .06, radius * .58]} center distanceFactor={8} className="clearance-label door-swing"><span>{zone.label}</span></Html>}
     </group>
   )
 }
 
-export function Clearances({ items, architecture, displayUnit, visible }: { items: EquipmentItem[]; architecture: Architecture; displayUnit: DisplayUnit; visible: boolean }) {
+export function Clearances({ items, architecture, displayUnit, visible, showLabels = true }: { items: EquipmentItem[]; architecture: Architecture; displayUnit: DisplayUnit; visible: boolean; showLabels?: boolean }) {
   if (!visible) return null
-  return <group>{buildClearanceDescriptors(items, architecture, displayUnit).map((zone) => zone.shape === 'rect' ? <RectClearance key={zone.id} zone={zone} /> : <ArcClearance key={zone.id} zone={zone} />)}</group>
+  return <group>{buildClearanceDescriptors(items, architecture, displayUnit).map((zone) => zone.shape === 'rect' ? <RectClearance key={zone.id} zone={zone} showLabels={showLabels} /> : <ArcClearance key={zone.id} zone={zone} showLabels={showLabels} />)}</group>
 }

@@ -18,6 +18,8 @@ const COLORS: Record<EquipmentItem['category'], { fill: string; stroke: string; 
   custom: { fill: '#e5dcee', stroke: '#79648c', text: '#493a58' },
 }
 
+type NodeFeedback = { kind: 'move' | 'resize'; xMm: number; yMm: number; widthMm: number; depthMm: number }
+
 type NodeProps = {
   item: EquipmentItem
   selected: boolean
@@ -43,17 +45,26 @@ const eventPosition = (event: MouseEvent | TouchEvent): OverlayPosition => {
 export function EquipmentNode({ item, selected, warning = false, displayUnit, pixelsPerMm: scale, originX, originY, snapMm, onSelect, onQuickConfigure, onOpenContextMenu, onMove, onTransform }: NodeProps) {
   const nodeRef = useRef<Konva.Group>(null)
   const transformerRef = useRef<Konva.Transformer>(null)
-  const [feedback, setFeedback] = useState<PointMm | null>(null)
+  const [feedback, setFeedback] = useState<NodeFeedback | null>(null)
   const colors = COLORS[item.category]
   const width = item.widthMm * scale
   const height = item.depthMm * scale
   const label = `${item.label}\n${formatDimensions(item, displayUnit)}`
 
+  const liveFeedback = (kind: NodeFeedback['kind'], node: Konva.Node, scaleX: number, scaleY: number): NodeFeedback => ({
+    kind,
+    xMm: snapValue((node.x() - originX) / scale, snapMm),
+    yMm: snapValue((node.y() - originY) / scale, snapMm),
+    widthMm: Math.max(snapMm, snapValue(item.widthMm * Math.abs(scaleX), snapMm)),
+    depthMm: Math.max(snapMm, snapValue(item.depthMm * Math.abs(scaleY), snapMm)),
+  })
+
   useEffect(() => {
     if (!selected || item.dimensionsLocked || !nodeRef.current || !transformerRef.current) return
     transformerRef.current.nodes([nodeRef.current])
+    transformerRef.current.forceUpdate()
     transformerRef.current.getLayer()?.batchDraw()
-  }, [item.dimensionsLocked, selected])
+  }, [item.dimensionsLocked, item.widthMm, item.depthMm, item.xMm, item.yMm, item.rotationDeg, selected])
 
   return <Fragment>
     <Group
@@ -79,25 +90,40 @@ export function EquipmentNode({ item, selected, warning = false, displayUnit, pi
         event.cancelBubble = true
         onOpenContextMenu(item.id, eventPosition(event.evt))
       }}
+      onMouseEnter={() => {
+        if (!item.movable) return
+        const stage = nodeRef.current?.getStage()
+        if (stage) stage.container().style.cursor = 'move'
+      }}
+      onMouseLeave={() => {
+        const stage = nodeRef.current?.getStage()
+        if (stage && stage.container().style.cursor === 'move') stage.container().style.cursor = ''
+      }}
       onDragStart={(event) => {
         if ('button' in event.evt && event.evt.button !== 0) {
           event.target.stopDrag()
           event.cancelBubble = true
           return
         }
-        setFeedback({ x: snapValue((event.target.x() - originX) / scale, snapMm), y: snapValue((event.target.y() - originY) / scale, snapMm) })
+        setFeedback(liveFeedback('move', event.target, 1, 1))
       }}
-      onDragMove={(event) => setFeedback({ x: snapValue((event.target.x() - originX) / scale, snapMm), y: snapValue((event.target.y() - originY) / scale, snapMm) })}
+      onDragMove={(event) => setFeedback(liveFeedback('move', event.target, 1, 1))}
       onDragEnd={(event) => {
         onMove(item.id, { x: (event.target.x() - originX) / scale, y: (event.target.y() - originY) / scale })
         setFeedback(null)
       }}
-      onTransform={() => setFeedback({ x: snapValue((nodeRef.current!.x() - originX) / scale, snapMm), y: snapValue((nodeRef.current!.y() - originY) / scale, snapMm) })}
+      onTransform={() => {
+        const node = nodeRef.current
+        if (!node) return
+        setFeedback(liveFeedback('resize', node, node.scaleX(), node.scaleY()))
+      }}
       onTransformEnd={() => {
         const node = nodeRef.current
         if (!node) return
         const patch = equipmentTransformPatch({ x: node.x(), y: node.y(), scaleX: node.scaleX(), scaleY: node.scaleY(), rotation: node.rotation() }, { widthMm: item.widthMm, depthMm: item.depthMm, originX, originY, pixelsPerMm: scale, snapMm })
         node.scale({ x: 1, y: 1 })
+        transformerRef.current?.forceUpdate()
+        node.getLayer()?.batchDraw()
         onTransform(item.id, patch)
         setFeedback(null)
       }}
@@ -117,8 +143,10 @@ export function EquipmentNode({ item, selected, warning = false, displayUnit, pi
       <Text text={label} width={width} height={height} padding={4} align="center" verticalAlign="middle" fill={colors.text} fontSize={Math.max(7, Math.min(11, Math.min(width, height) / 7))} fontStyle="bold" wrap="word" ellipsis />
       {item.approximate && <Text x={width - 16} y={3} width={13} text="~" fill={colors.stroke} fontSize={10} fontStyle="bold" align="right" />}
       {feedback && <Group x={0} y={-26} rotation={-item.rotationDeg}>
-        <Rect width={150} height={20} fill="#17211e" cornerRadius={3} opacity={.94} />
-        <Text x={5} y={4} width={140} height={13} text={`X ${formatLength(feedback.x, displayUnit)} · Y ${formatLength(feedback.y, displayUnit)}`} fill="#fffaf0" fontSize={8} align="center" />
+        <Rect width={170} height={20} fill="#17211e" cornerRadius={3} opacity={.94} />
+        <Text x={5} y={4} width={160} height={13} text={feedback.kind === 'move'
+          ? `X ${formatLength(feedback.xMm, displayUnit)} · Y ${formatLength(feedback.yMm, displayUnit)}`
+          : `W ${formatLength(feedback.widthMm, displayUnit)} · D ${formatLength(feedback.depthMm, displayUnit)}`} fill="#fffaf0" fontSize={8} align="center" />
       </Group>}
     </Group>
     {selected && !item.dimensionsLocked && <Transformer
@@ -127,6 +155,7 @@ export function EquipmentNode({ item, selected, warning = false, displayUnit, pi
       enabledAnchors={['top-left', 'top-center', 'top-right', 'middle-left', 'middle-right', 'bottom-left', 'bottom-center', 'bottom-right']}
       anchorFill="#fffaf0"
       anchorStroke="#d46847"
+      anchorCornerRadius={2}
       borderStroke="#d46847"
       anchorSize={9}
       padding={3}

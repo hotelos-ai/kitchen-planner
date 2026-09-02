@@ -19,11 +19,11 @@ export function SpatulaModel({ depthTest = false }: { depthTest?: boolean }) {
     </mesh>
     <mesh position={[0, -.115, 0]} scale={[1, 1, .22]} castShadow>
       <boxGeometry args={[.105, .14, .018]} />
-      <meshStandardMaterial color="#d8dfde" metalness={.82} roughness={.24} depthTest={depthTest} />
+      <meshStandardMaterial color="#2e3436" metalness={.6} roughness={.35} depthTest={depthTest} />
     </mesh>
     {[-.028, 0, .028].map((x) => <mesh key={x} position={[x, -.115, -.003]}>
       <boxGeometry args={[.01, .085, .008]} />
-      <meshStandardMaterial color="#5d6665" metalness={.55} roughness={.35} depthTest={depthTest} />
+      <meshStandardMaterial color="#c9d2d0" metalness={.7} roughness={.3} depthTest={depthTest} />
     </mesh>)}
   </group>
 }
