@@ -214,7 +214,7 @@ test('applies a typical equipment configuration and reflects it in 3D', async ({
   expect(pageErrors).toEqual([])
 })
 
-test('walks conventionally with keyboard aliases and publishes adaptive jump elevation', async ({ page }) => {
+test('switches live walk cameras while preserving movement and adaptive jump state', async ({ page }) => {
   const pageErrors: string[] = []
   page.on('pageerror', (error) => pageErrors.push(error.message))
   await page.goto('/')
@@ -223,33 +223,29 @@ test('walks conventionally with keyboard aliases and publishes adaptive jump ele
 
   const scene = page.getByTestId('kitchen-scene')
   await scene.locator('canvas').click()
+  await expect(scene).toHaveAttribute('data-player-x-mm', /\d+/)
   await expect(scene).toHaveAttribute('data-player-y-mm', /\d+/)
-  await expect(page.getByLabel('Walk kitchen controls')).toContainText('A/Left · move left')
-  await expect(page.getByLabel('Walk kitchen controls')).toContainText('D/Right · move right')
+  await expect(page.getByLabel('Walk kitchen controls')).toContainText('A/D')
+  await expect(page.getByLabel('Walk kitchen controls')).toContainText('Left/Right arrows')
+  await expect(page.getByLabel('Walk kitchen controls')).toContainText('Click · F')
 
-  const startY = Number(await scene.getAttribute('data-player-y-mm'))
-  await page.keyboard.down('a')
-  await page.waitForTimeout(320)
-  await page.keyboard.up('a')
-  await expect.poll(async () => Number(await scene.getAttribute('data-player-y-mm'))).toBeLessThan(startY)
-  const afterA = Number(await scene.getAttribute('data-player-y-mm'))
+  const rendererGeneration = await scene.getAttribute('data-renderer-generation')
+  const firstPersonX = await scene.getAttribute('data-player-x-mm')
+  const firstPersonY = await scene.getAttribute('data-player-y-mm')
+  await page.getByRole('button', { name: 'Third-person view' }).click()
+  await expect(scene).toHaveAttribute('data-walk-view', 'third-person')
+  await expect(scene).toHaveAttribute('data-player-x-mm', firstPersonX!)
+  await expect(scene).toHaveAttribute('data-player-y-mm', firstPersonY!)
+  await expect(scene).toHaveAttribute('data-renderer-generation', rendererGeneration!)
+  await page.getByRole('button', { name: 'First-person view' }).click()
+  await expect(scene).toHaveAttribute('data-walk-view', 'first-person')
 
-  await page.keyboard.down('d')
+  const beforeMove = `${await scene.getAttribute('data-player-x-mm')},${await scene.getAttribute('data-player-y-mm')}`
+  await page.keyboard.down('ArrowUp')
   await page.waitForTimeout(420)
-  await page.keyboard.up('d')
-  await expect.poll(async () => Number(await scene.getAttribute('data-player-y-mm'))).toBeGreaterThan(afterA)
-  const beforeArrowLeft = Number(await scene.getAttribute('data-player-y-mm'))
-
-  await page.keyboard.down('ArrowLeft')
-  await page.waitForTimeout(320)
-  await page.keyboard.up('ArrowLeft')
-  await expect.poll(async () => Number(await scene.getAttribute('data-player-y-mm'))).toBeLessThan(beforeArrowLeft)
-  const afterArrowLeft = Number(await scene.getAttribute('data-player-y-mm'))
-
-  await page.keyboard.down('ArrowRight')
-  await page.waitForTimeout(420)
-  await page.keyboard.up('ArrowRight')
-  await expect.poll(async () => Number(await scene.getAttribute('data-player-y-mm'))).toBeGreaterThan(afterArrowLeft)
+  await page.keyboard.up('ArrowUp')
+  await expect.poll(async () => `${await scene.getAttribute('data-player-x-mm')},${await scene.getAttribute('data-player-y-mm')}`).not.toBe(beforeMove)
+  await page.keyboard.press('f')
   await expect(scene).toHaveAttribute('data-player-grounded', 'true')
 
   await page.evaluate(() => {
@@ -292,9 +288,15 @@ test('shares live service state across 2D, 3D, and first-person views', async ({
   await page.getByRole('button', { name: 'Walk Kitchen' }).click()
   await expect(scene).toHaveAttribute('data-view', 'walk')
   await expect(page.getByRole('button', { name: /Exit walk mode/i })).toBeVisible()
-  await expect(page.getByText(/WASD.*Arrow keys/i)).toBeVisible()
+  await expect(page.getByLabel(/Walk kitchen controls/i)).toContainText('WASD · Up/Down')
   await scene.locator('canvas').click()
   await expect(scene).toHaveAttribute('data-player-position', /\d+,\d+/)
+  const firstPersonPosition = await scene.getAttribute('data-player-position')
+  await page.getByRole('button', { name: 'Third-person view' }).click()
+  await expect(scene).toHaveAttribute('data-walk-view', 'third-person')
+  await expect(scene).toHaveAttribute('data-player-position', firstPersonPosition!)
+  await page.getByRole('button', { name: 'First-person view' }).click()
+  await expect(scene).toHaveAttribute('data-walk-view', 'first-person')
   const positionBeforeWalking = await scene.getAttribute('data-player-position')
   await page.keyboard.down('w')
   await page.waitForTimeout(450)

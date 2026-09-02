@@ -172,6 +172,30 @@ describe('3D scene synchronization', () => {
     expect(screen.getByTestId('kitchen-scene')).toHaveAttribute('data-renderer-generation', generation)
   })
 
+  it('switches live walk cameras without remounting the renderer or resetting player motion', async () => {
+    const user = userEvent.setup()
+    let mounts = 0
+    const SwitchableRenderer = ({ walkMode, walkView, onPlayerPositionChange }: SceneRendererProps) => {
+      useEffect(() => {
+        mounts += 1
+        onPlayerPositionChange({ x: 2100, y: 3200, elevationMm: 650, grounded: false, verticalVelocityMps: 1.8 })
+      }, [onPlayerPositionChange])
+      return <output data-testid="live-walk-view">{walkMode ? walkView : 'overview'}</output>
+    }
+    render(<SceneWorkspace renderer={SwitchableRenderer} />)
+    const canvas = screen.getByTestId('kitchen-scene')
+
+    await user.click(screen.getByRole('button', { name: 'Walk kitchen' }))
+    expect(screen.getByTestId('live-walk-view')).toHaveTextContent('first-person')
+    await user.click(screen.getByRole('button', { name: 'Third-person view' }))
+
+    expect(screen.getByTestId('kitchen-scene')).toBe(canvas)
+    expect(screen.getByTestId('live-walk-view')).toHaveTextContent('third-person')
+    expect(screen.getByTestId('kitchen-scene')).toHaveAttribute('data-player-elevation-mm', '650')
+    expect(screen.getByTestId('kitchen-scene')).toHaveAttribute('data-player-vertical-velocity', '1.8')
+    expect(mounts).toBe(1)
+  })
+
   it('keeps the overview renderer mounted when Walk has no valid spawn', async () => {
     const user = userEvent.setup()
     let mounts = 0

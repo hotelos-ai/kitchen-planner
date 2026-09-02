@@ -3,10 +3,15 @@ import { chefVisualDescriptor } from './ChefAvatar'
 
 describe('ChefAvatar', () => {
   it('describes the approved chef silhouette and player styling', () => {
-    expect(chefVisualDescriptor('head-chef', false).parts).toEqual(expect.arrayContaining([
+    const descriptor = chefVisualDescriptor('head-chef', false)
+    expect(descriptor.parts).toEqual(expect.arrayContaining([
       'toque-band', 'toque-crown', 'eyes', 'eyebrows', 'smile', 'cheeks', 'ears',
-      'double-breasted-jacket', 'apron', 'neckerchief', 'trousers', 'non-slip-shoes',
+      'nose', 'pupils', 'double-breasted-jacket', 'collar', 'apron', 'neckerchief',
+      'cuffed-sleeves', 'trousers', 'non-slip-shoes',
     ]))
+    expect(descriptor.proportions).toEqual({ heightM: 1.82, headToHeightRatio: .1, shoulderToHeightRatio: .36 })
+    expect(descriptor.visualRegressionViews).toEqual(['front', 'three-quarter'])
+    expect(descriptor.uniform).toBe('modern-double-breasted')
     expect(chefVisualDescriptor('head-chef', true).expression).toBe('happy')
     expect(chefVisualDescriptor('head-chef', true).accent).toBe('#b95f47')
   })

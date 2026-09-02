@@ -54,4 +54,17 @@ describe('PointerLockLook', () => {
     fireEvent(document, new Event('pointerlockchange'))
     expect(onUnlock).toHaveBeenCalledOnce()
   })
+
+  it('publishes look deltas to the player pose owner without mutating the camera', () => {
+    const camera = new THREE.PerspectiveCamera()
+    const onLook = vi.fn()
+    useThreeMock.mockImplementation((selector: (state: unknown) => unknown) => selector({ camera, gl: { domElement: canvas } }))
+    render(<PointerLockLook active onLock={vi.fn()} onUnlock={vi.fn()} onLook={onLook} />)
+
+    Object.defineProperty(document, 'pointerLockElement', { configurable: true, value: canvas })
+    fireEvent.mouseMove(document, { movementX: 12, movementY: -8 })
+
+    expect(onLook).toHaveBeenCalledWith(.024, .016)
+    expect(camera.quaternion.toArray()).toEqual([0, 0, 0, 1])
+  })
 })

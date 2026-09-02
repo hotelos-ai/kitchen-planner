@@ -16,10 +16,14 @@ export function chefVisualDescriptor(role: StaffRole, player: boolean) {
   return {
     parts: [
       'toque-band', 'toque-crown', 'eyes', 'eyebrows', 'smile', 'cheeks', 'ears',
-      'double-breasted-jacket', 'apron', 'neckerchief', 'trousers', 'non-slip-shoes',
+      'nose', 'pupils', 'double-breasted-jacket', 'collar', 'apron', 'neckerchief',
+      'cuffed-sleeves', 'trousers', 'non-slip-shoes',
     ],
     expression: 'happy' as const,
     accent: player ? '#b95f47' : ROLE_COLORS[role],
+    proportions: { heightM: 1.82, headToHeightRatio: .1, shoulderToHeightRatio: .36 },
+    visualRegressionViews: ['front', 'three-quarter'] as const,
+    uniform: 'modern-double-breasted' as const,
   }
 }
 
@@ -88,15 +92,19 @@ export function ChefAvatar({ pose, label, reducedMotion = false, player = false 
       <mesh position={[0, 1.05, .238]} castShadow><boxGeometry args={[.39, .48, .024]} /><meshStandardMaterial color="#f4f1e9" roughness={.72} /></mesh>
       <mesh position={[0, .965, .256]} castShadow><boxGeometry args={[.31, .42, .018]} /><meshStandardMaterial color="#e7e2d8" roughness={.76} /></mesh>
       <mesh position={[0, 1.18, .255]}><boxGeometry args={[.035, .28, .018]} /><meshStandardMaterial color={descriptor.accent} roughness={.58} /></mesh>
+      <mesh position={[-.08, 1.285, .245]} rotation={[0, 0, -.55]}><boxGeometry args={[.14, .045, .025]} /><KitchenSurfaceMaterial material="whiteUniform" /></mesh>
+      <mesh position={[.08, 1.285, .245]} rotation={[0, 0, .55]}><boxGeometry args={[.14, .045, .025]} /><KitchenSurfaceMaterial material="whiteUniform" /></mesh>
       {[-.105, .105].flatMap((x) => [.94, 1.07, 1.2].map((y) => <mesh key={`${x}-${y}`} position={[x, y, .274]}><sphereGeometry args={[.017, 10, 8]} /><KitchenSurfaceMaterial material="blackEnamel" /></mesh>))}
       <mesh position={[0, 1.34, .17]} rotation={[Math.PI / 2, 0, 0]}><coneGeometry args={[.115, .16, 3]} /><meshStandardMaterial color={descriptor.accent} roughness={.65} /></mesh>
 
       <group ref={leftArm} position={[-.32, 1.22, 0]} rotation={[0, 0, -.12]}>
         <mesh position={[0, -.25, 0]} castShadow><capsuleGeometry args={[.07, .36, 6, 12]} /><KitchenSurfaceMaterial material="whiteUniform" /></mesh>
+        <mesh position={[0, -.43, 0]} castShadow><cylinderGeometry args={[.079, .074, .09, 12]} /><KitchenSurfaceMaterial material="whiteUniform" /></mesh>
         <mesh position={[0, -.49, 0]} scale={[.88, 1.05, .82]} castShadow><sphereGeometry args={[.085, 14, 10]} /><meshStandardMaterial color={SKIN} roughness={.78} /></mesh>
       </group>
       <group ref={rightArm} position={[.32, 1.22, 0]} rotation={[0, 0, .12]}>
         <mesh position={[0, -.25, 0]} castShadow><capsuleGeometry args={[.07, .36, 6, 12]} /><KitchenSurfaceMaterial material="whiteUniform" /></mesh>
+        <mesh position={[0, -.43, 0]} castShadow><cylinderGeometry args={[.079, .074, .09, 12]} /><KitchenSurfaceMaterial material="whiteUniform" /></mesh>
         <mesh position={[0, -.49, 0]} scale={[.88, 1.05, .82]} castShadow><sphereGeometry args={[.085, 14, 10]} /><meshStandardMaterial color={SKIN} roughness={.78} /></mesh>
       </group>
 

@@ -5,7 +5,12 @@ import * as THREE from 'three'
 const LOOK_SENSITIVITY = .002
 const MAX_PITCH = Math.PI / 2 - .015
 
-export function PointerLockLook({ active, onLock, onUnlock }: { active: boolean; onLock(): void; onUnlock(): void }) {
+export function PointerLockLook({ active, onLock, onUnlock, onLook }: {
+  active: boolean
+  onLock(): void
+  onUnlock(): void
+  onLook?(headingDeltaRad: number, pitchDeltaRad: number): void
+}) {
   const camera = useThree((state) => state.camera)
   const canvas = useThree((state) => state.gl.domElement)
   const locked = useRef(false)
@@ -32,6 +37,10 @@ export function PointerLockLook({ active, onLock, onUnlock }: { active: boolean;
     }
     const handleMouseMove = (event: MouseEvent) => {
       if (documentRef.pointerLockElement !== canvas) return
+      if (onLook) {
+        onLook(event.movementX * LOOK_SENSITIVITY, -event.movementY * LOOK_SENSITIVITY)
+        return
+      }
       euler.setFromQuaternion(camera.quaternion)
       euler.y -= event.movementX * LOOK_SENSITIVITY
       euler.x = Math.max(-MAX_PITCH, Math.min(MAX_PITCH, euler.x - event.movementY * LOOK_SENSITIVITY))
@@ -47,7 +56,7 @@ export function PointerLockLook({ active, onLock, onUnlock }: { active: boolean;
       if (documentRef.pointerLockElement === canvas) documentRef.exitPointerLock?.()
       locked.current = false
     }
-  }, [active, camera, canvas, onLock, onUnlock])
+  }, [active, camera, canvas, onLock, onLook, onUnlock])
 
   return null
 }

@@ -14,7 +14,11 @@ type Props = {
   onClearSelection(): void
 }
 
+// eslint-disable-next-line react-refresh/only-export-components
+export const resolveSceneArchitecture = (variant: LayoutVariant) => variant.architecture
+
 export function KitchenScene({ project, variant, selectedIds, showClearances, wallsTransparent, onSelect, onClearSelection }: Props) {
+  const architecture = resolveSceneArchitecture(variant)
   return (
     <>
       <color attach="background" args={['#e8e4da']} />
@@ -26,9 +30,9 @@ export function KitchenScene({ project, variant, selectedIds, showClearances, wa
         <Lightformer form="rect" color="#b7d5d0" intensity={1.35} position={[-4, 2.5, 3]} rotation={[0, Math.PI / 2, 0]} scale={[5, 1.5, 1]} />
       </Environment>
       <group onPointerMissed={onClearSelection}>
-        <ArchitectureMesh architecture={project.architecture} wallsTransparent={wallsTransparent} />
-        {variant.equipment.map((item) => <EquipmentMesh key={item.id} item={item} selected={selectedIds.includes(item.id)} wallHeightMm={project.architecture.wallHeightMm} onSelect={onSelect} />)}
-        <Clearances items={variant.equipment} architecture={project.architecture} displayUnit={project.displayUnit} visible={showClearances} />
+        <ArchitectureMesh architecture={architecture} wallsTransparent={wallsTransparent} />
+        {variant.equipment.map((item) => <EquipmentMesh key={item.id} item={item} selected={selectedIds.includes(item.id)} wallHeightMm={architecture.wallHeightMm} onSelect={onSelect} />)}
+        <Clearances items={variant.equipment} architecture={architecture} displayUnit={project.displayUnit} visible={showClearances} />
         <Grid args={[12, 12]} position={[1.95, -.006, 3.325]} cellSize={.1} cellThickness={.25} cellColor="#9ea9a5" sectionSize={1} sectionThickness={.8} sectionColor="#6e7f79" fadeDistance={14} infiniteGrid />
       </group>
     </>
