@@ -25,10 +25,10 @@ export function App() {
     <main className="app-shell">
       <header className="topbar">
         <div className="brand-lockup">
-          <span className="brand-mark" aria-hidden="true">MR</span>
+          <span className="brand-mark" aria-hidden="true">KP</span>
           <div>
-            <h1>Manta Raja Kitchen Lab</h1>
-            <p>Metric kitchen planning and service simulation</p>
+            <h1>Kitchen Planner</h1>
+            <p>Commercial kitchen planning and service simulation</p>
           </div>
         </div>
         <ProjectExchange />

@@ -6,7 +6,7 @@ test.beforeEach(async ({ page }) => {
 
 test('edits, simulates, compares, exports, and restores Manta Raja', async ({ page }) => {
   await page.goto('/')
-  await expect(page.getByRole('heading', { name: /Manta Raja Kitchen Lab/i })).toBeVisible()
+  await expect(page.getByRole('heading', { name: /Kitchen Planner/i })).toBeVisible()
 
   await page.getByRole('button', { name: /Select Tandoor, 700 mm by 700 mm/i }).click()
   await page.getByLabel(/Lock dimensions/i).uncheck()

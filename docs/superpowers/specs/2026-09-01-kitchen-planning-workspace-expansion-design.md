@@ -2,7 +2,7 @@
 
 **Date:** 2026-09-01  
 **Status:** Draft for written-spec approval  
-**Product:** Manta Raja Kitchen Lab
+**Product:** Kitchen Planner
 
 ## Purpose
 

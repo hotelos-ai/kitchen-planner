@@ -1,4 +1,4 @@
-# Manta Raja Kitchen Lab — User Guide
+# Kitchen Planner — User Guide
 
 ## What opens by default
 

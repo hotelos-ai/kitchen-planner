@@ -7,7 +7,7 @@
 
 Add WebMCP site tools to the spatial-layout application so a person can give an image, written instruction, or other reference material to their own compatible AI agent and have that agent construct, inspect, and repeatedly refine the shared canvas. Follow-up requests such as "move the fryer beside the range," "make this counter 20 cm deeper," or "try the alternative with a wider aisle" must translate into validated changes on the live drawing. The application does not ingest, upload, store, or interpret reference images or natural-language instructions. The external agent performs that interpretation. This application supplies the live spatial document, component catalog, validated editing operations, diagnostics, 3D/first-person environment, and configurable operational simulation.
 
-The first product remains Manta Raja Kitchen Lab, but the WebMCP boundary must describe generic spatial components and capabilities. Kitchen equipment, commercial-kitchen diagnostics, and service simulation are domain modules behind that boundary rather than assumptions embedded in the protocol adapter.
+The first product is Kitchen Planner, seeded with the Manta Raja restaurant layout, but the WebMCP boundary must describe generic spatial components and capabilities. Kitchen equipment, commercial-kitchen diagnostics, and service simulation are domain modules behind that boundary rather than assumptions embedded in the protocol adapter.
 
 ## User Experience
 

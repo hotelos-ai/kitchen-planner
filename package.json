@@ -1,7 +1,13 @@
 {
-  "name": "manta-raja-kitchen-lab",
+  "name": "kitchen-planner",
   "private": true,
   "version": "0.1.0",
+  "license": "UNLICENSED",
+  "description": "Browser-based commercial kitchen planning, 3D walkthrough, and deterministic service simulation.",
+  "repository": {
+    "type": "git",
+    "url": "git+ssh://git@github.com/hotelos-ai/kitchen-planner.git"
+  },
   "type": "module",
   "scripts": {
     "dev": "vite",
