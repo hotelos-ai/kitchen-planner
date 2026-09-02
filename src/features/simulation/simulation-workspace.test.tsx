@@ -3,7 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { createSeedProject } from '../../domain/seed-project'
 import { runSimulation } from '../../simulation/engine'
-import { projectStore } from '../../state/project-store'
+import { createProjectStore, projectStore } from '../../state/project-store'
 import { SimulationWorkspace } from './SimulationWorkspace'
 
 describe('simulation workspace', () => {
@@ -39,5 +39,18 @@ describe('simulation workspace', () => {
     await userEvent.click(screen.getByRole('button', { name: '2D Operations' }))
     expect(screen.getByLabelText(/Simulation time/i)).toHaveValue('900')
     expect(run).toHaveBeenCalledOnce()
+  })
+
+  it('validates and runs the active variant architecture rather than the compatibility mirror', async () => {
+    const project = createSeedProject()
+    project.architecture.wallHeightMm = 2100
+    project.variants[0].architecture.wallHeightMm = 4700
+    const store = createProjectStore(project)
+    const run = vi.fn(runSimulation)
+
+    render(<SimulationWorkspace store={store} run={run} />)
+    await userEvent.click(screen.getByRole('button', { name: /Run 60-minute service/i }))
+
+    expect(run).toHaveBeenCalledWith(expect.objectContaining({ architecture: expect.objectContaining({ wallHeightMm: 4700 }) }))
   })
 })

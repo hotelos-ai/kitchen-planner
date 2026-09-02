@@ -87,4 +87,37 @@ describe('executeWorkspaceBatch', () => {
     expect(executeWorkspaceBatch({ project, revision: 2, operations: [] })).toMatchObject({ ok: false, code: 'empty-batch', revision: 2 })
     expect(executeWorkspaceBatch({ project, revision: 2, operations: [{ type: 'move_components', variantId: 'baseline-trace', componentIds: [], anchor: { xMm: 0, yMm: 0 } }] })).toMatchObject({ ok: false, code: 'invalid-operation', operationIndex: 0, revision: 2 })
   })
+
+  it('patches the targeted layout operational profile inside an ordered atomic batch', () => {
+    const project = createSeedProject()
+    const result = executeWorkspaceBatch({
+      project,
+      revision: 3,
+      operations: [
+        { type: 'create_layout', variantId: 'wizard-layout', parentVariantId: 'baseline-trace', name: 'Wizard layout', equipmentMode: 'empty' },
+        { type: 'update_operational_profile', variantId: 'wizard-layout', patch: {
+          covers: 72,
+          peakDurationMinutes: 90,
+          arrivalPattern: 'two-waves',
+          serviceStyle: 'table service',
+          menuAssumptions: ['high à la minute demand'],
+          staff: [{ role: 'head-chef', count: 1 }, { role: 'cdp', count: 3 }],
+          targetCapacityPerHour: 54,
+        } },
+      ],
+    })
+
+    expect(result).toMatchObject({ ok: true, revision: 4, changedIds: ['wizard-layout', 'operational-profile'] })
+    if (!result.ok) throw new Error(result.message)
+    expect(result.project.variants.find((variant) => variant.id === 'wizard-layout')?.operationalProfile).toEqual({
+      covers: 72,
+      peakDurationMinutes: 90,
+      arrivalPattern: 'two-waves',
+      serviceStyle: 'table service',
+      menuAssumptions: ['high à la minute demand'],
+      staff: [{ role: 'head-chef', count: 1 }, { role: 'cdp', count: 3 }],
+      targetCapacityPerHour: 54,
+    })
+    expect(project.variants).toHaveLength(1)
+  })
 })

@@ -50,6 +50,24 @@ describe('project schema', () => {
     expect(projectSchema.safeParse(validProject).success).toBe(true)
   })
 
+  it('strictly preserves arbitrary polygon wall-segment targets with named-wall fallback', () => {
+    const segmented = structuredClone(validProject)
+    ;(segmented.variants[0].architecture.openings as unknown[]).push({
+      id: 'jagged-window',
+      label: 'Jagged pass',
+      kind: 'service-window',
+      wall: 'top',
+      segmentIndex: 2,
+      offsetMm: 500,
+      widthMm: 900,
+    })
+    const parsed = projectSchema.parse(segmented)
+    expect(parsed.variants[0].architecture.openings[0]).toMatchObject({ wall: 'top', segmentIndex: 2 })
+
+    ;(segmented.variants[0].architecture.openings[0] as unknown as { segmentIndex: number }).segmentIndex = -1
+    expect(projectSchema.safeParse(segmented).success).toBe(false)
+  })
+
   it('accepts a nonempty equipment configuration identifier', () => {
     const configured = structuredClone(validProject)
     Object.assign(configured.variants[0].equipment[0], { configurationPreset: 'hot-tandoor' })

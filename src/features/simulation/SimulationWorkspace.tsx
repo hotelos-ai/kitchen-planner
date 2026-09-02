@@ -28,10 +28,14 @@ export function SimulationWorkspace({ store = projectStore, run = runSimulation,
   const [followRole, setFollowRole] = useState<StaffRole | 'overview'>('overview')
   const [view, setView] = useState<SimulationView>('operations-2d')
   const staffCount = scenario.staff.reduce((sum, entry) => sum + entry.count, 0)
-  const validationErrors = useMemo(() => validateSimulationInput({ architecture: project.architecture, equipment: variant.equipment, scenario }), [project.architecture, scenario, variant.equipment])
-  if (staffCount < 1) validationErrors.unshift({ code: 'missing-capability', message: 'Add at least one staff member.', itemIds: [] })
+  const validationErrors = useMemo(() => validateSimulationInput({
+    architecture: variant.architecture,
+    equipment: variant.equipment,
+    scenario,
+    layoutConstraints: variant.layoutConstraints,
+  }), [scenario, variant.architecture, variant.equipment, variant.layoutConstraints])
   const hasValidationErrors = validationErrors.length > 0
-  const simulationInput = useMemo(() => ({ architecture: project.architecture, equipment: variant.equipment, scenario }), [project.architecture, scenario, variant.equipment])
+  const simulationInput = useMemo(() => ({ architecture: variant.architecture, equipment: variant.equipment, scenario }), [scenario, variant.architecture, variant.equipment])
   const session = useSimulationSession({ input: simulationInput, run })
   const { result, liveState, elapsedSeconds, playing, speed } = session
 
@@ -56,7 +60,7 @@ export function SimulationWorkspace({ store = projectStore, run = runSimulation,
           <div className="simulation-view-stage">
             <SimulationViewSwitcher value={view} onChange={setView} />
             {view === 'operations-2d'
-              ? <SimulationScene result={result} liveState={liveState} elapsedSeconds={elapsedSeconds} architecture={project.architecture} equipment={variant.equipment} layers={layers} followRole={followRole} />
+              ? <SimulationScene result={result} liveState={liveState} elapsedSeconds={elapsedSeconds} architecture={variant.architecture} equipment={variant.equipment} layers={layers} followRole={followRole} />
               : <ThreeRenderer view={view} project={project} variant={variant} result={result} liveState={liveState} elapsedSeconds={elapsedSeconds} layers={layers} followRole={followRole} onExitWalk={() => setView('overview-3d')} />}
           </div>
           <PlaybackControls elapsedSeconds={elapsedSeconds} durationSeconds={result.durationSeconds} playing={playing} speed={speed} onPlaying={session.setPlaying} onElapsed={session.setElapsedSeconds} onSpeed={session.setSpeed} />

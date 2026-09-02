@@ -3,7 +3,7 @@ import { APPEARANCE_SKINS } from '../../domain/catalog/appearance-skins'
 import { getCatalogEntry } from '../../domain/catalog/kitchen-catalog'
 import { normalizeRotation, snapMm } from '../../domain/geometry'
 import type { Architecture, EquipmentItem, KitchenProject, LayoutVariant, PointMm, StationCapability } from '../../domain/project'
-import { architectureSchema, projectSchema, scenarioSchema } from '../../domain/project-schema'
+import { architectureSchema, operationalProfileSchema, projectSchema, scenarioSchema } from '../../domain/project-schema'
 import { workspaceOperationSchema, type WorkspaceOperation } from './workspace-operation'
 
 export type WorkspaceOperationErrorCode =
@@ -278,6 +278,13 @@ export function executeWorkspaceBatch(options: BatchOptions): WorkspaceBatchResu
         variant.architecture = parsed.data
         if (project.activeVariantId === variant.id) project.architecture = structuredClone(parsed.data)
         changedIds.push('architecture')
+        return
+      }
+      case 'update_operational_profile': {
+        const parsed = operationalProfileSchema.safeParse({ ...variant.operationalProfile, ...operation.patch })
+        if (!parsed.success) return fail('invalid-candidate', 'Operational profile update is invalid.', parsed.error.issues)
+        variant.operationalProfile = parsed.data
+        changedIds.push('operational-profile')
         return
       }
       case 'update_workspace_settings':

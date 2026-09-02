@@ -34,6 +34,11 @@ test('edits, simulates, compares, exports, and restores Manta Raja', async ({ pa
   await expect(page.getByLabel(/Equipment label/i)).toHaveValue('Tandoor')
 
   await page.getByRole('button', { name: /New variant/i }).click()
+  await page.getByRole('button', { name: 'Next' }).click()
+  await page.getByRole('button', { name: 'Next' }).click()
+  await page.getByRole('button', { name: 'Next' }).click()
+  await page.getByRole('button', { name: 'Next' }).click()
+  await page.getByRole('button', { name: 'Create layout' }).click()
   await expect(page.getByLabel(/Active layout variant/i)).toHaveValue(/variant-/)
   await page.getByRole('button', { name: /Select Tandoor/i }).click()
   await page.getByLabel(/^X position \(mm\)$/i).fill('2300')
@@ -61,6 +66,39 @@ test('edits, simulates, compares, exports, and restores Manta Raja', async ({ pa
   expect(exportedPath).toBeTruthy()
   await page.getByLabel(/Import project JSON/i).setInputFiles(exportedPath!)
   await expect(page.getByRole('status')).toContainText(/Imported/i)
+})
+
+test('creates an advanced room and recommended essentials through the novice wizard', async ({ page }) => {
+  await page.goto('/')
+  await page.getByRole('button', { name: /New variant/i }).click()
+  const wizard = page.getByRole('dialog')
+
+  await wizard.getByLabel('Layout name').fill('Jagged service concept')
+  await wizard.getByRole('radio', { name: 'Advanced polygon room' }).check()
+  await wizard.getByRole('button', { name: 'Next' }).click()
+  await wizard.getByRole('button', { name: 'Add wall vertex' }).click()
+  await wizard.getByRole('button', { name: 'Add service window' }).click()
+  await wizard.getByRole('button', { name: 'Add pillar' }).click()
+  await wizard.getByRole('button', { name: 'Add storage zone' }).click()
+  await wizard.getByRole('button', { name: 'Next' }).click()
+
+  await wizard.getByLabel('Covers').fill('180')
+  await wizard.getByLabel('Peak duration (minutes)').fill('90')
+  await wizard.getByLabel('Arrival pattern').selectOption('two-waves')
+  await wizard.getByLabel('Head chef count').fill('2')
+  await wizard.getByRole('button', { name: 'Next' }).click()
+  await wizard.getByText(/Handwash sink/).locator('input').check()
+  await wizard.getByRole('button', { name: 'Next' }).click()
+
+  await expect(wizard.getByRole('heading', { name: 'Review new layout' })).toBeVisible()
+  await expect(wizard).toContainText('180 covers')
+  await expect(wizard).toContainText(/1 service window.*1 pillar.*1 storage zone/)
+  await wizard.getByRole('button', { name: 'Create layout' }).click()
+
+  await expect(wizard).toHaveCount(0)
+  await expect(page.getByRole('tab', { name: /Jagged service concept/ })).toHaveAttribute('aria-selected', 'true')
+  await page.getByRole('button', { name: 'Check essentials' }).click()
+  await expect(page.getByRole('dialog', { name: 'Check essentials' })).toContainText(/operational guidance, not regulatory certification/i)
 })
 
 test('keeps the full simulation readable at phone width', async ({ page }) => {
@@ -96,6 +134,7 @@ test('keeps every 3D control usable and recovers a lost WebGL context', async ({
   await expect(page.locator('.clearance-label').first()).toBeVisible()
   await page.getByRole('button', { name: 'Transparent walls', exact: true }).click()
   await expect(page.getByRole('button', { name: 'Transparent walls', exact: true })).toHaveAttribute('aria-pressed', 'true')
+  const scene = page.getByTestId('kitchen-scene')
   await expect(scene.getByText('Clean pass · orders out')).toBeVisible()
   await expect(page.getByText('Dirty return · dishes in')).toBeVisible()
   await page.getByRole('button', { name: /Select Tandoor in 3D/i }).click()

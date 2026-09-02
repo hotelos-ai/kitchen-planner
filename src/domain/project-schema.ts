@@ -56,6 +56,7 @@ export const architectureSchema = z.object({
     label: z.string().min(1),
     kind: z.enum(['door', 'service-window', 'sealed-opening']),
     wall: z.enum(['top', 'right', 'bottom', 'left']),
+    segmentIndex: z.number().int().nonnegative().max(999).optional(),
     offsetMm: z.number().nonnegative().finite(),
     widthMm: z.number().positive().finite(),
     sillHeightMm: z.number().nonnegative().finite().optional(),

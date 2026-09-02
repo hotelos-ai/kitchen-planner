@@ -36,6 +36,7 @@ export interface ProjectState {
   past: KitchenProject[]
   future: KitchenProject[]
   executeCommand(command: unknown, options?: { dryRun?: boolean; expectedRevision?: number }): CommandResult<KitchenProject>
+  applyWorkspaceOperations(operations: readonly unknown[], intent?: string): ReturnType<WorkspaceFacade['applyOperations']>
   selectItems(ids: string[]): void
   toggleItemSelection(id: string): void
   clearSelection(): void
@@ -124,6 +125,7 @@ export function createProjectStore(initialProject: KitchenProject): ProjectStore
       past: [],
       future: [],
       executeCommand: dispatch,
+      applyWorkspaceOperations: (operations, intent) => applyOperations(operations, intent ?? 'Update workspace'),
       selectItems: (ids) => set({ selectedIds: [...new Set(ids)] }),
       toggleItemSelection: (id) => set((state) => ({
         selectedIds: state.selectedIds.includes(id)

@@ -45,6 +45,8 @@ export interface Opening {
   label: string
   kind: 'door' | 'service-window' | 'sealed-opening'
   wall: 'top' | 'right' | 'bottom' | 'left'
+  /** Zero-based roomPolygon edge target; wall remains the rectangular/migration fallback. */
+  segmentIndex?: number
   offsetMm: Millimetres
   widthMm: Millimetres
   sillHeightMm?: Millimetres

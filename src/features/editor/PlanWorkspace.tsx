@@ -3,7 +3,9 @@ import { useStore } from 'zustand'
 import { getActiveVariant, projectStore, type ProjectStore } from '../../state/project-store'
 import { EquipmentInspector } from './EquipmentInspector'
 import { EquipmentLibrary } from './EquipmentLibrary'
+import { EssentialsChecker } from './EssentialsChecker'
 import { LayoutVariants } from './LayoutVariants'
+import { LayoutWizard } from './LayoutWizard'
 import { LayoutDiagnostics } from './LayoutDiagnostics'
 import { PlanCanvas } from './PlanCanvas'
 import { ProjectSettings } from './ProjectSettings'
@@ -19,6 +21,9 @@ export function PlanWorkspace({ store = projectStore, showCanvas = typeof Resize
   const [showReference, setShowReference] = useState(false)
   const [catalogOpen, setCatalogOpen] = useState(true)
   const [inspectorOpen, setInspectorOpen] = useState(true)
+  const [wizardOpen, setWizardOpen] = useState(false)
+  const [wizardStartsAtRoom, setWizardStartsAtRoom] = useState(false)
+  const [essentialsOpen, setEssentialsOpen] = useState(false)
   const selectedIds = useStore(store, (state) => state.selectedIds)
   const canUndo = useStore(store, (state) => state.past.length > 0)
   const canRedo = useStore(store, (state) => state.future.length > 0)
@@ -38,12 +43,14 @@ export function PlanWorkspace({ store = projectStore, showCanvas = typeof Resize
   })
 
   return (
+    <>
     <section className={`plan-workspace${compact ? ' compact' : ''}`} aria-label="2D plan workspace">
       {!compact && <div key="toolbar" className="workspace-toolbar">
-        <LayoutVariants store={store} />
+        <LayoutVariants store={store} onAdd={() => { setWizardStartsAtRoom(false); setWizardOpen(true) }} />
         <div className="toolbar-actions">
           <button type="button" aria-label="Toggle equipment catalog" aria-pressed={catalogOpen} onClick={() => setCatalogOpen((open) => !open)}>Catalog</button>
           <button type="button" aria-label="Toggle inspector" aria-pressed={inspectorOpen} onClick={() => setInspectorOpen((open) => !open)}>Inspector</button>
+          <button type="button" onClick={() => setEssentialsOpen(true)}>Check essentials</button>
           <button type="button" aria-label="Undo" disabled={!canUndo} onClick={() => store.getState().undo()}>↶ Undo</button>
           <button type="button" aria-label="Redo" disabled={!canRedo} onClick={() => store.getState().redo()}>↷ Redo</button>
           <button type="button" aria-pressed={showReference} onClick={() => setShowReference((value) => !value)}>Source reference</button>
@@ -67,5 +74,22 @@ export function PlanWorkspace({ store = projectStore, showCanvas = typeof Resize
         {!compact && <div key="inspector" className="editor-drawer right-panel inspector-drawer" data-editor-drawer="inspector" aria-hidden={!inspectorOpen}><EquipmentInspector store={store} /><LayoutDiagnostics store={store} /><ProjectSettings store={store} /></div>}
       </div>
     </section>
+    {!compact && wizardOpen && <LayoutWizard
+      store={store}
+      initialStep={wizardStartsAtRoom ? 1 : 0}
+      initialMode={wizardStartsAtRoom ? 'polygon' : 'duplicate'}
+      onClose={() => { setWizardOpen(false); setWizardStartsAtRoom(false) }}
+    />}
+    {!compact && essentialsOpen && <div className="workspace-modal-backdrop">
+      <section className="essentials-dialog" role="dialog" aria-modal="true" aria-label="Check essentials">
+        <button type="button" className="workspace-modal-close" aria-label="Close essentials checker" onClick={() => setEssentialsOpen(false)}>×</button>
+        <EssentialsChecker store={store} onEditRoom={() => {
+          setEssentialsOpen(false)
+          setWizardStartsAtRoom(true)
+          setWizardOpen(true)
+        }} />
+      </section>
+    </div>}
+    </>
   )
 }

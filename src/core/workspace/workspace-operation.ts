@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { operationalProfileSchema } from '../../domain/project-schema'
 
 const idSchema = z.string()
   .min(1)
@@ -39,6 +40,7 @@ const openingSchema = z.object({
   label: nameSchema,
   kind: z.enum(['door', 'service-window', 'sealed-opening']),
   wall: z.enum(['top', 'right', 'bottom', 'left']),
+  segmentIndex: z.number().int().nonnegative().max(999).optional(),
   offsetMm: z.number().finite().nonnegative().max(1_000_000),
   widthMm: dimensionSchema,
   sillHeightMm: z.number().finite().nonnegative().max(100_000).optional(),
@@ -124,6 +126,9 @@ const scenarioPatchSchema = z.object({
   stationCapacities: z.record(idSchema, z.number().int().positive().max(100)).optional(),
 }).strict().refine((patch) => Object.keys(patch).length > 0, 'Scenario patch cannot be empty')
 
+const operationalProfilePatchSchema = operationalProfileSchema.partial()
+  .refine((patch) => Object.keys(patch).length > 0, 'Operational profile patch cannot be empty')
+
 const variantId = { variantId: idSchema }
 
 export const workspaceOperationSchema = z.discriminatedUnion('type', [
@@ -175,6 +180,7 @@ export const workspaceOperationSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('lock_components'), ...variantId, componentIds: componentIdsSchema, locked: z.boolean() }).strict(),
   z.object({ type: z.literal('remove_components'), ...variantId, componentIds: componentIdsSchema }).strict(),
   z.object({ type: z.literal('update_architecture'), ...variantId, patch: architecturePatchSchema }).strict(),
+  z.object({ type: z.literal('update_operational_profile'), ...variantId, patch: operationalProfilePatchSchema }).strict(),
   z.object({
     type: z.literal('update_workspace_settings'),
     ...variantId,
@@ -213,6 +219,7 @@ export const WORKSPACE_OPERATION_TYPES: WorkspaceOperation['type'][] = [
   'lock_components',
   'remove_components',
   'update_architecture',
+  'update_operational_profile',
   'update_workspace_settings',
   'update_scenario',
   'adopt_auto_layout_result',

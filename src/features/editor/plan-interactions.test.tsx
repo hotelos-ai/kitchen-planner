@@ -2,7 +2,7 @@ import { act, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it } from 'vitest'
 import { createSeedProject } from '../../domain/seed-project'
-import { getActiveItem, projectStore } from '../../state/project-store'
+import { createProjectStore, getActiveItem, projectStore } from '../../state/project-store'
 import { PlanWorkspace } from './PlanWorkspace'
 
 describe('plan workspace', () => {
@@ -73,12 +73,19 @@ describe('plan workspace', () => {
     expect(screen.getByRole('button', { name: /Select Rice warmer copy/i })).toBeInTheDocument()
   })
 
-  it('creates and switches to an isolated layout variant', async () => {
+  it('opens the layout wizard and atomically switches to its new variant', async () => {
     const user = userEvent.setup()
     render(<PlanWorkspace showCanvas={false} />)
     await user.click(screen.getByRole('button', { name: /New variant/i }))
+    expect(screen.getByRole('dialog', { name: 'Starting point' })).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Next' }))
+    await user.click(screen.getByRole('button', { name: 'Next' }))
+    await user.click(screen.getByRole('button', { name: 'Next' }))
+    await user.click(screen.getByRole('button', { name: 'Next' }))
+    await user.click(screen.getByRole('button', { name: 'Create layout' }))
     expect(screen.getByLabelText(/Active layout variant/i)).toHaveDisplayValue('Layout option 2')
     expect(projectStore.getState().project.variants).toHaveLength(2)
+    expect(projectStore.getState().past).toHaveLength(1)
   })
 
   it('collapses overlay drawers without remounting the active canvas host', async () => {
@@ -98,5 +105,31 @@ describe('plan workspace', () => {
     expect(container.querySelector('.canvas-column')).toBe(canvasHost)
     expect(catalogDrawer).toHaveAttribute('aria-hidden', 'true')
     expect(inspectorDrawer).toHaveAttribute('aria-hidden', 'true')
+  })
+
+  it('opens operational essentials from the workspace toolbar', async () => {
+    const user = userEvent.setup()
+    render(<PlanWorkspace showCanvas={false} />)
+
+    await user.click(screen.getByRole('button', { name: 'Check essentials' }))
+    expect(screen.getByRole('dialog', { name: 'Check essentials' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Professional review' })).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Close essentials checker' }))
+    expect(screen.queryByRole('dialog', { name: 'Check essentials' })).not.toBeInTheDocument()
+  })
+
+  it('routes architecture essentials directly to advanced room editing', async () => {
+    const user = userEvent.setup()
+    const project = createSeedProject()
+    project.variants[0].architecture.openings = project.variants[0].architecture.openings.filter((opening) => opening.flow !== 'entry')
+    project.architecture = structuredClone(project.variants[0].architecture)
+    render(<PlanWorkspace store={createProjectStore(project)} showCanvas={false} />)
+
+    await user.click(screen.getByRole('button', { name: 'Check essentials' }))
+    await user.click(screen.getByRole('button', { name: /Edit room.*dedicated staff entry/i }))
+
+    expect(screen.queryByRole('dialog', { name: 'Check essentials' })).not.toBeInTheDocument()
+    expect(screen.getByRole('dialog', { name: 'Room' })).toBeInTheDocument()
+    expect(screen.getByRole('group', { name: 'Advanced room geometry' })).toBeInTheDocument()
   })
 })

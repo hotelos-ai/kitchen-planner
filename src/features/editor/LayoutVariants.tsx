@@ -141,7 +141,7 @@ export function LayoutVariants({ store, onAdd, onClosed }: Props) {
           )
         })}
       </div>
-      <button type="button" className="layout-tab-add" aria-label="New variant" title="Create a new layout" onClick={add}>＋</button>
+      <button type="button" className="layout-tab-add" aria-label="New variant" title={onAdd ? 'Open layout wizard' : 'Create a new layout'} onClick={add}>＋</button>
       <select
         hidden
         tabIndex={-1}
