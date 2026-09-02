@@ -41,6 +41,18 @@ describe('project store', () => {
     expect(getActiveItem(store.getState(), 'tandoor')).toMatchObject({ widthMm: 900, depthMm: 800 })
   })
 
+  it('routes component locks and appearance skins through atomic workspace operations', () => {
+    const store = createProjectStore(createSeedProject())
+
+    store.getState().setComponentLocked('tandoor', true)
+    expect(store.getState().project.variants[0].layoutConstraints?.lockedComponentIds).toContain('tandoor')
+
+    store.getState().setAppearanceSkin('tandoor', 'stainless-worn')
+    expect(getActiveItem(store.getState(), 'tandoor').appearanceSkinId).toBe('stainless-worn')
+    expect(store.getState()).toMatchObject({ revision: 2 })
+    expect(store.getState().past).toHaveLength(2)
+  })
+
   it('adds, duplicates, removes, and restores equipment', () => {
     const store = createProjectStore(createSeedProject())
     const customId = store.getState().addCustomItem({ label: 'Rice warmer', widthMm: 600, depthMm: 600 })

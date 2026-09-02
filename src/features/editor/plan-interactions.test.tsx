@@ -80,4 +80,23 @@ describe('plan workspace', () => {
     expect(screen.getByLabelText(/Active layout variant/i)).toHaveDisplayValue('Layout option 2')
     expect(projectStore.getState().project.variants).toHaveLength(2)
   })
+
+  it('collapses overlay drawers without remounting the active canvas host', async () => {
+    const user = userEvent.setup()
+    const { container } = render(<PlanWorkspace showCanvas={false} />)
+    const canvasHost = container.querySelector('.canvas-column')
+    const catalogDrawer = container.querySelector('[data-editor-drawer="catalog"]')
+    const inspectorDrawer = container.querySelector('[data-editor-drawer="inspector"]')
+
+    expect(canvasHost).not.toBeNull()
+    expect(catalogDrawer).toHaveAttribute('aria-hidden', 'false')
+    expect(inspectorDrawer).toHaveAttribute('aria-hidden', 'false')
+
+    await user.click(screen.getByRole('button', { name: 'Toggle equipment catalog' }))
+    await user.click(screen.getByRole('button', { name: 'Toggle inspector' }))
+
+    expect(container.querySelector('.canvas-column')).toBe(canvasHost)
+    expect(catalogDrawer).toHaveAttribute('aria-hidden', 'true')
+    expect(inspectorDrawer).toHaveAttribute('aria-hidden', 'true')
+  })
 })

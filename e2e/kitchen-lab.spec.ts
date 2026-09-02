@@ -96,7 +96,7 @@ test('keeps every 3D control usable and recovers a lost WebGL context', async ({
   await expect(page.locator('.clearance-label').first()).toBeVisible()
   await page.getByRole('button', { name: 'Transparent walls', exact: true }).click()
   await expect(page.getByRole('button', { name: 'Transparent walls', exact: true })).toHaveAttribute('aria-pressed', 'true')
-  await expect(page.getByText('Clean pass · orders out')).toBeVisible()
+  await expect(scene.getByText('Clean pass · orders out')).toBeVisible()
   await expect(page.getByText('Dirty return · dishes in')).toBeVisible()
   await page.getByRole('button', { name: /Select Tandoor in 3D/i }).click()
 
@@ -245,7 +245,6 @@ test('shares live service state across 2D, 3D, and first-person views', async ({
   await expect(scene).toHaveAttribute('data-staff-count', '5')
   await expect(scene.locator('canvas')).toBeVisible()
   await expect(page.getByLabel(/Live order tickets/i)).toBeVisible()
-  await expect(page.getByText('Clean pass · orders out')).toBeVisible()
   const staffAtTenMinutes = await scene.getAttribute('data-staff-positions')
 
   await page.getByLabel(/Simulation time/i).fill('900')

@@ -4,6 +4,7 @@ import { Group, Layer, Rect, Text, Transformer } from 'react-konva'
 import type { DisplayUnit, EquipmentItem, PointMm } from '../../domain/project'
 import { snapMm as snapValue } from '../../domain/geometry'
 import { formatDimensions, formatLength } from '../../domain/units'
+import type { OverlayPosition } from './ComponentContextMenu'
 import { equipmentTransformPatch } from './equipment-transform'
 
 const COLORS: Record<EquipmentItem['category'], { fill: string; stroke: string; text: string }> = {
@@ -26,12 +27,20 @@ type NodeProps = {
   originY: number
   snapMm: number
   onSelect(itemId: string, additive: boolean): void
+  onQuickConfigure(itemId: string, position: OverlayPosition): void
+  onOpenContextMenu(itemId: string, position: OverlayPosition): void
   onMove(itemId: string, point: PointMm): void
   onTransform(itemId: string, patch: Partial<EquipmentItem>): void
   warning?: boolean
 }
 
-export function EquipmentNode({ item, selected, warning = false, displayUnit, pixelsPerMm: scale, originX, originY, snapMm, onSelect, onMove, onTransform }: NodeProps) {
+const eventPosition = (event: MouseEvent | TouchEvent): OverlayPosition => {
+  if ('clientX' in event) return { x: event.clientX, y: event.clientY }
+  const touch = event.changedTouches[0] ?? event.touches[0]
+  return { x: touch?.clientX ?? 0, y: touch?.clientY ?? 0 }
+}
+
+export function EquipmentNode({ item, selected, warning = false, displayUnit, pixelsPerMm: scale, originX, originY, snapMm, onSelect, onQuickConfigure, onOpenContextMenu, onMove, onTransform }: NodeProps) {
   const nodeRef = useRef<Konva.Group>(null)
   const transformerRef = useRef<Konva.Transformer>(null)
   const [feedback, setFeedback] = useState<PointMm | null>(null)
@@ -55,7 +64,29 @@ export function EquipmentNode({ item, selected, warning = false, displayUnit, pi
       draggable={item.movable}
       onClick={(event) => onSelect(item.id, Boolean(event.evt.shiftKey))}
       onTap={() => onSelect(item.id, false)}
-      onDragStart={(event) => setFeedback({ x: snapValue((event.target.x() - originX) / scale, snapMm), y: snapValue((event.target.y() - originY) / scale, snapMm) })}
+      onDblClick={(event) => {
+        event.evt.preventDefault()
+        event.cancelBubble = true
+        onQuickConfigure(item.id, eventPosition(event.evt))
+      }}
+      onDblTap={(event) => {
+        event.evt.preventDefault()
+        event.cancelBubble = true
+        onQuickConfigure(item.id, eventPosition(event.evt))
+      }}
+      onContextMenu={(event) => {
+        event.evt.preventDefault()
+        event.cancelBubble = true
+        onOpenContextMenu(item.id, eventPosition(event.evt))
+      }}
+      onDragStart={(event) => {
+        if ('button' in event.evt && event.evt.button !== 0) {
+          event.target.stopDrag()
+          event.cancelBubble = true
+          return
+        }
+        setFeedback({ x: snapValue((event.target.x() - originX) / scale, snapMm), y: snapValue((event.target.y() - originY) / scale, snapMm) })
+      }}
       onDragMove={(event) => setFeedback({ x: snapValue((event.target.x() - originX) / scale, snapMm), y: snapValue((event.target.y() - originY) / scale, snapMm) })}
       onDragEnd={(event) => {
         onMove(item.id, { x: (event.target.x() - originX) / scale, y: (event.target.y() - originY) / scale })
@@ -92,8 +123,7 @@ export function EquipmentNode({ item, selected, warning = false, displayUnit, pi
     </Group>
     {selected && !item.dimensionsLocked && <Transformer
       ref={transformerRef}
-      rotateEnabled
-      rotationSnaps={[0, 90, 180, 270]}
+      rotateEnabled={false}
       enabledAnchors={['top-left', 'top-center', 'top-right', 'middle-left', 'middle-right', 'bottom-left', 'bottom-center', 'bottom-right']}
       anchorFill="#fffaf0"
       anchorStroke="#d46847"

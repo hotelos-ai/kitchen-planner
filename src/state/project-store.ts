@@ -43,6 +43,8 @@ export interface ProjectState {
   rotateItems(ids: string[], deltaDeg?: number): void
   resizeItem(id: string, size: ResizeInput): void
   setDimensionsLocked(id: string, locked: boolean): void
+  setComponentLocked(id: string, locked: boolean): void
+  setAppearanceSkin(id: string, skinId: string): void
   updateItem(id: string, patch: Partial<EquipmentItem>): void
   applyEquipmentConfiguration(id: string, configurationId: string): boolean
   addCustomItem(input: CustomItemInput): string
@@ -132,6 +134,8 @@ export function createProjectStore(initialProject: KitchenProject): ProjectStore
       rotateItems: (ids, deltaDeg = 90) => { if (ids.length) applyOperations([{ type: 'rotate_components', variantId: activeVariantId(), componentIds: ids, deltaDeg }], 'Rotate components') },
       resizeItem: (id, size) => { applyOperations([{ type: 'resize_component', variantId: activeVariantId(), componentId: id, dimensions: size }], 'Resize component') },
       setDimensionsLocked: (id, locked) => { applyOperations([{ type: 'set_component_dimensions_lock', variantId: activeVariantId(), componentId: id, locked }], 'Set component dimension lock') },
+      setComponentLocked: (id, locked) => { applyOperations([{ type: 'lock_components', variantId: activeVariantId(), componentIds: [id], locked }], 'Set component lock') },
+      setAppearanceSkin: (id, skinId) => { applyOperations([{ type: 'skin_component', variantId: activeVariantId(), componentId: id, skinId }], 'Set component appearance') },
       updateItem: (id, patch) => {
         const current = getActiveItem(get(), id)
         const operations: unknown[] = []

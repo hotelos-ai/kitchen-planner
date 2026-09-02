@@ -1,0 +1,109 @@
+import { useEffect, useRef } from 'react'
+import type { PointMm } from '../../domain/project'
+
+export type WorkspaceShortcutOptions = {
+  selectedIds: readonly string[]
+  getSnapMm(): number
+  undo(): void
+  redo(): void
+  duplicate(id: string): void
+  remove(ids: string[]): void
+  nudge(ids: string[], delta: PointMm): void
+  rotate(ids: string[], deltaDeg: number): void
+  clearSelection(): void
+  onEscape?: () => boolean | void
+}
+
+const INTERACTIVE_SELECTOR = [
+  'input',
+  'textarea',
+  'select',
+  'option',
+  'button',
+  'a[href]',
+  'area[href]',
+  'summary',
+  'details',
+  'audio[controls]',
+  'video[controls]',
+  '[contenteditable]:not([contenteditable="false"])',
+].join(',')
+
+export function isWorkspaceShortcutTarget(target: EventTarget | null): boolean {
+  return target instanceof Element && target.closest(INTERACTIVE_SELECTOR) !== null
+}
+
+export function useWorkspaceShortcuts(options: WorkspaceShortcutOptions): void {
+  const optionsRef = useRef(options)
+
+  useEffect(() => {
+    optionsRef.current = options
+  }, [options])
+
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (isWorkspaceShortcutTarget(event.target)) return
+
+      const current = optionsRef.current
+      const key = event.key.toLowerCase()
+      const command = event.metaKey || event.ctrlKey
+      const selectedIds = [...current.selectedIds]
+
+      if (command && key === 'z') {
+        event.preventDefault()
+        if (event.shiftKey) current.redo()
+        else current.undo()
+        return
+      }
+
+      if (command && key === 'y') {
+        event.preventDefault()
+        current.redo()
+        return
+      }
+
+      if (command && key === 'd' && selectedIds[0]) {
+        event.preventDefault()
+        current.duplicate(selectedIds[0])
+        return
+      }
+
+      if (!command && !event.altKey && (event.key === 'Delete' || event.key === 'Backspace') && selectedIds.length) {
+        event.preventDefault()
+        current.remove(selectedIds)
+        return
+      }
+
+      if (!command && !event.altKey && event.key === 'Escape') {
+        event.preventDefault()
+        if (current.onEscape?.() === true) return
+        current.clearSelection()
+        return
+      }
+
+      if (!command && !event.altKey && selectedIds.length && (event.key === '[' || event.key === ']')) {
+        event.preventDefault()
+        current.rotate(selectedIds, event.key === '[' ? -90 : 90)
+        return
+      }
+
+      if (command || event.altKey || !selectedIds.length) return
+      const configuredSnap = current.getSnapMm()
+      const snapMm = Number.isFinite(configuredSnap) && configuredSnap > 0 ? configuredSnap : 1
+      const amount = event.shiftKey ? snapMm * 5 : snapMm
+      const deltas: Partial<Record<string, PointMm>> = {
+        ArrowLeft: { x: -amount, y: 0 },
+        ArrowRight: { x: amount, y: 0 },
+        ArrowUp: { x: 0, y: -amount },
+        ArrowDown: { x: 0, y: amount },
+      }
+      const delta = deltas[event.key]
+      if (!delta) return
+      event.preventDefault()
+      current.nudge(selectedIds, delta)
+    }
+
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [])
+}

@@ -47,11 +47,24 @@ export function App() {
       </header>
       <ErrorBoundary>
         <Suspense fallback={<section className="workspace-placeholder">Loading workspace…</section>}>
-          {view === 'plan' && <PlanWorkspace />}
-          {view === 'scene' && <SceneWorkspace />}
-          {view === 'split' && <section className="split-workspace"><PlanWorkspace compact /><SceneWorkspace compact /></section>}
-          {view === 'simulate' && <SimulationWorkspace />}
-          {view === 'compare' && <CompareWorkspace />}
+          <section className={`workspace-surfaces${view === 'split' ? ' split-workspace' : ''}`}>
+            <div
+              className={`workspace-surface plan-surface${view === 'plan' || view === 'split' ? ' active' : ''}`}
+              data-workspace-surface="plan"
+              aria-hidden={view !== 'plan' && view !== 'split'}
+            >
+              <PlanWorkspace compact={view === 'split'} />
+            </div>
+            <div
+              className={`workspace-surface scene-surface${view === 'scene' || view === 'split' ? ' active' : ''}`}
+              data-workspace-surface="scene"
+              aria-hidden={view !== 'scene' && view !== 'split'}
+            >
+              <SceneWorkspace compact={view === 'split'} />
+            </div>
+            {view === 'simulate' && <div className="workspace-surface active"><SimulationWorkspace /></div>}
+            {view === 'compare' && <div className="workspace-surface active"><CompareWorkspace /></div>}
+          </section>
         </Suspense>
       </ErrorBoundary>
     </main>

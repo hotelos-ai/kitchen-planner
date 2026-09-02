@@ -53,7 +53,7 @@ export function EquipmentInspector({ store }: Props) {
   const [confirmRemoveId, setConfirmRemoveId] = useState<string | null>(null)
 
   if (!item) {
-    return <aside className="inspector empty-inspector"><div><span className="eyebrow">Inspector</span><h2>No item selected</h2><p>Select an equipment footprint to edit its size, position, rotation, and metadata.</p></div></aside>
+    return <aside className="inspector empty-inspector"><div><span className="eyebrow">Inspector</span><h2>No item selected</h2><p>Select an equipment footprint to edit its size, position, and metadata.</p></div></aside>
   }
   const confirmRemove = confirmRemoveId === item.id
 
@@ -78,11 +78,6 @@ export function EquipmentInspector({ store }: Props) {
         <LengthField key={`x-${item.id}-${item.xMm}-${project.displayUnit}`} label="X position" valueMm={item.xMm} unit={project.displayUnit} onCommit={(xMm) => store.getState().moveItems([item.id], { x: xMm, y: item.yMm })} />
         <LengthField key={`y-${item.id}-${item.yMm}-${project.displayUnit}`} label="Y position" valueMm={item.yMm} unit={project.displayUnit} onCommit={(yMm) => store.getState().moveItems([item.id], { x: item.xMm, y: yMm })} />
       </div>
-      <label>Rotation
-        <select aria-label="Rotation" value={item.rotationDeg} onChange={(event) => update({ rotationDeg: Number(event.target.value) })}>
-          <option value="0">0°</option><option value="90">90°</option><option value="180">180°</option><option value="270">270°</option>
-        </select>
-      </label>
       <LengthField key={`clearance-${item.id}-${item.clearance?.frontMm ?? 1}-${project.displayUnit}`} label="Front clearance" valueMm={item.clearance?.frontMm ?? 1} unit={project.displayUnit} onCommit={(frontMm) => update({ clearance: { kind: item.clearance?.kind ?? (item.category === 'cooking' ? 'heat' : 'work'), frontMm } })} />
       <details className="capability-editor"><summary>Simulation capabilities ({item.capabilities.length})</summary><div>{CAPABILITIES.map((capability) => <label className="checkbox-row" key={capability}><input type="checkbox" checked={item.capabilities.includes(capability)} onChange={(event) => update({ capabilities: event.target.checked ? [...item.capabilities, capability] : item.capabilities.filter((value) => value !== capability) })} />{capability.replaceAll('-', ' ')}</label>)}</div></details>
       {item.notes && <p className="item-note">{item.notes}</p>}
