@@ -1,0 +1,26 @@
+# CalmKitchen Designer
+
+> Design, walk through, and pressure-test commercial kitchen layouts in the browser. Part of the HotelOS suite.
+
+CalmKitchen Designer combines a dimensionally accurate 2D editor, a synchronized procedural 3D scene with first-person walkthrough, deterministic busy-service simulation, and evidence-based layout comparison. All geometry is millimetre-native; identical layouts and seeds produce identical results.
+
+## How to use
+
+- App: https://planner.kitchen.hotelos.ai/
+- CalmKitchen home: https://kitchen.hotelos.ai/
+- Guided tour: open the "?" help menu in the app, then "Start guided tour"
+
+## Workflow
+
+1. **Space** — draw or trace the room outline; drag outline vertices to reshape; add doors, service windows, pillars, and zones. The floor plan is shared by every layout.
+2. **Fit-out** — place equipment from the catalog or station templates; select items to configure dimensions, capabilities, and appearance.
+3. **Simulate** — run deterministic service scenarios (covers, staff, arrival patterns) with live playback, queues, and pressure findings.
+4. **Compare** — diff two layouts or scenarios with metric deltas and evidence-backed findings.
+
+## For agents and MCP clients
+
+The app shell exposes machine-readable state on the root element: `data-app-stage` (space | equipment | simulate), `data-app-view` (plan | scene | split), and `data-app-overlay` (none | compare | auto-layout). All interactive controls carry stable accessible names. Projects round-trip through validated JSON (Save project / Open project), and an atomic workspace API is available for tool integrations.
+
+## Limits
+
+A comparative planning aid — it does not replace architectural, fire, ventilation, food-safety, accessibility, structural, or occupational-safety review by qualified professionals.
