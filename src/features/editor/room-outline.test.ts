@@ -84,13 +84,52 @@ describe('named-wall opening movement', () => {
     expect(next.openings[0].wall).toBe('right')
     const clamped = moveOpening(named, 0, { x: 3000, y: 2950 }, 100)
     expect(clamped.openings[0].offsetMm).toBe(1100)
-    const floorZero = moveOpening(named, 0, { x: 3000, y: 0 }, 100)
-    expect(floorZero.openings[0].offsetMm).toBe(0)
+    const corner = moveOpening(named, 0, { x: 3000, y: 0 }, 100)
+    expect(corner.openings[0].segmentIndex).toBe(0)
+    expect(corner.openings[0].offsetMm).toBe(2100)
   })
 
   it('places the named-wall handle at offset plus half width', () => {
     const named: Architecture = { ...architecture, openings: [{ id: 'w', label: 'W', kind: 'service-window', wall: 'top', offsetMm: 600, widthMm: 900, sillHeightMm: 900, heightMm: 900, flow: 'clean-out' as const }] }
     const center = openingCenter(named, named.openings[0])
     expect(center).toEqual({ x: 1050, y: 0 })
+  })
+})
+
+describe('cross-wall opening movement', () => {
+  it('moves an opening to the nearest wall, not just its own', () => {
+    const source: Architecture = {
+      ...architecture,
+      openings: [{ id: 'w', label: 'W', kind: 'service-window', wall: 'right', offsetMm: 500, widthMm: 900, sillHeightMm: 900, heightMm: 900, flow: 'clean-out' as const }],
+    }
+    // drop near the bottom wall (y=2000), far from the right wall
+    const next = moveOpening(source, 0, { x: 1500, y: 1900 }, 100)
+    expect(next.openings[0].segmentIndex).toBe(2)
+    expect(next.openings[0].wall).toBe('bottom')
+    expect(next.openings[0].offsetMm).toBe(1100)
+  })
+
+  it('keeps the opening on its wall when dragged along it', () => {
+    const source: Architecture = {
+      ...architecture,
+      openings: [{ id: 'w', label: 'W', kind: 'service-window', wall: 'right', offsetMm: 500, widthMm: 900, sillHeightMm: 900, heightMm: 900, flow: 'clean-out' as const }],
+    }
+    const next = moveOpening(source, 0, { x: 2950, y: 1600 }, 100)
+    expect(next.openings[0].segmentIndex).toBe(1)
+    expect(next.openings[0].wall).toBe('right')
+    expect(next.openings[0].offsetMm).toBe(1100)
+  })
+
+  it('clamps width when the only reachable wall is shorter than the opening', () => {
+    const narrow: Architecture = {
+      ...architecture,
+      roomPolygon: [{ x: 0, y: 0 }, { x: 1000, y: 0 }, { x: 1000, y: 2000 }, { x: 0, y: 2000 }],
+      widthMm: 1000,
+      depthMm: 2000,
+      openings: [{ id: 'w', label: 'W', kind: 'door', wall: 'right', offsetMm: 500, widthMm: 900, flow: 'entry' as const, swingDepthMm: 900 }],
+    }
+    const next = moveOpening(narrow, 0, { x: 900, y: 100 }, 100)
+    expect(next.openings[0].widthMm).toBeLessThanOrEqual(1000)
+    expect(next.openings[0].offsetMm).toBeGreaterThanOrEqual(0)
   })
 })

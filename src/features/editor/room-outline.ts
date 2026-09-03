@@ -106,15 +106,38 @@ export function openingCenter(architecture: Architecture, opening: { wall?: stri
 export function moveOpening(architecture: Architecture, index: number, point: PointMm, snapMm: number): Architecture {
   if (index < 0 || index >= architecture.openings.length) return architecture
   const opening = architecture.openings[index]
-  const segment = segmentOf(architecture, opening)
-  if (!segment) return architecture
-  const dx = segment.end.x - segment.start.x
-  const dy = segment.end.y - segment.start.y
-  const length = Math.hypot(dx, dy) || 1
-  const projected = ((point.x - segment.start.x) * dx + (point.y - segment.start.y) * dy) / length
-  const maxOffset = Math.max(0, length - opening.widthMm)
-  const offsetMm = Math.max(0, Math.min(maxOffset, Math.round((projected - opening.widthMm / 2) / snapMm) * snapMm))
-  const openings = architecture.openings.map((candidate, position) => position === index ? { ...candidate, offsetMm } : candidate)
+  const polygon = architecture.roomPolygon
+  if (polygon.length < 3) return architecture
+
+  const candidates = polygon.map((start, segmentIndex) => {
+    const end = polygon[(segmentIndex + 1) % polygon.length]
+    const dx = end.x - start.x
+    const dy = end.y - start.y
+    const length = Math.hypot(dx, dy) || 1
+    const projected = Math.max(0, Math.min(length, ((point.x - start.x) * dx + (point.y - start.y) * dy) / length))
+    const px = start.x + (dx / length) * projected
+    const py = start.y + (dy / length) * projected
+    return { segmentIndex, start, end, length, projected, distance: Math.hypot(px - point.x, py - point.y) }
+  }).sort((left, right) => left.distance - right.distance || left.segmentIndex - right.segmentIndex)
+
+  const target = candidates.find((candidate) => candidate.length >= opening.widthMm) ?? candidates[0]
+  const widthMm = Math.min(opening.widthMm, target.length)
+  const maxOffset = Math.max(0, target.length - widthMm)
+  const rawOffset = target.projected - widthMm / 2
+  const offsetMm = Math.max(0, Math.min(maxOffset, Math.round(rawOffset / snapMm) * snapMm))
+
+  const midpoint = { x: (target.start.x + target.end.x) / 2, y: (target.start.y + target.end.y) / 2 }
+  const wallCandidates: { wall: 'top' | 'right' | 'bottom' | 'left'; distance: number }[] = [
+    { wall: 'top', distance: midpoint.y },
+    { wall: 'right', distance: architecture.widthMm - midpoint.x },
+    { wall: 'bottom', distance: architecture.depthMm - midpoint.y },
+    { wall: 'left', distance: midpoint.x },
+  ]
+  const wall = wallCandidates.sort((left, right) => left.distance - right.distance)[0].wall
+
+  const openings = architecture.openings.map((candidate, position) => position === index
+    ? { ...candidate, segmentIndex: target.segmentIndex, wall, offsetMm, ...(widthMm !== candidate.widthMm ? { widthMm } : {}) }
+    : candidate)
   return { ...architecture, openings }
 }
 
