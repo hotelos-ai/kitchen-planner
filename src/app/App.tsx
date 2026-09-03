@@ -9,7 +9,8 @@ import { createBlankProject } from '../domain/blank-project'
 import { createSeedProject } from '../domain/seed-project'
 import { AgentToolsPanel } from '../features/webmcp/AgentToolsPanel'
 import { WebMcpProvider } from '../features/webmcp/WebMcpProvider'
-import type { ViewMode, WorkflowStage, WorkspaceOverlay } from './workflow'
+import { appStateStore } from '../state/app-state-store'
+import type { ViewMode } from './workflow'
 import { ErrorBoundary } from './ErrorBoundary'
 import { HelpDialog } from './HelpDialog'
 import { CURRENT_PROJECT_KEY, LAST_GOOD_PROJECT_KEY, LEGACY_CURRENT_PROJECT_KEY, LEGACY_LAST_GOOD_PROJECT_KEY } from '../state/persistence'
@@ -32,10 +33,18 @@ void Promise.all([
 ])
 
 export function App() {
-  const [stage, setStage] = useState<WorkflowStage>('space')
-  const [view, setView] = useState<ViewMode>('plan')
-  const [overlay, setOverlay] = useState<WorkspaceOverlay>(null)
+  const stage = useStore(appStateStore, (state) => state.stage)
+  const view = useStore(appStateStore, (state) => state.view)
+  const overlay = useStore(appStateStore, (state) => state.overlay)
+  const setStage = useStore(appStateStore, (state) => state.setStage)
+  const setView = useStore(appStateStore, (state) => state.setView)
+  const setOverlay = useStore(appStateStore, (state) => state.setOverlay)
+  const toggleOverlay = useStore(appStateStore, (state) => state.toggleOverlay)
+  const agentIntent = useStore(appStateStore, (state) => state.agentIntent)
+  const lastAgentAction = useStore(appStateStore, (state) => state.lastAgentAction)
+  const clearLastAgentAction = useStore(appStateStore, (state) => state.clearLastAgentAction)
   const project = useStore(projectStore, (state) => state.project)
+  const revision = useStore(projectStore, (state) => state.revision)
   const selectedIds = useStore(projectStore, (state) => state.selectedIds)
   const selectedItem = useStore(projectStore, (state) => getActiveVariant(state).equipment.find((item) => item.id === state.selectedIds[0]))
   const canUndo = useStore(projectStore, (state) => state.past.length > 0)
@@ -50,19 +59,19 @@ export function App() {
   const [revisionsOpen, setRevisionsOpen] = useState(false)
   const [sourceImageUrl, setSourceImageUrl] = useState('/reference/kitchen-sketch.png')
   const [closedLayout, setClosedLayout] = useState<{ name: string; revision: number; undo(): boolean } | null>(null)
-  const [showStartScreen, setShowStartScreen] = useState(false)
-  const [helpOpen, setHelpOpen] = useState(false)
-
-  useEffect(() => {
-    const hasSession = typeof localStorage !== 'undefined' && Boolean(
+  const [showStartScreen, setShowStartScreen] = useState(() => {
+    if (typeof localStorage === 'undefined') return false
+    return !(
       localStorage.getItem(SESSION_FLAG_KEY)
       ?? localStorage.getItem(CURRENT_PROJECT_KEY)
       ?? localStorage.getItem(LAST_GOOD_PROJECT_KEY)
       ?? localStorage.getItem(LEGACY_CURRENT_PROJECT_KEY)
-      ?? localStorage.getItem(LEGACY_LAST_GOOD_PROJECT_KEY),
+      ?? localStorage.getItem(LEGACY_LAST_GOOD_PROJECT_KEY)
     )
-    if (!hasSession) setShowStartScreen(true)
-  }, [])
+  })
+  const [helpOpen, setHelpOpen] = useState(false)
+
+  useEffect(() => () => appStateStore.getState().reset(), [])
 
   const beginSession = () => {
     localStorage.setItem(SESSION_FLAG_KEY, '1')
@@ -131,8 +140,8 @@ export function App() {
           showAutoLayout={showAutoLayout}
           onViewChange={setView}
           onStageChange={setStage}
-          onOpenCompare={() => setOverlay((current) => current === 'compare' ? null : 'compare')}
-          onOpenAutoLayout={() => setOverlay((current) => current === 'auto-layout' ? null : 'auto-layout')}
+          onOpenCompare={() => toggleOverlay('compare')}
+          onOpenAutoLayout={() => toggleOverlay('auto-layout')}
           aiToolsOpen={aiToolsOpen}
           onOpenAiTools={() => setAiToolsOpen((open) => !open)}
           onTourFocus={focusTourStep}
@@ -242,6 +251,21 @@ export function App() {
         </Suspense>
         {aiToolsOpen && <AgentToolsPanel onClose={() => setAiToolsOpen(false)} />}
       </ErrorBoundary>
+      {agentIntent && <div className="agent-working-indicator" role="status">Agent is working · {agentIntent}</div>}
+      {lastAgentAction && (
+        <div className="workspace-toast agent-action-toast" role="status">
+          <span><strong>Agent:</strong> {lastAgentAction.intent}</span>
+          <button
+            type="button"
+            disabled={revision !== lastAgentAction.revision}
+            title={revision === lastAgentAction.revision ? 'Undo this agent batch' : 'Undo is unavailable after another edit'}
+            onClick={() => {
+              projectStore.getState().undo()
+              clearLastAgentAction(lastAgentAction.id)
+            }}
+          >Undo</button>
+        </div>
+      )}
       {helpOpen && <HelpDialog onClose={() => setHelpOpen(false)} />}
       <footer className="app-footer">
         <span className="footer-brand">

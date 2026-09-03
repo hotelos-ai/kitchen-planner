@@ -1,6 +1,8 @@
 import type { WorkspaceFacade } from '../core/workspace/workspace-facade'
 import { kitchenCapabilityManifest, type CapabilityManifest } from './capability-manifest'
 import type { WebMcpToolDefinition } from './model-context'
+import { createAnalysisTools } from './webmcp-analysis-tools'
+import { createAppTools } from './webmcp-app-tools'
 import { createReadTools } from './webmcp-read-tools'
 import type { ToolDependencies } from './webmcp-tool-utils'
 import { createWriteTools } from './webmcp-write-tools'
@@ -18,8 +20,10 @@ export type WebMcpToolDependencies = ToolDependencies & {
 export function createWebMcpTools(deps: WebMcpToolDependencies): WebMcpToolDefinition[] {
   const manifest = deps.manifest ?? kitchenCapabilityManifest
   const readTools = createReadTools({ store: deps.store, getFacade: deps.getFacade, manifest, getToolSummaries: () => [] })
+  const appTools = createAppTools({ store: deps.store })
+  const analysisTools = createAnalysisTools({ store: deps.store, getFacade: deps.getFacade })
   const writeTools = createWriteTools({ store: deps.store, getFacade: deps.getFacade })
-  const tools = [...readTools, ...writeTools]
+  const tools = [...readTools, ...appTools, ...analysisTools, ...writeTools]
   const summaries = tools.map((tool) => ({
     name: tool.name,
     description: tool.description,

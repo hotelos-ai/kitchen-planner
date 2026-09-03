@@ -4,10 +4,34 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { createSeedProject } from '../../domain/seed-project'
 import { runSimulation } from '../../simulation/engine'
 import { createProjectStore, projectStore } from '../../state/project-store'
+import { appStateStore } from '../../state/app-state-store'
 import { SimulationWorkspace } from './SimulationWorkspace'
 
 describe('simulation workspace', () => {
-  beforeEach(() => projectStore.getState().replaceProject(createSeedProject()))
+  beforeEach(() => {
+    projectStore.getState().replaceProject(createSeedProject())
+    appStateStore.getState().reset()
+  })
+
+  it('turns an agent-requested run into visible playback', async () => {
+    const run = vi.fn(runSimulation)
+    const project = projectStore.getState().project
+    appStateStore.getState().requestSimulationRun({
+      scenarioId: project.activeScenarioId,
+      variantId: project.activeVariantId,
+      seed: 4242,
+      playback: true,
+    })
+
+    render(<SimulationWorkspace run={run} />)
+
+    expect(await screen.findByText(/Total staff travel/i)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Pause' })).toBeInTheDocument()
+    expect(run).toHaveBeenCalledWith(expect.objectContaining({
+      scenario: expect.objectContaining({ seed: 4242 }),
+    }))
+    expect(appStateStore.getState().requestedSimulationRun).toBeNull()
+  })
 
   it('runs the approved five-person 50-cover scenario and displays metrics', async () => {
     render(<SimulationWorkspace run={runSimulation} />)

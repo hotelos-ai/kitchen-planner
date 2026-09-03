@@ -125,6 +125,7 @@ export function createWorkspaceFacade(dependencies: FacadeDependencies) {
       changedIds: [...preview.preview.candidate.changedIds],
       warnings: [...preview.preview.candidate.warnings],
       diagnostics: structuredClone(preview.preview.candidate.diagnostics),
+      ...(preview.preview.candidate.intent === undefined ? {} : { intent: preview.preview.candidate.intent }),
     }
   }
 

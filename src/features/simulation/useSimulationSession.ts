@@ -9,7 +9,7 @@ export type SimulationSession = {
   elapsedSeconds: number
   playing: boolean
   speed: number
-  startRun(): void
+  startRun(inputOverride?: SimulationInput, autoplay?: boolean): void
   clearRun(): void
   setPlaying(value: boolean): void
   setSpeed(value: number): void
@@ -44,7 +44,11 @@ export function useSimulationSession({ input, run }: { input: SimulationInput; r
 
   return {
     result, liveState, elapsedSeconds, playing, speed,
-    startRun: () => { setResult(run(input)); setElapsedSeconds(0); setPlaying(true) },
+    startRun: (inputOverride, autoplay = true) => {
+      setResult(run(inputOverride ?? input))
+      setElapsedSeconds(0)
+      setPlaying(autoplay)
+    },
     clearRun: () => { setResult(null); setElapsedSeconds(0); setPlaying(false) },
     setPlaying, setSpeed, setElapsedSeconds,
   }

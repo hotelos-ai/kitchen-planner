@@ -1,5 +1,6 @@
 import type { WorkspaceFacade } from '../core/workspace/workspace-facade'
 import type { ProjectStore } from '../state/project-store'
+import { appStateStore } from '../state/app-state-store'
 import { kitchenCapabilityManifest, type CapabilityManifest } from './capability-manifest'
 import { detectModelContext, type ModelContextDetection } from './model-context'
 import { createWebMcpTools } from './webmcp-tools'
@@ -47,11 +48,12 @@ const starterPromptFor = (toolNames: readonly string[]) => {
   const tool = (name: string) => toolNames.find((candidate) => candidate === name) ?? 'the site tools'
   return [
     'Inspect my attached reference image — you interpret it; this page never receives it.',
-    `Call ${tool('get_workspace_guide')} to learn the coordinate system and units, then ${tool('get_component_catalog')} and ${tool('get_layout')} to read the component catalog and the current plan.`,
+    `Call ${tool('get_workspace_guide')} to learn the coordinate system and units, then ${tool('get_app_state')}, ${tool('get_component_catalog')}, and ${tool('get_layout')} to read the visible workspace, catalog, and current plan.`,
     'Translate the sketch into explicit millimetre coordinates, dimensions, rotations, and component IDs.',
     `Call ${tool('preview_layout_changes')} with the current revision and a complete operation batch, then ${tool('apply_layout_changes')} with the returned preview token.`,
-    `Verify with ${tool('analyze_layout')} and ${tool('get_layout')}. For follow-up edits such as "move the fryer beside the range", re-read the revision, preview only the delta, apply, and verify.`,
-    `For operational questions, read ${tool('get_simulation_guide')}, adjust scenario parameters through preview/apply, then ${tool('run_simulation')} and report assumptions separately from results.`,
+    `Verify with ${tool('analyze_layout')}, ${tool('check_operational_essentials')}, and ${tool('get_layout')}. For follow-up edits such as "move the fryer beside the range", re-read the revision, preview only the delta, apply, and verify.`,
+    `Use ${tool('set_app_view')} to move between Space, Fit-out, 2D/3D, and Simulate, and ${tool('select_components')} to reveal the equipment you are discussing.`,
+    `For operational questions, read ${tool('get_simulation_guide')}, adjust scenario parameters through preview/apply, then ${tool('run_simulation')} with visible playback and report assumptions separately from results.`,
     `Save or download the finished plan with ${tool('export_project')}.`,
     'Never invent measurements: mark uncertain components approximate and ask me when scale is unclear.',
   ].join(' ')
@@ -99,6 +101,7 @@ export function createWebMcpController(deps: WebMcpControllerDependencies): WebM
     ...tool,
     execute: async (input: unknown) => {
       let result: unknown
+      appStateStore.getState().setAgentIntent(tool.title ?? tool.name.replaceAll('_', ' '))
       try {
         result = await tool.execute(input)
       } catch (error) {
@@ -107,6 +110,8 @@ export function createWebMcpController(deps: WebMcpControllerDependencies): WebM
           code: 'internal-error',
           message: error instanceof Error ? error.message : 'Tool execution failed.',
         }
+      } finally {
+        appStateStore.getState().setAgentIntent(null)
       }
       const summary = summarizeResult(tool.name, result)
       activitySequence += 1

@@ -1,10 +1,11 @@
-import { useMemo, useState, type ComponentType } from 'react'
+import { useEffect, useMemo, useState, type ComponentType } from 'react'
 import { useStore } from 'zustand'
 import type { StaffRole } from '../../domain/project'
 import { runSimulation } from '../../simulation/engine'
 import type { SimulationInput, SimulationResult } from '../../simulation/types'
 import { validateSimulationInput } from '../../simulation/validation'
 import { getActiveVariant, projectStore, type ProjectStore } from '../../state/project-store'
+import { appStateStore } from '../../state/app-state-store'
 import { FindingsPanel } from './FindingsPanel'
 import { LayoutVerdict } from './LayoutVerdict'
 import { LiveServiceHUD } from './LiveServiceHUD'
@@ -30,6 +31,7 @@ export function SimulationWorkspace({ store = projectStore, run = runSimulation,
   const project = useStore(store, (state) => state.project)
   const variant = useStore(store, getActiveVariant)
   const scenario = project.scenarios.find((value) => value.id === project.activeScenarioId) ?? project.scenarios[0]
+  const requestedRun = useStore(appStateStore, (state) => state.requestedSimulationRun)
   const [layers, setLayers] = useState<Layers>({ heatmap: true, trails: true, queues: true, clearances: false, flows: true, labels: true })
   const [followRole, setFollowRole] = useState<StaffRole | 'overview'>('overview')
   const [view, setView] = useState<SimulationView>('operations-2d')
@@ -48,6 +50,18 @@ export function SimulationWorkspace({ store = projectStore, run = runSimulation,
     scenario,
     layoutConstraints: variant.layoutConstraints,
   }), [scenario, variant.architecture, variant.equipment, variant.layoutConstraints])
+  const requestedSimulationInput = useMemo(() => {
+    if (!requestedRun) return null
+    const requestedVariant = project.variants.find((candidate) => candidate.id === requestedRun.variantId)
+    const requestedScenario = project.scenarios.find((candidate) => candidate.id === requestedRun.scenarioId)
+    if (!requestedVariant || !requestedScenario) return null
+    return {
+      architecture: requestedVariant.architecture,
+      equipment: requestedVariant.equipment,
+      scenario: { ...requestedScenario, seed: requestedRun.seed },
+      layoutConstraints: requestedVariant.layoutConstraints,
+    }
+  }, [project.scenarios, project.variants, requestedRun])
   const session = useSimulationSession({ input: simulationInput, run })
   const { result, liveState, elapsedSeconds, playing, speed } = session
 
@@ -56,6 +70,16 @@ export function SimulationWorkspace({ store = projectStore, run = runSimulation,
     setScenarioCollapsed(true)
     session.startRun()
   }
+
+  useEffect(() => {
+    if (!requestedRun) return
+    appStateStore.getState().consumeSimulationRun(requestedRun.id)
+    if (!requestedSimulationInput || validateSimulationInput(requestedSimulationInput).length > 0) return
+    session.startRun(requestedSimulationInput, requestedRun.playback)
+    // The request id is a one-shot command. Session methods intentionally stay
+    // out of the dependency list so ordinary playback renders cannot replay it.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [requestedRun?.id, requestedSimulationInput])
   const toggleLayer = (key: keyof Layers) => setLayers((current) => ({ ...current, [key]: !current[key] }))
   const bottleneck = result ? Object.entries(result.metrics.stationUtilization).sort((left, right) => right[1] - left[1])[0]?.[0] : undefined
 

@@ -21,7 +21,7 @@ describe('workspace facade', () => {
     if (!preview.ok) throw new Error(preview.message)
 
     const applied = facade.applyLayoutChanges({ previewToken: preview.previewToken })
-    expect(applied).toMatchObject({ ok: true, revision: 1, changedIds: ['tandoor'] })
+    expect(applied).toMatchObject({ ok: true, revision: 1, changedIds: ['tandoor'], intent: 'Move and turn tandoor' })
     expect(store.getState().past).toHaveLength(1)
     expect(getActiveItem(store.getState(), 'tandoor')).toMatchObject({ xMm: 2900, yMm: 1000, rotationDeg: 90 })
     expect(facade.applyLayoutChanges({ previewToken: preview.previewToken })).toMatchObject({ ok: false, code: 'used-preview-token', revision: 1 })

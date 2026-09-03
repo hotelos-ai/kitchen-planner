@@ -34,9 +34,9 @@ describe('webmcp controller', () => {
     const controller = createWebMcpController({ store, getFacade: () => getWorkspaceFacade(store), detect: () => fake.detection })
     await controller.register()
     expect(controller.getStatus()).toBe('available')
-    expect(controller.getStatusMessage()).toMatch(/11 agent tools/)
-    expect(controller.getTools()).toHaveLength(11)
-    expect(fake.captured).toHaveLength(11)
+    expect(controller.getStatusMessage()).toMatch(/15 agent tools/)
+    expect(controller.getTools()).toHaveLength(15)
+    expect(fake.captured).toHaveLength(15)
   })
 
   it('resolves as unavailable without throwing when WebMCP is missing', async () => {
@@ -126,6 +126,10 @@ describe('webmcp controller', () => {
     expect(prompt).toMatch(/get_workspace_guide/)
     expect(prompt).toMatch(/preview_layout_changes/)
     expect(prompt).toMatch(/apply_layout_changes/)
+    expect(prompt).toMatch(/set_app_view/)
+    expect(prompt).toMatch(/select_components/)
+    expect(prompt).toMatch(/check_operational_essentials/)
+    expect(prompt).toMatch(/run_simulation/)
     expect(prompt).toMatch(/export_project/)
   })
 })

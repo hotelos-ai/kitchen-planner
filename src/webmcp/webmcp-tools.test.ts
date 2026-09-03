@@ -1,6 +1,7 @@
-import { describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it } from 'vitest'
 import { createSeedProject } from '../domain/seed-project'
 import { projectSchema } from '../domain/project-schema'
+import { appStateStore } from '../state/app-state-store'
 import { createProjectStore, getActiveItem, getActiveVariant, getWorkspaceFacade } from '../state/project-store'
 import { kitchenCapabilityManifest } from './capability-manifest'
 import type { WebMcpToolDefinition } from './model-context'
@@ -37,6 +38,8 @@ const collectObjectSchemas = (schema: unknown, found: unknown[] = []): unknown[]
 }
 
 describe('webmcp tools', () => {
+  beforeEach(() => appStateStore.getState().reset())
+
   it('exposes a stable, uniquely named toolset with strict top-level schemas', () => {
     const { tools } = setup()
     const names = tools.map((tool) => tool.name)
@@ -49,6 +52,7 @@ describe('webmcp tools', () => {
     expect(names).toEqual(expect.arrayContaining([
       'get_workspace_guide', 'get_component_catalog', 'get_layout', 'analyze_layout',
       'suggest_component_placement', 'get_simulation_guide', 'export_project',
+      'get_app_state', 'set_app_view', 'select_components', 'check_operational_essentials',
       'preview_layout_changes', 'apply_layout_changes', 'run_simulation', 'step_workspace_history',
     ]))
   })
@@ -119,6 +123,112 @@ describe('webmcp tools', () => {
     expect(Array.isArray(analysis.findings)).toBe(true)
   })
 
+  it('reads and navigates app state without changing the document revision', async () => {
+    const { store, call } = setup()
+    const revision = store.getState().revision
+    const initial = await call('get_app_state', {})
+    expect(initial).toMatchObject({
+      ok: true,
+      revision,
+      stage: 'space',
+      view: 'plan',
+      overlay: null,
+      selectedIds: [],
+      canUndo: false,
+      canRedo: false,
+    })
+
+    const navigated = await call('set_app_view', { stage: 'simulate', view: 'scene', overlay: 'compare' })
+    expect(navigated).toMatchObject({ ok: true, revision, stage: 'simulate', view: 'scene', overlay: 'compare' })
+    expect(store.getState().revision).toBe(revision)
+    expect(appStateStore.getState()).toMatchObject({ stage: 'simulate', view: 'scene', overlay: 'compare' })
+
+    const closed = await call('set_app_view', { overlay: null })
+    expect(closed).toMatchObject({ ok: true, stage: 'simulate', view: 'scene', overlay: null })
+    expect(await call('set_app_view', {})).toMatchObject({ ok: false, code: 'invalid-input' })
+    expect(await call('set_app_view', { drawer: 'catalog' })).toMatchObject({ ok: false, code: 'invalid-input' })
+  })
+
+  it('selects only active-layout components in replace, add, toggle, and clear modes', async () => {
+    const { store, call } = setup()
+    const revision = store.getState().revision
+
+    expect(await call('select_components', { componentIds: ['tandoor'] })).toMatchObject({
+      ok: true,
+      revision,
+      selectedIds: ['tandoor'],
+    })
+    expect(await call('select_components', { componentIds: ['two-door-fridge'], mode: 'add' })).toMatchObject({
+      ok: true,
+      selectedIds: ['tandoor', 'two-door-fridge'],
+    })
+    expect(await call('select_components', { componentIds: ['tandoor', 'six-burner'], mode: 'toggle' })).toMatchObject({
+      ok: true,
+      selectedIds: ['two-door-fridge', 'six-burner'],
+    })
+    expect(await call('select_components', { mode: 'clear' })).toMatchObject({ ok: true, selectedIds: [] })
+    expect(store.getState().revision).toBe(revision)
+  })
+
+  it('rejects unknown component IDs before mutating selection or app navigation', async () => {
+    const { store, call } = setup()
+    store.getState().selectItems(['tandoor'])
+    appStateStore.getState().setOverlay('compare')
+    const result = await call('select_components', {
+      componentIds: ['six-burner', 'not-in-active-layout'],
+      mode: 'replace',
+      reveal: 'scene',
+    })
+    expect(result).toMatchObject({
+      ok: false,
+      code: 'unknown-component',
+      details: { missingComponentIds: ['not-in-active-layout'] },
+    })
+    expect(store.getState().selectedIds).toEqual(['tandoor'])
+    expect(appStateStore.getState()).toMatchObject({ stage: 'space', view: 'plan', overlay: 'compare' })
+  })
+
+  it('reveals selected components in plan, scene, or split view', async () => {
+    const { call } = setup()
+    appStateStore.getState().setOverlay('auto-layout')
+    const result = await call('select_components', { componentIds: ['tandoor'], mode: 'replace', reveal: 'both' })
+    expect(result).toMatchObject({
+      ok: true,
+      selectedIds: ['tandoor'],
+      stage: 'equipment',
+      view: 'split',
+      overlay: null,
+    })
+    expect(appStateStore.getState()).toMatchObject({ stage: 'equipment', view: 'split', overlay: null })
+  })
+
+  it('checks operational essentials for an explicit layout and scenario', async () => {
+    const { store, call } = setup()
+    const state = store.getState()
+    const result = await call('check_operational_essentials', {
+      variantId: state.project.activeVariantId,
+      scenarioId: state.project.activeScenarioId,
+    })
+    expect(result).toMatchObject({
+      ok: true,
+      revision: state.revision,
+      variantId: state.project.activeVariantId,
+      scenarioId: state.project.activeScenarioId,
+      ready: expect.any(Boolean),
+      status: expect.stringMatching(/^(blocked|ready|ready-with-warnings)$/),
+      counts: {
+        total: expect.any(Number),
+        blockers: expect.any(Number),
+        warnings: expect.any(Number),
+        professionalReview: expect.any(Number),
+      },
+      requirements: expect.any(Array),
+    })
+    expect(result.certification).toMatch(/not a regulatory certification/i)
+    expect(await call('check_operational_essentials', { variantId: 'missing' })).toMatchObject({ ok: false, code: 'missing-variant' })
+    expect(await call('check_operational_essentials', { scenarioId: 'missing' })).toMatchObject({ ok: false, code: 'missing-scenario' })
+  })
+
   it('previews and applies a multi-operation batch as one revision', async () => {
     const { store, call } = setup()
     const state = store.getState()
@@ -137,7 +247,7 @@ describe('webmcp tools', () => {
     expect(store.getState().revision).toBe(state.revision)
 
     const applied = await call('apply_layout_changes', { previewToken: preview.previewToken as string })
-    expect(applied).toMatchObject({ ok: true, revision: state.revision + 1, changedIds: ['tandoor'] })
+    expect(applied).toMatchObject({ ok: true, revision: state.revision + 1, changedIds: ['tandoor'], intent: 'Agent test batch' })
     expect(store.getState().past).toHaveLength(1)
     expect(getActiveItem(store.getState(), 'tandoor')).toMatchObject({ xMm: item.xMm + 200, notes: 'agent-adjusted' })
   })

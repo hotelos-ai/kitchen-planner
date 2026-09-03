@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import type { WorkspaceFacade } from '../core/workspace/workspace-facade'
 import { workspaceOperationSchema } from '../core/workspace/workspace-operation'
+import { appStateStore } from '../state/app-state-store'
 import type { JsonSchemaObject, WebMcpToolDefinition } from './model-context'
 import {
   currentRevision,
@@ -35,6 +36,8 @@ const runSimulationInput = z.object({
   variantId: z.string().min(1).max(128).optional(),
   seed: z.number().int().min(-2_147_483_648).max(2_147_483_647).optional(),
   outputMode: z.enum(['metrics-only', 'full']).optional(),
+  playback: z.enum(['play', 'pause', 'none']).optional(),
+  navigateTo: z.boolean().optional(),
 }).strict()
 
 const historyInput = z.object({
@@ -58,7 +61,7 @@ const operationSchemaDescription: JsonSchemaObject = {
 
 type PreviewResult = { ok: true; revision: number; previewToken: string; changedIds: string[]; warnings: string[]; normalizedOperations: unknown[]; diagnostics: { added: unknown[]; resolved: unknown[]; current: unknown[] } }
 
-type ApplyResult = { ok: true; revision: number; changedIds: string[]; warnings: string[]; diagnostics: { added: unknown[]; resolved: unknown[]; current: unknown[] } }
+type ApplyResult = { ok: true; revision: number; changedIds: string[]; warnings: string[]; diagnostics: { added: unknown[]; resolved: unknown[]; current: unknown[] }; intent?: string }
 
 type FacadeFailure = { ok: false; revision: number; code: string; message: string; issues?: unknown; operationIndex?: number }
 
@@ -139,10 +142,19 @@ export function createWriteTools(deps: WriteToolDependencies): WebMcpToolDefinit
             recovery: applyRecoveryHint(result.code),
           }
         }
+        if (result.intent) {
+          appStateStore.getState().setLastAgentAction({
+            id: `agent-action-${result.revision}`,
+            intent: result.intent,
+            changedIds: [...result.changedIds],
+            revision: result.revision,
+          })
+        }
         return success(result.revision, {
           changedIds: result.changedIds,
           warnings: result.warnings,
           diagnostics: diagnosticsSummary(result.diagnostics),
+          ...(result.intent === undefined ? {} : { intent: result.intent }),
         })
       } catch (error) {
         return failure(currentRevision(deps), 'internal-error', unknownErrorMessage(error))
@@ -154,7 +166,7 @@ export function createWriteTools(deps: WriteToolDependencies): WebMcpToolDefinit
     name: 'run_simulation',
     title: 'Run service simulation',
     description:
-      'Run the deterministic service simulation for a scenario against a layout revision and return assumptions, metrics, warnings, and recommendations. outputMode "metrics-only" (default) returns aggregates; "full" adds time series and is truncated to a size limit when needed. Does not change the document revision.',
+      'Run the deterministic service simulation for a scenario against a layout revision, show the run in the app, and return assumptions, metrics, warnings, and recommendations. playback controls visible playback; navigateTo opens Simulate by default. outputMode "metrics-only" (default) returns aggregates; "full" adds time series and is size-capped. Does not change the document revision.',
     inputSchema: {
       type: 'object',
       additionalProperties: false,
@@ -163,6 +175,8 @@ export function createWriteTools(deps: WriteToolDependencies): WebMcpToolDefinit
         variantId: { type: 'string', description: 'Optional layout variant ID; defaults to the active variant.' },
         seed: { type: 'number', description: 'Optional deterministic seed; defaults to the scenario seed.' },
         outputMode: { type: 'string', enum: ['metrics-only', 'full'], description: 'Detail level; defaults to metrics-only.' },
+        playback: { type: 'string', enum: ['play', 'pause', 'none'], description: 'Whether the visible run should play, start paused, or not be requested. Defaults to play.' },
+        navigateTo: { type: 'boolean', description: 'Open the Simulate stage so the user sees the run. Defaults to true.' },
       },
     },
     annotations: { readOnlyHint: true },
@@ -196,6 +210,19 @@ export function createWriteTools(deps: WriteToolDependencies): WebMcpToolDefinit
           outputMode,
           result: structuredClone(result),
           assumptions: 'Simulated values are scenario assumptions, not observed service data.',
+        }
+        const playback = parsed.value.playback ?? 'play'
+        if (parsed.value.navigateTo ?? true) {
+          appStateStore.getState().setOverlay(null)
+          appStateStore.getState().setStage('simulate')
+        }
+        if (playback !== 'none') {
+          appStateStore.getState().requestSimulationRun({
+            scenarioId: scenario.id,
+            variantId: variant.id,
+            seed: parsed.value.seed ?? scenario.seed,
+            playback: playback === 'play',
+          })
         }
         if (jsonSafeSize(payload) > MAX_SIMULATION_RESULT_BYTES) {
           const record = result as { seed?: unknown; durationSeconds?: unknown; metrics?: unknown; warnings?: unknown }
