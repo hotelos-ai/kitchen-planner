@@ -18,6 +18,7 @@ export function PointerLockLook({ active, onLock, onUnlock, onLook }: {
   useEffect(() => {
     if (!active) return
     const documentRef = canvas.ownerDocument
+    if (!documentRef) return
     const euler = new THREE.Euler(0, 0, 0, 'YXZ')
     const handleClick = () => {
       if (documentRef.pointerLockElement === canvas) return

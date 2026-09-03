@@ -38,6 +38,8 @@ describe('plan workspace', () => {
     await user.tab()
     expect(getActiveItem(projectStore.getState(), 'tandoor').widthMm).toBe(750)
     expect(screen.getByLabelText(/Height/i)).not.toBeDisabled()
+    await act(async () => { projectStore.getState().clearSelection() })
+    await screen.findByLabelText(/Display units/i)
     await user.selectOptions(screen.getByLabelText(/Display units/i), 'ft')
     await user.selectOptions(screen.getByLabelText(/Display units/i), 'mm')
     expect(getActiveItem(projectStore.getState(), 'tandoor').widthMm).toBe(750)

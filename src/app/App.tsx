@@ -6,12 +6,13 @@ import { configureWorkspaceAutoLayout, getWorkspaceFacade, getActiveVariant, pro
 import { AppHeader, StageToolbar } from './AppHeader'
 import { ProjectStartScreen } from './ProjectStartScreen'
 import { createBlankProject } from '../domain/blank-project'
+import { createSeedProject } from '../domain/seed-project'
 import { AgentToolsPanel } from '../features/webmcp/AgentToolsPanel'
 import { WebMcpProvider } from '../features/webmcp/WebMcpProvider'
 import type { ViewMode, WorkflowStage, WorkspaceOverlay } from './workflow'
 import { ErrorBoundary } from './ErrorBoundary'
 import { HelpDialog } from './HelpDialog'
-import { CURRENT_PROJECT_KEY, LAST_GOOD_PROJECT_KEY } from '../state/persistence'
+import { CURRENT_PROJECT_KEY, LAST_GOOD_PROJECT_KEY, LEGACY_CURRENT_PROJECT_KEY, LEGACY_LAST_GOOD_PROJECT_KEY } from '../state/persistence'
 import './styles.css'
 
 export const SESSION_FLAG_KEY = 'calmkitchen-designer:session'
@@ -56,7 +57,9 @@ export function App() {
     const hasSession = typeof localStorage !== 'undefined' && Boolean(
       localStorage.getItem(SESSION_FLAG_KEY)
       ?? localStorage.getItem(CURRENT_PROJECT_KEY)
-      ?? localStorage.getItem(LAST_GOOD_PROJECT_KEY),
+      ?? localStorage.getItem(LAST_GOOD_PROJECT_KEY)
+      ?? localStorage.getItem(LEGACY_CURRENT_PROJECT_KEY)
+      ?? localStorage.getItem(LEGACY_LAST_GOOD_PROJECT_KEY),
     )
     if (!hasSession) setShowStartScreen(true)
   }, [])
@@ -148,7 +151,7 @@ export function App() {
                 setStage('space')
               }}
               onScratch={() => { projectStore.getState().replaceProject(createBlankProject()); setStage('space'); setView('plan') }}
-              onStarterKitchen={() => { beginSession(); setStage('space'); setView('plan') }}
+              onStarterKitchen={() => { projectStore.getState().replaceProject(createSeedProject()); beginSession(); setStage('space'); setView('plan') }}
               onDrawManually={() => { beginSession(); setStage('space'); setWizardOpen(true); setWizardStartsAtRoom(true) }}
               onTraceImage={(url) => { beginSession(); setSourceImageUrl(url); setShowReference(true); setStage('space') }}
               onOpenProject={(opened) => { projectStore.getState().replaceProject(opened); beginSession(); setStage('space') }}

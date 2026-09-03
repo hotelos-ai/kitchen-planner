@@ -28,8 +28,11 @@ test('edits, simulates, compares, exports, and restores the example kitchen', as
   await page.getByLabel(/Lock dimensions/i).uncheck()
   await page.getByLabel(/^Width \(mm\)$/i).fill('750')
   await page.getByLabel(/^Width \(mm\)$/i).press('Tab')
+  await page.locator('.canvas-footer').click()
+  await page.keyboard.press('Escape')
   await page.getByLabel(/Display units/i).selectOption('ft')
   await page.getByLabel(/Display units/i).selectOption('mm')
+  await page.getByRole('button', { name: /Select Tandoor/i }).click()
   await expect(page.getByLabel(/^Width \(mm\)$/i)).toHaveValue('750')
 
   await page.getByRole('button', { name: /Add custom item/i }).click()
