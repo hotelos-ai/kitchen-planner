@@ -80,7 +80,7 @@ export function advanceWalkPlayerMotion({
   const softened = softenPlayerStep({ x: pose.x, y: pose.y }, intendedDelta, staff)
   const body = { positionMm: { x: pose.x, y: pose.y }, radiusMm: PLAYER_RADIUS_MM }
   const resolved = resolveWalkStep(body, softened.delta, colliders, pose.elevationMm)
-  const supportHeightMm = supportHeightAt(resolved.positionMm, colliders)
+  const supportHeightMm = supportHeightAt(resolved.positionMm, colliders, pose.elevationMm + 1)
   let vertical = { footHeightMm: pose.elevationMm, velocityMps: pose.verticalVelocityMps, grounded: pose.grounded }
 
   if (jumpRequested && pose.grounded) {

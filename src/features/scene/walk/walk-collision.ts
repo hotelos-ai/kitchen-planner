@@ -215,9 +215,9 @@ export function resolveWalkStep(body: WalkBody, intendedDeltaMm: PointMm, collid
   return { positionMm: position, collided, colliderIds: [...colliderIds] }
 }
 
-export function supportHeightAt(position: PointMm, colliders: readonly WalkCollider[]): number {
+export function supportHeightAt(position: PointMm, colliders: readonly WalkCollider[], maxTopMm = Number.POSITIVE_INFINITY): number {
   return colliders
-    .filter((collider) => collider.landable && pointInPolygon(position, collider.polygon))
+    .filter((collider) => collider.landable && collider.topMm <= maxTopMm && pointInPolygon(position, collider.polygon))
     .reduce((height, collider) => Math.max(height, collider.topMm), 0)
 }
 

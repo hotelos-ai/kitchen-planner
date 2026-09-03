@@ -185,6 +185,12 @@ describe('walk collision', () => {
     )).toMatchObject({ id: 'tandoor', topMm: 900 })
   })
 
+  it('ignores support surfaces above the feet so a player below them still lands on the floor', () => {
+    const table = project.variants[0].equipment.find((item) => item.id === 'working-table')!
+    expect(supportHeightAt({ x: 2200, y: 3000 }, colliders, 1)).toBe(0)
+    expect(supportHeightAt({ x: 2200, y: 3000 }, colliders, table.heightMm + 1)).toBe(table.heightMm)
+  })
+
   it('ignores the support under the player when targeting the next obstacle', () => {
     expect(findJumpObstacle(
       { positionMm: { x: 2200, y: 3000 }, radiusMm: 220 },
