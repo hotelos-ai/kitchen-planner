@@ -1,6 +1,13 @@
 import { expect, test, type Page } from '@playwright/test'
 
 const SCREENSHOT_VIEWPORT = { width: 1909, height: 792 }
+const RESPONSIVE_VIEWPORTS = [
+  { width: 1440, height: 650 },
+  { width: 1024, height: 768 },
+  { width: 760, height: 800 },
+] as const
+
+type ElementBox = NonNullable<Awaited<ReturnType<ReturnType<Page['locator']>['boundingBox']>>>
 
 async function openSimulationWorkspace(page: Page) {
   await page.goto('/')
@@ -16,6 +23,32 @@ async function openSimulationWorkspace(page: Page) {
   await expect(page.locator('.simulation-workspace.three-panel')).toBeVisible()
 }
 
+async function expectNoHorizontalOverflow(page: Page) {
+  const surfaces = [
+    ['document', page.locator('html')],
+    ['Simulation workspace', page.locator('.simulation-workspace.three-panel')],
+    ['Simulation toolbar', page.locator('.simulation-toolbar')],
+  ] as const
+  for (const [name, surface] of surfaces) {
+    const size = await surface.evaluate((element) => ({
+      clientWidth: element.clientWidth,
+      scrollWidth: element.scrollWidth,
+    }))
+    expect(size.scrollWidth, `${name} should not overflow horizontally`).toBeLessThanOrEqual(size.clientWidth + 1)
+  }
+}
+
+function expectNoOverlap(left: ElementBox, right: ElementBox, label: string) {
+  const overlapX = Math.min(left.x + left.width, right.x + right.width) - Math.max(left.x, right.x)
+  const overlapY = Math.min(left.y + left.height, right.y + right.height) - Math.max(left.y, right.y)
+  expect(overlapX > 1 && overlapY > 1, `${label} should not overlap`).toBe(false)
+}
+
+async function expectScrollReachable(locator: ReturnType<Page['locator']>) {
+  await locator.scrollIntoViewIfNeeded()
+  await expect(locator).toBeVisible()
+}
+
 test.describe('Simulation responsive layout', () => {
   test.use({ viewport: SCREENSHOT_VIEWPORT })
 
@@ -28,6 +61,7 @@ test.describe('Simulation responsive layout', () => {
 
     const workspace = page.locator('.simulation-workspace.three-panel')
     const scenario = page.locator('.simulation-scenario-panel')
+    const scenarioContent = page.locator('#simulation-scenario-content')
     const scenarioPicker = page.getByLabel('Active scenario')
     const covers = scenario.getByLabel('Covers')
     const duration = scenario.getByLabel('Duration (minutes)')
@@ -51,7 +85,7 @@ test.describe('Simulation responsive layout', () => {
     expect(coversBox!.width).toBeGreaterThan(100)
     expect(durationBox!.width).toBeGreaterThan(100)
 
-    const overflow = await scenario.evaluate((element) => ({
+    const overflow = await scenarioContent.evaluate((element) => ({
       clientHeight: element.clientHeight,
       scrollHeight: element.scrollHeight,
       overflowY: getComputedStyle(element).overflowY,
@@ -99,3 +133,72 @@ test.describe('Simulation responsive layout', () => {
     await expect(page.getByLabel('Active scenario')).toBeVisible()
   })
 })
+
+for (const viewport of RESPONSIVE_VIEWPORTS) {
+  test.describe(`Simulation at ${viewport.width} × ${viewport.height}`, () => {
+    test.use({ viewport })
+
+    test.beforeEach(async ({ page }) => {
+      await page.addInitScript(() => localStorage.clear())
+    })
+
+    test('keeps panels, controls, results, and collapse affordances usable', async ({ page }) => {
+      await openSimulationWorkspace(page)
+
+      const workspace = page.locator('.simulation-workspace.three-panel')
+      const scenario = page.locator('.simulation-scenario-panel')
+      const simulationMain = page.locator('.simulation-main')
+      const sidebar = page.locator('.simulation-sidebar')
+      const toolbar = page.locator('.simulation-toolbar')
+
+      await expectNoHorizontalOverflow(page)
+      const [scenarioBox, mainBox, sidebarBox] = await Promise.all([
+        scenario.boundingBox(),
+        simulationMain.boundingBox(),
+        sidebar.boundingBox(),
+      ])
+      expect(scenarioBox).not.toBeNull()
+      expect(mainBox).not.toBeNull()
+      expect(sidebarBox).not.toBeNull()
+      expect(scenarioBox!.height).toBeGreaterThanOrEqual(48)
+      expectNoOverlap(scenarioBox!, mainBox!, 'Scenario and simulation canvas')
+      expectNoOverlap(mainBox!, sidebarBox!, 'Simulation canvas and results sidebar')
+
+      const collapse = page.getByRole('button', { name: 'Collapse scenario panel', exact: true })
+      await expectScrollReachable(collapse)
+      await expectScrollReachable(toolbar.getByRole('button', { name: 'Run 60-minute service', exact: true }))
+      await toolbar.getByRole('button', { name: 'Run 60-minute service', exact: true }).click()
+
+      const playback = page.locator('.playback-controls')
+      const result = page.locator('.simulation-primary-summary')
+      await expectScrollReachable(playback)
+      await expectScrollReachable(page.getByLabel(/Simulation time/i))
+      await expectScrollReachable(result)
+      await expect(result).toContainText(/Orders completed/i)
+
+      await expect(workspace).not.toHaveClass(/scenario-collapsed/)
+      const collapseAfterRun = page.getByRole('button', { name: 'Collapse scenario panel', exact: true })
+      await expectScrollReachable(collapseAfterRun)
+      await collapseAfterRun.click()
+      await expect(workspace).toHaveClass(/scenario-collapsed/)
+      const expand = page.getByRole('button', { name: 'Expand scenario panel', exact: true })
+      await expectScrollReachable(expand)
+      await expand.click()
+      await expect(workspace).not.toHaveClass(/scenario-collapsed/)
+      await expectScrollReachable(page.getByRole('button', { name: 'Collapse scenario panel', exact: true }))
+
+      await expectNoHorizontalOverflow(page)
+      const [expandedScenarioBox, expandedMainBox, expandedSidebarBox] = await Promise.all([
+        scenario.boundingBox(),
+        simulationMain.boundingBox(),
+        sidebar.boundingBox(),
+      ])
+      expect(expandedScenarioBox).not.toBeNull()
+      expect(expandedMainBox).not.toBeNull()
+      expect(expandedSidebarBox).not.toBeNull()
+      expect(expandedScenarioBox!.height).toBeGreaterThanOrEqual(48)
+      expectNoOverlap(expandedScenarioBox!, expandedMainBox!, 'Expanded Scenario and simulation canvas')
+      expectNoOverlap(expandedMainBox!, expandedSidebarBox!, 'Expanded simulation canvas and results sidebar')
+    })
+  })
+}
