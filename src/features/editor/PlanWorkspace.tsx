@@ -226,6 +226,10 @@ export function PlanWorkspace({
     openLayoutWizard(true)
     onStageChange?.('space')
   }
+  const runAutomaticFix = () => {
+    setAutoFixStatus('Fixing the plan…')
+    window.setTimeout(() => setAutoFixStatus(applyAutomaticPlanFixes(store).message), 0)
+  }
 
   useWorkspaceShortcuts({
     enabled: shortcutEnabled,
@@ -272,7 +276,7 @@ export function PlanWorkspace({
             hasSelection={selectedIds.length > 0}
             onToggleCatalog={() => setLocalCatalogOpen((open) => !open)}
             onToggleInspector={() => setLocalInspectorOpen((open) => !open)}
-            onAutoFix={() => setAutoFixStatus(applyAutomaticPlanFixes(store).message)}
+            onAutoFix={runAutomaticFix}
             onOpenEssentials={() => setEssentialsVisible(true)}
             onOpenRevisions={() => setRevisionsVisible(true)}
             onUndo={() => store.getState().undo()}

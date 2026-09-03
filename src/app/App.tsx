@@ -62,6 +62,10 @@ export function App() {
   const [sourceImageUrl, setSourceImageUrl] = useState('/reference/kitchen-sketch.webp')
   const [closedLayout, setClosedLayout] = useState<{ name: string; revision: number; undo(): boolean } | null>(null)
   const [autoFixStatus, setAutoFixStatus] = useState('')
+  const runAutomaticFix = () => {
+    setAutoFixStatus('Fixing the plan…')
+    window.setTimeout(() => setAutoFixStatus(applyAutomaticPlanFixes(projectStore).message), 0)
+  }
   const [showStartScreen, setShowStartScreen] = useState(() => {
     if (typeof localStorage === 'undefined') return false
     const hasMatchingDeepLink = typeof window !== 'undefined'
@@ -214,7 +218,7 @@ export function App() {
                   hasSelection={selectedIds.length > 0}
                   onToggleCatalog={() => setPanels({ catalog: !catalogOpen })}
                   onToggleInspector={() => setPanels({ inspector: !inspectorOpen })}
-                  onAutoFix={() => setAutoFixStatus(applyAutomaticPlanFixes(projectStore).message)}
+                  onAutoFix={runAutomaticFix}
                   onOpenEssentials={() => setPanels({ essentials: true, revisions: false, inspector: true })}
                   onOpenRevisions={() => setPanels({ inspector: true, revisions: true, essentials: false })}
                   onUndo={() => projectStore.getState().undo()}

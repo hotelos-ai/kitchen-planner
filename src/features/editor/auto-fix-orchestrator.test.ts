@@ -5,6 +5,22 @@ import { createProjectStore } from '../../state/project-store'
 import { applyAutomaticPlanFixes } from './auto-fix-orchestrator'
 
 describe('automatic plan fix orchestrator', () => {
+  it('returns immediately without rearranging a ready plan for advisory clearance warnings', () => {
+    const project = createSeedProject()
+    const before = structuredClone(project.variants[0].equipment)
+    const store = createProjectStore(project)
+
+    const result = applyAutomaticPlanFixes(store)
+
+    expect(result.status).toBe('success')
+    expect(result.applied).toBe(false)
+    expect(result.after.blockers).toBe(0)
+    expect(result.after.layoutErrors).toBe(0)
+    expect(result.after.layoutWarnings).toBeGreaterThan(0)
+    expect(store.getState().project.variants[0].equipment).toEqual(before)
+    expect(store.getState().past).toHaveLength(0)
+  })
+
   it('adds missing essentials and fixes top-left anchored overlaps in one undoable batch', () => {
     const project = createSeedProject()
     const variant = project.variants[0]

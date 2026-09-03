@@ -128,9 +128,12 @@ export function SimulationWorkspace({
     appState.setStage('space')
   }
   const runAutomaticFix = () => {
-    const result = applyAutomaticPlanFixes(store)
-    setAutoFixStatus(result.message)
-    setAutoFixOpen(result.status !== 'success')
+    setAutoFixStatus('Fixing the plan…')
+    window.setTimeout(() => {
+      const result = applyAutomaticPlanFixes(store)
+      setAutoFixStatus(result.message)
+      setAutoFixOpen(result.status !== 'success')
+    }, 0)
   }
   const bottleneck = result ? Object.entries(result.metrics.stationUtilization).sort((left, right) => right[1] - left[1])[0]?.[0] : undefined
 

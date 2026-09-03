@@ -278,16 +278,25 @@ const hardConstraintsAllow = (item: EquipmentItem, variant: LayoutVariant) => {
  * A candidate is accepted only when the production diagnostics report no issue
  * involving the item and it avoids explicit no-go zones and door swings.
  */
-function planSafeMoves(variant: LayoutVariant, equipment: readonly EquipmentItem[], snapMm: number) {
+function movementBlockers(variant: LayoutVariant, equipment: readonly EquipmentItem[], scenario: SimulationScenario | undefined) {
+  const layoutErrors = analyzeLayout(variant.architecture, equipment, { layoutConstraints: variant.layoutConstraints })
+    .filter((issue) => issue.severity === 'error')
+  const simulationLayoutBlockers = scenario ? validateSimulationInput({
+    architecture: variant.architecture,
+    equipment,
+    layoutConstraints: variant.layoutConstraints,
+    scenario,
+  }).filter((issue) => issue.scope === 'layout') : []
+  return [...layoutErrors, ...simulationLayoutBlockers]
+}
+
+function planSafeMoves(variant: LayoutVariant, equipment: readonly EquipmentItem[], snapMm: number, scenario: SimulationScenario | undefined) {
   let planned = [...equipment]
   const moves: MoveOperation[] = []
   const lockedIds = new Set(variant.layoutConstraints?.lockedComponentIds ?? [])
-  const initialIssues = analyzeLayout(variant.architecture, planned, { layoutConstraints: variant.layoutConstraints })
+  const initialIssues = movementBlockers(variant, planned, scenario)
   const issueCount = new Map<string, number>()
   initialIssues.forEach((issue) => issue.itemIds.forEach((id) => issueCount.set(id, (issueCount.get(id) ?? 0) + 1)))
-  planned.forEach((item) => {
-    if (!hardConstraintsAllow(item, variant)) issueCount.set(item.id, (issueCount.get(item.id) ?? 0) + 1)
-  })
   const candidates = planned
     .filter((item) => (issueCount.get(item.id) ?? 0) > 0 && item.movable && !lockedIds.has(item.id))
     .sort((left, right) =>
@@ -296,22 +305,23 @@ function planSafeMoves(variant: LayoutVariant, equipment: readonly EquipmentItem
 
   for (const item of candidates) {
     const currentIssues = analyzeLayout(variant.architecture, planned, { layoutConstraints: variant.layoutConstraints })
+      .filter((issue) => issue.severity === 'error')
     const currentItemIssues = currentIssues.filter((issue) => issue.itemIds.includes(item.id))
-    if (currentItemIssues.length === 0 && hardConstraintsAllow(item, variant)) continue
-    const hasBlockingGeometry = currentItemIssues.some((issue) => issue.severity === 'error') || !hardConstraintsAllow(item, variant)
+    const wasSimulationBlocked = initialIssues.some((issue) => issue.itemIds.includes(item.id))
+    if (currentItemIssues.length === 0 && !wasSimulationBlocked) continue
     const index = planned.findIndex((candidate) => candidate.id === item.id)
     if (index < 0) continue
     for (const position of candidatePositions(planned[index], variant, snapMm).slice(0, MAX_PLACEMENT_ATTEMPTS_PER_ITEM)) {
       const candidate = { ...planned[index], xMm: position.xMm, yMm: position.yMm }
       if (!hardConstraintsAllow(candidate, variant)) continue
       const next = planned.map((entry, candidateIndex) => candidateIndex === index ? candidate : entry)
+      // Full circulation validation builds a navigation grid and is intentionally
+      // reserved for the final revalidation. Candidate search only needs the
+      // inexpensive hard geometry checks to keep a toolbar click responsive.
       const issues = analyzeLayout(variant.architecture, next, { layoutConstraints: variant.layoutConstraints })
+        .filter((issue) => issue.severity === 'error')
       const candidateIssues = issues.filter((issue) => issue.itemIds.includes(candidate.id))
-      // Resolve hard geometry first even when a dense plan cannot also eliminate
-      // every advisory clearance. Warning-only moves remain strictly zero-issue.
-      if (hasBlockingGeometry
-        ? candidateIssues.some((issue) => issue.severity === 'error')
-        : candidateIssues.length > 0) continue
+      if (candidateIssues.length > 0) continue
       planned = next
       if (candidate.xMm !== item.xMm || candidate.yMm !== item.yMm) {
         moves.push({
@@ -397,7 +407,7 @@ export function applyAutomaticPlanFixes(store: ProjectStore): AutomaticPlanFixRe
   const architecture = planArchitectureAdditions(state.project, variant, state.project.snapMm)
   const variantWithArchitecture = { ...variant, architecture: architecture.architecture }
   const additions = planEssentialAdditions(variantWithArchitecture, scenario, state.project.snapMm)
-  const moves = planSafeMoves(variantWithArchitecture, additions.equipment, state.project.snapMm)
+  const moves = planSafeMoves(variantWithArchitecture, additions.equipment, state.project.snapMm, scenario)
   const plannedVariant = { ...variantWithArchitecture, equipment: moves.equipment }
   const scenarioAdjustment = planScenarioAdjustment(plannedVariant, scenario)
   const operations = [...architecture.operations, ...additions.operations, ...moves.moves, ...(scenarioAdjustment.operation ? [scenarioAdjustment.operation] : [])]
