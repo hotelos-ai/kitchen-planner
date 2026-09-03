@@ -99,6 +99,9 @@ describe('simulation workspace', () => {
     expect(screen.getByLabelText(/Head chef count/i)).toHaveValue(1)
     await userEvent.click(screen.getByRole('button', { name: /Run 60-minute service/i }))
     expect(await screen.findByText(/Total staff travel/i)).toBeInTheDocument()
+    expect(screen.getByRole('complementary', { name: 'Scenario' })).toHaveAttribute('data-collapsed', 'false')
+    expect(screen.getByRole('button', { name: 'Collapse scenario panel' })).toBeInTheDocument()
+    expect(screen.getByLabelText(/Covers/i)).toHaveValue(50)
     expect(screen.getByText(/Dirty-clean crossings/i)).toBeInTheDocument()
     expect(screen.getByText(/Live backlog/i)).toBeInTheDocument()
     expect(screen.getByText(/Average served wait/i)).toBeInTheDocument()
@@ -156,5 +159,31 @@ describe('simulation workspace', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Review assumptions' }))
     fireEvent.change(screen.getByLabelText('Grilled fish Cook active seconds'), { target: { value: '55' } })
     expect(store.getState().project.scenarios[0].menuItems?.[0].steps[2].activeSeconds).toBe(55)
+  })
+
+  it('uses a dedicated accessible affordance when the scenario panel is collapsed and preserves editor state', async () => {
+    const store = createProjectStore(createSeedProject())
+    render(<SimulationWorkspace store={store} run={runSimulation} />)
+
+    await userEvent.click(screen.getByRole('button', { name: /Quick estimate/i }))
+    const scenarioName = screen.getByRole('textbox', { name: 'Scenario name' })
+    expect(scenarioName).toHaveValue('Dinner peak · mostly cooked to order')
+    const panel = screen.getByRole('complementary', { name: 'Scenario' })
+    const content = document.getElementById('simulation-scenario-content')!
+    expect(panel).toHaveAttribute('data-collapsed', 'false')
+    expect(content).not.toHaveAttribute('hidden')
+
+    await userEvent.click(screen.getByRole('button', { name: 'Collapse scenario panel' }))
+
+    expect(panel).toHaveAttribute('data-collapsed', 'true')
+    expect(content).toHaveAttribute('hidden')
+    expect(screen.getByRole('button', { name: 'Expand scenario panel' })).toHaveAttribute('aria-expanded', 'false')
+    expect(screen.queryByRole('textbox', { name: 'Scenario name' })).not.toBeInTheDocument()
+
+    await userEvent.click(screen.getByRole('button', { name: 'Expand scenario panel' }))
+
+    expect(panel).toHaveAttribute('data-collapsed', 'false')
+    expect(content).not.toHaveAttribute('hidden')
+    expect(screen.getByRole('textbox', { name: 'Scenario name' })).toBe(scenarioName)
   })
 })

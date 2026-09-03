@@ -845,8 +845,16 @@ button { cursor: pointer; }
 /* simulation three-panel */
 .simulation-workspace.three-panel { grid-template-columns: 320px minmax(0, 1fr) 360px; }
 .simulation-workspace.three-panel.scenario-collapsed { grid-template-columns: 52px minmax(0, 1fr) 360px; }
-.simulation-scenario-panel { min-width: 0; min-height: 0; overflow-y: auto; border-right: 1px solid var(--rule); background: var(--paper-hi); }
-.scenario-collapsed .simulation-scenario-panel { overflow: hidden; }
+.simulation-scenario-panel { min-width: 280px; min-height: 0; overflow-y: auto; border-right: 1px solid var(--rule); background: var(--paper-hi); }
+.simulation-scenario-content { min-width: 280px; }
+.simulation-scenario-content[hidden] { display: none; }
+.simulation-scenario-content > .panel-heading { margin: 0; border-bottom: 1px solid var(--rule); padding: 14px; }
+.scenario-panel-title-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.scenario-collapse-button { width: 28px; height: 28px; display: grid; place-items: center; flex: 0 0 auto; border: 1px solid var(--rule); border-radius: var(--control-radius); color: var(--ink-3); background: var(--paper-hi); font-size: 20px; line-height: 1; }
+.scenario-collapse-button:hover, .scenario-expand-button:hover { color: var(--accent); border-color: rgba(202, 78, 142, 0.4); background: var(--accent-soft); }
+.scenario-collapsed .simulation-scenario-panel { width: 52px; min-width: 52px; overflow: hidden; }
+.scenario-expand-button { width: 100%; min-height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: flex-start; gap: 12px; border: 0; border-right: 1px solid transparent; padding: 16px 0; color: var(--ink-3); background: var(--paper-hi); font-size: 18px; }
+.scenario-expand-label { writing-mode: vertical-rl; transform: rotate(180deg); color: inherit; font-size: 10.5px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; }
 .simulation-setup, .stress-tests, .revision-history, .menu-item-detail { padding: 14px; border-bottom: 1px solid var(--rule); }
 .menu-table { width: 100%; border-collapse: collapse; font-size: 12px; }
 .menu-table th { color: var(--ink-3); font-size: 10.5px; font-weight: 510; letter-spacing: 0.04em; text-transform: uppercase; }
@@ -936,6 +944,10 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px s
   .scene-legend { overflow-x: auto; white-space: nowrap; }
   .simulation-workspace { grid-template-columns: 1fr; overflow-y: auto; }
   .simulation-workspace.three-panel, .simulation-workspace.three-panel.scenario-collapsed { grid-template-columns: 1fr; }
+  .simulation-scenario-panel, .simulation-scenario-content { min-width: 0; }
+  .scenario-collapsed .simulation-scenario-panel { width: auto; min-width: 0; min-height: 48px; border-right: 0; border-bottom: 1px solid var(--rule); }
+  .scenario-expand-button { min-height: 48px; flex-direction: row; justify-content: center; padding: 8px 14px; }
+  .scenario-expand-label { writing-mode: horizontal-tb; transform: none; }
   .simulation-main { min-height: 660px; }
   .simulation-sidebar { border-left: 0; border-top: 1px solid var(--rule); }
   .simulation-toolbar { align-items: stretch; flex-direction: column; }

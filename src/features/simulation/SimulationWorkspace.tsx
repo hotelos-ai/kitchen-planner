@@ -94,7 +94,6 @@ export function SimulationWorkspace({
 
   const startRun = () => {
     if (hasValidationErrors) return
-    setScenarioCollapsed(true)
     session.startRun()
   }
 
@@ -119,23 +118,49 @@ export function SimulationWorkspace({
 
   return (
     <section className={`simulation-workspace three-panel${scenarioCollapsed ? ' scenario-collapsed' : ''}`}>
-      <aside className="simulation-scenario-panel" aria-label="Scenario">
-        <div className="panel-heading">
-          <span className="eyebrow">Scenario</span>
-          <h2>{scenario.name}</h2>
-          <label>Scenario
-            <select aria-label="Active scenario" value={scenario.id} onChange={(event) => {
-              appStateStore.getState().clearSimulationRun()
-              store.getState().patchProject((project) => { project.activeScenarioId = event.target.value })
-            }}>
-              {project.scenarios.map((entry) => <option key={entry.id} value={entry.id}>{entry.name}</option>)}
-            </select>
-          </label>
+      <aside className="simulation-scenario-panel" aria-label="Scenario" data-collapsed={scenarioCollapsed}>
+        {scenarioCollapsed && (
+          <button
+            type="button"
+            className="scenario-expand-button"
+            aria-controls="simulation-scenario-content"
+            aria-expanded="false"
+            aria-label="Expand scenario panel"
+            onClick={() => setScenarioCollapsed(false)}
+          >
+            <span aria-hidden="true">›</span>
+            <span className="scenario-expand-label">Scenario</span>
+          </button>
+        )}
+        <div id="simulation-scenario-content" className="simulation-scenario-content" hidden={scenarioCollapsed}>
+          <div className="panel-heading">
+            <div className="scenario-panel-title-row">
+              <span className="eyebrow">Scenario</span>
+              <button
+                type="button"
+                className="scenario-collapse-button"
+                aria-controls="simulation-scenario-content"
+                aria-expanded="true"
+                aria-label="Collapse scenario panel"
+                onClick={() => setScenarioCollapsed(true)}
+              >
+                ‹
+              </button>
+            </div>
+            <h2>{scenario.name}</h2>
+            <label>Scenario
+              <select aria-label="Active scenario" value={scenario.id} onChange={(event) => {
+                appStateStore.getState().clearSimulationRun()
+                store.getState().patchProject((project) => { project.activeScenarioId = event.target.value })
+              }}>
+                {project.scenarios.map((entry) => <option key={entry.id} value={entry.id}>{entry.name}</option>)}
+              </select>
+            </label>
+          </div>
+          <SimulationSetup scenario={scenario} store={store} onRun={startRun} onChange={(patch) => { store.getState().updateScenario(scenario.id, patch); session.clearRun() }} />
+          <ScenarioEditor scenario={scenario} onChange={(patch) => { store.getState().updateScenario(scenario.id, patch); session.clearRun() }} />
+          {result && <StressTestPresets scenario={scenario} store={store} onRun={startRun} />}
         </div>
-        <SimulationSetup scenario={scenario} store={store} onRun={startRun} onChange={(patch) => { store.getState().updateScenario(scenario.id, patch); session.clearRun() }} />
-        <ScenarioEditor scenario={scenario} onChange={(patch) => { store.getState().updateScenario(scenario.id, patch); session.clearRun() }} />
-        {result && <StressTestPresets scenario={scenario} store={store} onRun={startRun} />}
-        <button type="button" className="link-button" onClick={() => setScenarioCollapsed((value) => !value)}>{scenarioCollapsed ? 'Show scenario' : 'Collapse scenario'}</button>
       </aside>
       <div className="simulation-main">
         <div className="simulation-toolbar">
