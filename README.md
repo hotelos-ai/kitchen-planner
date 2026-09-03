@@ -1,8 +1,8 @@
-# Kitchen Planner
+# CalmKitchen Designer
 
-Design, inspect, and pressure-test commercial kitchen layouts in one browser-based workspace.
+Design, inspect, and pressure-test commercial kitchen layouts in one browser-based workspace. Part of the HotelOS suite, branded CalmKitchen Designer.
 
-Kitchen Planner combines a dimensionally accurate 2D editor, synchronized procedural 3D, first-person walkthroughs, deterministic busy-service simulation, and evidence-based layout comparison. The repository includes the Manta Raja Indian restaurant as a detailed example project reconstructed from a measured sketch.
+Kitchen Planner combines a dimensionally accurate 2D editor, synchronized procedural 3D, first-person walkthroughs, deterministic busy-service simulation, and evidence-based layout comparison. The repository ships with a detailed example kitchen — a jagged 3.9 × 6.65 m restaurant room — reconstructed from a measured sketch.
 
 > Kitchen Planner is a comparative planning aid. It does not replace architectural, fire, ventilation, food-safety, accessibility, structural, or occupational-safety review.
 
@@ -20,7 +20,7 @@ All geometry is stored canonically in millimetres. Display units can change with
 
 ## Demo project
 
-The bundled Manta Raja layout models:
+The bundled example kitchen models:
 
 - a jagged 3.9 m × 6.65 m kitchen shell;
 - the D2 staff/receiving entrance and permanently sealed D6 wall;
