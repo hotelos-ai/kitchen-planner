@@ -24,6 +24,7 @@ export type StageToolbarProps = {
   hasSelection: boolean
   onToggleCatalog(): void
   onToggleInspector(): void
+  onAutoFix(): void
   onOpenEssentials(): void
   onUndo(): void
   onRedo(): void
@@ -70,13 +71,14 @@ function useWorkflowIssues(store: ProjectStore) {
   const scenario = project.scenarios.find((entry) => entry.id === project.activeScenarioId) ?? project.scenarios[0]
 
   return useMemo(() => {
-    const geometryCount = analyzeLayout(variant.architecture, variant.equipment, { layoutConstraints: variant.layoutConstraints }).length
+    const geometryCount = analyzeLayout(variant.architecture, variant.equipment, { layoutConstraints: variant.layoutConstraints })
+      .filter((issue) => issue.severity === 'error').length
     const operationalCount = scenario ? evaluateOperationalRequirements({
       architecture: variant.architecture,
       equipment: variant.equipment,
       scenario,
       layoutConstraints: variant.layoutConstraints,
-    }).filter((result) => result.severity !== 'professional-review').length : 0
+    }).filter((result) => result.severity === 'blocker').length : 0
     const simulationCount = scenario ? validateSimulationInput({
       architecture: variant.architecture,
       equipment: variant.equipment,
@@ -89,7 +91,7 @@ function useWorkflowIssues(store: ProjectStore) {
       equipment: geometryCount + operationalCount,
       simulate: simulationCount,
     }
-  }, [project, scenario, variant])
+  }, [scenario, variant])
 }
 
 export function StageToolbar({
@@ -105,6 +107,7 @@ export function StageToolbar({
   hasSelection,
   onToggleCatalog,
   onToggleInspector,
+  onAutoFix,
   onOpenEssentials,
   onUndo,
   onRedo,
@@ -148,7 +151,7 @@ export function StageToolbar({
           <button type="button" aria-label="Toggle equipment catalog" aria-pressed={catalogOpen} onClick={onToggleCatalog}>Catalog</button>
         )}
         <button type="button" aria-label="Toggle inspector" aria-pressed={inspectorOpen} onClick={onToggleInspector}>Inspector</button>
-        {showAutoFix && <button type="button" className="toolbar-autofix" onClick={onOpenEssentials}>Auto-fix</button>}
+        {showAutoFix && <button type="button" className="toolbar-autofix" onClick={onAutoFix}>Auto-fix</button>}
         <button type="button" onClick={onOpenEssentials}>
           {stage === 'space' ? 'Validate Plan' : 'Validate Fit-Out'}{essentialsCount > 0 ? ` · ${essentialsCount}` : ''}
         </button>

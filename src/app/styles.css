@@ -696,6 +696,19 @@ button { cursor: pointer; }
 .essentials-dialog .essentials-quick-fixes .primary-action { color: var(--paper-hi); border-color: var(--accent); background: var(--accent); }
 .essentials-dialog .essentials-quick-fixes .primary-action:hover { color: var(--paper-hi); border-color: var(--accent-hover); background: var(--accent-hover); }
 .essentials-dialog > .layout-diagnostics { margin: 0 0 12px; border: 1px solid var(--rule); border-radius: var(--control-radius); }
+.validation-auto-fix { display: grid; gap: 7px; margin: 0 0 12px; border: 1px solid rgba(202, 78, 142, 0.35); border-radius: var(--control-radius); padding: 12px; background: var(--accent-soft); }
+.validation-auto-fix-button { width: 100%; min-height: 38px; border: 1px solid var(--accent); border-radius: var(--control-radius); padding: 7px 12px; color: var(--paper-hi); background: var(--accent); font-size: 13px; font-weight: 600; }
+.validation-auto-fix-button:hover { border-color: var(--accent-hover); background: var(--accent-hover); }
+.validation-auto-fix .validation-room-fix { width: 100%; background: var(--paper-hi); }
+.validation-auto-fix > strong { color: var(--ok); font-family: var(--font-display); font-size: 19px; }
+.validation-auto-fix > p { margin: 0; color: var(--ink-3); font-size: 11.5px; line-height: 1.45; }
+.validation-auto-fix.ready { border-color: rgba(45, 124, 111, 0.35); background: var(--ok-soft); }
+.validation-auto-fix .validation-auto-fix-status { color: var(--ink-2); font-weight: 510; }
+.validation-review-details { margin: 0; border: 1px solid var(--rule); border-radius: var(--control-radius); background: var(--paper); }
+.validation-review-details > summary { padding: 10px 12px; color: var(--ink-2); font-size: 12px; font-weight: 510; cursor: pointer; }
+.validation-review-details > div { display: grid; gap: 10px; border-top: 1px solid var(--rule); padding: 10px; }
+.validation-review-details .layout-diagnostics { border: 1px solid var(--rule); border-radius: var(--control-radius); }
+.validation-review-details .essentials-checker { margin: 0; }
 .simulation-autofix-dialog > h2 { margin: 2px 42px 5px 0; font-family: var(--font-display); font-size: 19px; letter-spacing: -0.015em; }
 .simulation-autofix-dialog > p { margin: 0 42px 14px 0; color: var(--ink-3); font-size: 11.5px; line-height: 1.45; }
 .simulation-autofix-dialog .simulation-autofix-status { margin: 12px 0; border: 1px solid rgba(45, 124, 111, 0.3); border-radius: var(--control-radius); padding: 10px; color: var(--ok); background: var(--ok-soft); font-weight: 510; }
@@ -703,6 +716,10 @@ button { cursor: pointer; }
 .simulation-autofix-dialog > section[aria-label="Simulation validation details"] h3 { margin: 0 0 7px; font-size: 12.5px; }
 .simulation-autofix-dialog > section[aria-label="Simulation validation details"] p,
 .simulation-autofix-dialog > section[aria-label="Simulation validation details"] ul { margin: 0; color: var(--ink-3); font-size: 11.5px; line-height: 1.45; }
+.simulation-autofix-dialog section[aria-label="Simulation validation details"] { border-top: 1px solid var(--rule); padding-top: 10px; }
+.simulation-autofix-dialog section[aria-label="Simulation validation details"] h3 { margin: 0 0 7px; font-size: 12.5px; }
+.simulation-autofix-dialog section[aria-label="Simulation validation details"] p,
+.simulation-autofix-dialog section[aria-label="Simulation validation details"] ul { margin: 0; color: var(--ink-3); font-size: 11.5px; line-height: 1.45; }
 .essentials-group { display: grid; grid-template-columns: 1fr auto; align-items: center; border: 1px solid rgba(194, 147, 79, 0.45); border-left: 3px solid var(--warn); border-radius: var(--control-radius); padding: 11px; background: var(--warn-soft); }
 .essentials-group.blocker { border-color: rgba(163, 47, 29, 0.4); border-left-color: var(--danger); background: var(--danger-soft); }
 .essentials-group.professional-review { border-color: var(--rule-2); border-left-color: var(--ink-3); background: var(--paper); }

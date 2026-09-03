@@ -13,6 +13,8 @@ import { ProjectSettings } from './ProjectSettings'
 import { RevisionHistory } from './RevisionHistory'
 import { SpaceImpactDialog } from './SpaceImpactDialog'
 import { StageOverview } from './StageOverview'
+import { applyAutomaticPlanFixes } from './auto-fix-orchestrator'
+import { ValidationAutoFix } from './ValidationAutoFix'
 import { RoomEditorPanel } from './RoomEditorPanel'
 import type { PlacementSpec } from './room-outline'
 import type { SpaceSelection } from './SpaceItemInspector'
@@ -122,6 +124,7 @@ export function PlanWorkspace({
   const [internalWizardStartsAtRoom, setInternalWizardStartsAtRoom] = useState(false)
   const [internalEssentialsOpen, setInternalEssentialsOpen] = useState(false)
   const [internalRevisionsOpen, setInternalRevisionsOpen] = useState(false)
+  const [autoFixStatus, setAutoFixStatus] = useState('')
   const [spaceImpactOpen, setSpaceImpactOpen] = useState(false)
   const [sourceOpacity, setSourceOpacity] = useState(35)
   const [sourceLocked, setSourceLocked] = useState(false)
@@ -218,6 +221,12 @@ export function PlanWorkspace({
     onStageChange?.('equipment')
   }
 
+  const editRoomForValidation = () => {
+    setEssentialsVisible(false)
+    openLayoutWizard(true)
+    onStageChange?.('space')
+  }
+
   useWorkspaceShortcuts({
     enabled: shortcutEnabled,
     selectedIds,
@@ -263,6 +272,7 @@ export function PlanWorkspace({
             hasSelection={selectedIds.length > 0}
             onToggleCatalog={() => setLocalCatalogOpen((open) => !open)}
             onToggleInspector={() => setLocalInspectorOpen((open) => !open)}
+            onAutoFix={() => setAutoFixStatus(applyAutomaticPlanFixes(store).message)}
             onOpenEssentials={() => setEssentialsVisible(true)}
             onOpenRevisions={() => setRevisionsVisible(true)}
             onUndo={() => store.getState().undo()}
@@ -332,12 +342,14 @@ export function PlanWorkspace({
               {essentialsVisible && (
                 <section className="essentials-dialog in-panel" role="dialog" aria-modal="true" aria-label="Validate plan">
                   <button type="button" className="workspace-modal-close" aria-label="Close essentials checker" onClick={() => setEssentialsVisible(false)}>×</button>
-                  <LayoutDiagnostics store={store} />
-                  <EssentialsChecker store={store} focusItemId={checksFocusId} onEditRoom={() => {
-                    setEssentialsVisible(false)
-                    openLayoutWizard(true)
-                    onStageChange?.('space')
-                  }} />
+                  <ValidationAutoFix store={store} onEditRoom={editRoomForValidation} />
+                  <details className="validation-review-details">
+                    <summary>Review details</summary>
+                    <div>
+                      <LayoutDiagnostics store={store} />
+                      <EssentialsChecker store={store} focusItemId={checksFocusId} onEditRoom={editRoomForValidation} showQuickFixes={false} />
+                    </div>
+                  </details>
                 </section>
               )}
               {revisionsVisible && <RevisionHistory store={store} />}
@@ -370,6 +382,12 @@ export function PlanWorkspace({
           <span>{activeClosedLayout.name} closed.</span>
           <button type="button" aria-label={`Undo close ${activeClosedLayout.name}`} disabled={revision !== activeClosedLayout.revision} title={revision === activeClosedLayout.revision ? 'Restore the closed layout' : 'Undo is unavailable after another edit'} onClick={() => { if (activeClosedLayout.undo()) { onClosedLayoutChange?.(null); setInternalClosedLayout(null) } }}>Undo</button>
           <button type="button" aria-label="Dismiss closed layout message" onClick={() => { onClosedLayoutChange?.(null); setInternalClosedLayout(null) }}>×</button>
+        </div>
+      )}
+      {!compact && autoFixStatus && (
+        <div className="workspace-toast autofix-result-toast" role="status">
+          <span>{autoFixStatus}</span>
+          <button type="button" aria-label="Dismiss automatic fix result" onClick={() => setAutoFixStatus('')}>×</button>
         </div>
       )}
       {!compact && wizardVisible && (

@@ -84,7 +84,7 @@ const titleFor = (severity: OperationalRequirementResult['severity']) => {
   return severity === 'blocker' ? 'Blockers' : 'Warnings'
 }
 
-export function EssentialsChecker({ store, onEditRoom, focusItemId }: { store: ProjectStore; onEditRoom?(): void; focusItemId?: string }) {
+export function EssentialsChecker({ store, onEditRoom, focusItemId, showQuickFixes = true }: { store: ProjectStore; onEditRoom?(): void; focusItemId?: string; showQuickFixes?: boolean }) {
   const project = useStore(store, (state) => state.project)
   const variant = useStore(store, getActiveVariant)
   const [message, setMessage] = useState('')
@@ -117,7 +117,7 @@ export function EssentialsChecker({ store, onEditRoom, focusItemId }: { store: P
         <strong>Check essentials</strong>
         <p>Scenario-based operational guidance, not regulatory certification.</p>
       </header>
-      {(equipmentRecommendations.length > 0 || (hasBlockingArchitectureFinding && onEditRoom)) &&
+      {showQuickFixes && (equipmentRecommendations.length > 0 || (hasBlockingArchitectureFinding && onEditRoom)) &&
         <section className="essentials-quick-fixes" aria-label="Quick fixes">
           {equipmentRecommendations.length > 0 &&
             <button type="button" className="primary-action" onClick={() => addRecommendations()}>Auto-fix missing essentials</button>}

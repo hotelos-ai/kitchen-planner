@@ -8,6 +8,7 @@ import { ProjectStartScreen } from './ProjectStartScreen'
 import { createBlankProject } from '../domain/blank-project'
 import { createSeedProject } from '../domain/seed-project'
 import { AgentToolsPanel } from '../features/webmcp/AgentToolsPanel'
+import { applyAutomaticPlanFixes } from '../features/editor/auto-fix-orchestrator'
 import { WebMcpProvider } from '../features/webmcp/WebMcpProvider'
 import { appStateStore } from '../state/app-state-store'
 import type { ViewMode } from './workflow'
@@ -60,6 +61,7 @@ export function App() {
   const [wizardStartsAtRoom, setWizardStartsAtRoom] = useState(false)
   const [sourceImageUrl, setSourceImageUrl] = useState('/reference/kitchen-sketch.webp')
   const [closedLayout, setClosedLayout] = useState<{ name: string; revision: number; undo(): boolean } | null>(null)
+  const [autoFixStatus, setAutoFixStatus] = useState('')
   const [showStartScreen, setShowStartScreen] = useState(() => {
     if (typeof localStorage === 'undefined') return false
     const hasMatchingDeepLink = typeof window !== 'undefined'
@@ -212,6 +214,7 @@ export function App() {
                   hasSelection={selectedIds.length > 0}
                   onToggleCatalog={() => setPanels({ catalog: !catalogOpen })}
                   onToggleInspector={() => setPanels({ inspector: !inspectorOpen })}
+                  onAutoFix={() => setAutoFixStatus(applyAutomaticPlanFixes(projectStore).message)}
                   onOpenEssentials={() => setPanels({ essentials: true, revisions: false, inspector: true })}
                   onOpenRevisions={() => setPanels({ inspector: true, revisions: true, essentials: false })}
                   onUndo={() => projectStore.getState().undo()}
@@ -278,6 +281,12 @@ export function App() {
         {aiToolsOpen && <AgentToolsPanel onClose={() => setDialogOpen('agent-tools', false)} />}
       </ErrorBoundary>
       {agentIntent && <div className="agent-working-indicator" role="status">Agent is working · {agentIntent}</div>}
+      {autoFixStatus && (
+        <div className="workspace-toast autofix-result-toast" role="status">
+          <span>{autoFixStatus}</span>
+          <button type="button" aria-label="Dismiss automatic fix result" onClick={() => setAutoFixStatus('')}>×</button>
+        </div>
+      )}
       {lastAgentAction && (
         <div className="workspace-toast agent-action-toast" role="status">
           <span><strong>Agent:</strong> {lastAgentAction.intent}</span>

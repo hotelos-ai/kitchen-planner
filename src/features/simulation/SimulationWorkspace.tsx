@@ -8,6 +8,8 @@ import { getActiveVariant, projectStore, type ProjectStore } from '../../state/p
 import { appStateStore } from '../../state/app-state-store'
 import { EssentialsChecker } from '../editor/EssentialsChecker'
 import { LayoutDiagnostics } from '../editor/LayoutDiagnostics'
+import { applyAutomaticPlanFixes } from '../editor/auto-fix-orchestrator'
+import { ValidationAutoFix } from '../editor/ValidationAutoFix'
 import {
   selectSimulationRun,
   simulationRunStore,
@@ -59,6 +61,7 @@ export function SimulationWorkspace({
   const setView = useStore(appStateStore, (state) => state.setSimulationView)
   const [scenarioCollapsed, setScenarioCollapsed] = useState(false)
   const [autoFixOpen, setAutoFixOpen] = useState(false)
+  const [autoFixStatus, setAutoFixStatus] = useState('')
   const staffCount = scenario.staff.reduce((sum, entry) => sum + entry.count, 0)
   const validationErrors = useMemo(() => validateSimulationInput({
     architecture: variant.architecture,
@@ -124,6 +127,11 @@ export function SimulationWorkspace({
     appState.setView('plan')
     appState.setStage('space')
   }
+  const runAutomaticFix = () => {
+    const result = applyAutomaticPlanFixes(store)
+    setAutoFixStatus(result.message)
+    setAutoFixOpen(result.status !== 'success')
+  }
   const bottleneck = result ? Object.entries(result.metrics.stationUtilization).sort((left, right) => right[1] - left[1])[0]?.[0] : undefined
 
   return (
@@ -178,10 +186,14 @@ export function SimulationWorkspace({
           <div><span className="eyebrow">Active layout</span><strong>{variant.name}</strong></div>
           <div className="layer-toggles">{(Object.keys(layers) as (keyof Layers)[]).map((key) => <button type="button" key={key} aria-pressed={layers[key]} onClick={() => toggleLayer(key)}>{key[0].toUpperCase() + key.slice(1)}</button>)}</div>
           <label className="follow-control">Follow<select aria-label="Follow staff role" value={followRole} onChange={(event) => setFollowRole(event.target.value as StaffRole | 'overview')}><option value="overview">Overview</option><option value="head-chef">Head chef</option><option value="sous-chef">Sous chef</option><option value="cdp">CDP</option><option value="busser-washer">Busser / washer</option></select></label>
-          {hasValidationErrors && <button type="button" className="simulation-autofix-button" onClick={() => setAutoFixOpen(true)}>Auto-fix plan</button>}
+          {hasValidationErrors && <button type="button" className="simulation-autofix-button" onClick={runAutomaticFix}>Auto-fix plan</button>}
           <button type="button" className="run-simulation" disabled={hasValidationErrors} onClick={startRun}>Run {scenario.durationMinutes}-minute service</button>
         </div>
-        {validationErrors.length > 0 && <div role="alert" className="simulation-validation"><strong>Resolve before simulation</strong>{validationErrors.map((error, index) => <button type="button" key={`${error.code}-${index}`} onClick={() => error.itemIds.length && store.getState().selectItems(error.itemIds)}>{error.message}{error.itemIds.length ? ' Select affected equipment, then open Plan.' : ''}</button>)}</div>}
+        {(validationErrors.length > 0 || autoFixStatus) && <div role="alert" className="simulation-validation">
+          <strong>{validationErrors.length > 0 ? `${validationErrors.length} blocking issue${validationErrors.length === 1 ? '' : 's'} must be resolved before simulation` : 'Ready to simulate'}</strong>
+          {autoFixStatus && <span>{autoFixStatus}</span>}
+          {validationErrors.length > 0 && <button type="button" onClick={() => setAutoFixOpen(true)}>Review issues</button>}
+        </div>}
         {result && liveState ? <>
           <LiveServiceHUD result={result} state={liveState} />
           <div className="simulation-view-stage">
@@ -222,16 +234,22 @@ export function SimulationWorkspace({
         >
           <button type="button" className="workspace-modal-close" aria-label="Close auto-fix plan" onClick={() => setAutoFixOpen(false)}>×</button>
           <h2>Resolve simulation blockers</h2>
-          <p>Review geometry first, then add any missing operational essentials. Changes use the same undoable workspace actions as the plan editor.</p>
-          <LayoutDiagnostics store={store} />
-          <EssentialsChecker store={store} onEditRoom={editRoom} />
+          <p>Automatic changes use the same undoable workspace actions as the plan editor.</p>
+          <ValidationAutoFix store={store} onEditRoom={editRoom} />
           {!hasValidationErrors && <p className="simulation-autofix-status" role="status">Simulation blockers resolved — close to run.</p>}
-          <section aria-label="Simulation validation details">
-            <h3>Remaining simulation blockers</h3>
-            {hasValidationErrors
-              ? <ul>{validationErrors.map((validationError, index) => <li key={`${validationError.code}-${index}`}>{validationError.message}</li>)}</ul>
-              : <p>None.</p>}
-          </section>
+          <details className="validation-review-details">
+            <summary>Review details</summary>
+            <div>
+              <LayoutDiagnostics store={store} />
+              <EssentialsChecker store={store} onEditRoom={editRoom} showQuickFixes={false} />
+              <section aria-label="Simulation validation details">
+                <h3>Remaining simulation blockers</h3>
+                {hasValidationErrors
+                  ? <ul>{validationErrors.map((validationError, index) => <li key={`${validationError.code}-${index}`}>{validationError.message}</li>)}</ul>
+                  : <p>None.</p>}
+              </section>
+            </div>
+          </details>
         </section>
       </div>
     )}
