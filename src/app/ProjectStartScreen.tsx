@@ -3,16 +3,18 @@ import { importProject } from '../state/persistence'
 import { RoomStartForm } from './RoomStartForm'
 import type { Architecture, KitchenProject } from '../domain/project'
 
-type StartChoice = 'home' | 'dimensions' | 'trace' | 'draw'
+type StartChoice = 'home' | 'scratch' | 'dimensions' | 'trace' | 'draw'
 
 type Props = {
+  onScratch?(): void
+  onStarterKitchen?(): void
   onCreateRoom(architecture: Architecture): void
   onDrawManually(): void
   onOpenProject(project: KitchenProject): void
   onTraceImage?(dataUrl: string): void
 }
 
-export function ProjectStartScreen({ onCreateRoom, onDrawManually, onOpenProject, onTraceImage }: Props) {
+export function ProjectStartScreen({ onCreateRoom, onDrawManually, onOpenProject, onTraceImage, onScratch, onStarterKitchen }: Props) {
   const [choice, setChoice] = useState<StartChoice>('home')
   const [error, setError] = useState('')
   const fileRef = useRef<HTMLInputElement>(null)
@@ -63,6 +65,35 @@ export function ProjectStartScreen({ onCreateRoom, onDrawManually, onOpenProject
     )
   }
 
+  if (choice === 'scratch') {
+    return (
+      <section className="start-screen" aria-label="Design from scratch">
+        <header>
+          <p className="eyebrow">CalmKitchen Designer</p>
+          <h2>Design from scratch</h2>
+          <p>Start with a blank Kitchen 1 — how do you want to draw the room?</p>
+        </header>
+        <div className="start-choices">
+          <button type="button" onClick={() => setChoice('dimensions')}>
+            <strong>Enter room dimensions</strong>
+            <span>Fastest option for a simple room</span>
+          </button>
+          <button type="button" onClick={() => setChoice('trace')}>
+            <strong>Trace a floor plan</strong>
+            <span>Upload a PDF or image and draw over it</span>
+          </button>
+          <button type="button" onClick={onDrawManually}>
+            <strong>Draw manually</strong>
+            <span>For irregular rooms and multiple areas</span>
+          </button>
+        </div>
+        <footer>
+          <button type="button" onClick={() => setChoice('home')}>‹ Back</button>
+        </footer>
+      </section>
+    )
+  }
+
   return (
     <section className="start-screen" aria-label="Create your kitchen space">
       <header>
@@ -71,21 +102,17 @@ export function ProjectStartScreen({ onCreateRoom, onDrawManually, onOpenProject
         <p>How would you like to start?</p>
       </header>
       <div className="start-choices">
-        <button type="button" onClick={() => setChoice('dimensions')}>
-          <strong>Enter room dimensions</strong>
-          <span>Fastest option for a simple room</span>
+        <button type="button" onClick={() => { onScratch?.(); setChoice('scratch') }}>
+          <strong>Design from scratch</strong>
+          <span>A blank kitchen you shape yourself</span>
         </button>
-        <button type="button" onClick={() => setChoice('trace')}>
-          <strong>Trace a floor plan</strong>
-          <span>Upload a PDF or image and draw over it</span>
-        </button>
-        <button type="button" onClick={onDrawManually}>
-          <strong>Draw manually</strong>
-          <span>For irregular rooms and multiple areas</span>
+        <button type="button" onClick={() => onStarterKitchen?.()}>
+          <strong>Simple starter kitchen</strong>
+          <span>A fully equipped example to explore and edit</span>
         </button>
         <button type="button" onClick={() => fileRef.current?.click()}>
-          <strong>Open a saved project</strong>
-          <span>Restore a CalmKitchen Designer file</span>
+          <strong>Upload a file</strong>
+          <span>Open a saved CalmKitchen Designer project</span>
         </button>
       </div>
       <input ref={fileRef} type="file" accept="application/json,.json" aria-label="Open saved project" hidden onChange={onOpenFile} />

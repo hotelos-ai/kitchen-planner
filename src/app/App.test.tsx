@@ -6,13 +6,17 @@ import { getActiveItem, getVariantItem, projectStore } from '../state/project-st
 import { App } from './App'
 
 describe('App', () => {
-  beforeEach(() => projectStore.getState().replaceProject(createSeedProject()))
+  beforeEach(() => {
+    localStorage.setItem('calmkitchen-designer:session', '1')
+    projectStore.getState().replaceProject(createSeedProject())
+  })
   it('opens the Kitchen 1 planning workspace', async () => {
     render(<App />)
     expect(screen.getByRole('heading', { name: /CalmKitchen Designer/i })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Plan' })).toHaveAttribute('aria-pressed', 'true')
     const user = userEvent.setup()
     await screen.findByLabelText('2D plan workspace', {}, { timeout: 5000 })
+    await user.click(screen.getByRole('button', { name: '2 Fit-out' }))
     const catalog = screen.getByLabelText('Equipment catalog')
     await user.click(within(catalog).getByRole('tab', { name: /Placed/i }))
     expect(await within(catalog).findByRole('button', { name: /Select Tandoor/i })).toBeInTheDocument()
@@ -36,6 +40,9 @@ describe('App', () => {
 
   it('opens the auto-layout experiment workspace from global actions', async () => {
     render(<App />)
+    const user = userEvent.setup()
+    await screen.findByLabelText('2D plan workspace', {}, { timeout: 5000 })
+    await user.click(screen.getByRole('button', { name: '2 Fit-out' }))
     await userEvent.click(screen.getByRole('button', { name: 'Auto-layout' }))
     expect(await screen.findByLabelText('Auto-layout experiment')).toBeInTheDocument()
     expect(screen.getByText(/best observed feasible layouts/i)).toBeInTheDocument()
@@ -51,11 +58,31 @@ describe('App', () => {
 
     await user.click(screen.getByRole('button', { name: '2 Fit-out' }))
     expect(screen.getByRole('button', { name: '2 Fit-out' })).toHaveAttribute('aria-current', 'step')
+    await userEvent.click(screen.getByRole('button', { name: '2 Fit-out' }))
     expect(await screen.findByLabelText('Equipment catalog')).toBeInTheDocument()
 
     await user.click(screen.getByRole('button', { name: '3 Simulate' }))
     expect(screen.getByRole('button', { name: '3 Simulate' })).toHaveAttribute('aria-current', 'step')
     expect(await screen.findByText(/Pressure-test this layout/i)).toBeInTheDocument()
+  })
+
+  it('starts on the space stage with the floor plan editor for returning sessions', async () => {
+    render(<App />)
+    await screen.findByLabelText('2D plan workspace', {}, { timeout: 5000 })
+    expect(screen.getByRole('button', { name: '1 Space' })).toHaveAttribute('aria-current', 'step')
+    expect(await screen.findByLabelText('Floor plan editor')).toBeInTheDocument()
+    expect(screen.queryByLabelText('Equipment catalog')).not.toBeInTheDocument()
+  })
+
+  it('shows the welcome choices to first-time visitors', async () => {
+    localStorage.removeItem('calmkitchen-designer:session')
+    localStorage.removeItem('kitchen-planner:project:v2')
+    localStorage.removeItem('kitchen-planner:project:last-good:v2')
+    render(<App />)
+    expect(await screen.findByRole('heading', { name: 'Create your kitchen space' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Design from scratch/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Simple starter kitchen/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Upload a file/i })).toBeInTheDocument()
   })
 
   it('switches workflow stages with the 1 2 3 keys', async () => {
@@ -70,6 +97,8 @@ describe('App', () => {
     render(<App />)
     const editorVariantId = projectStore.getState().project.activeVariantId
     const user = userEvent.setup()
+    await screen.findByLabelText('2D plan workspace', {}, { timeout: 5000 })
+    await user.click(screen.getByRole('button', { name: '2 Fit-out' }))
     const catalog = await screen.findByLabelText('Equipment catalog')
     await user.click(within(catalog).getByRole('tab', { name: /Placed/i }))
     await user.click(await within(catalog).findByRole('button', { name: /Select Tandoor/i }))
@@ -92,6 +121,8 @@ describe('App', () => {
     await user.click(screen.getByRole('button', { name: 'Project menu' }))
     await user.click(screen.getByRole('menuitem', { name: 'New project' }))
     expect(await screen.findByRole('heading', { name: 'Create your kitchen space' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Simple starter kitchen/i })).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: /Design from scratch/i }))
     expect(screen.getByRole('button', { name: /Enter room dimensions/i })).toBeInTheDocument()
   })
 

@@ -1,4 +1,4 @@
-import { lazy, Suspense, useMemo, useState } from 'react'
+import { lazy, Suspense, useEffect, useMemo, useState } from 'react'
 import { useStore } from 'zustand'
 import { createBrowserAutoLayoutRunner } from '../features/optimizer/browser-auto-layout-runner'
 import { evaluateOperationalRequirements } from '../domain/requirements/operational-requirements'
@@ -10,7 +10,11 @@ import { AgentToolsPanel } from '../features/webmcp/AgentToolsPanel'
 import { WebMcpProvider } from '../features/webmcp/WebMcpProvider'
 import type { ViewMode, WorkflowStage, WorkspaceOverlay } from './workflow'
 import { ErrorBoundary } from './ErrorBoundary'
+import { HelpDialog } from './HelpDialog'
+import { CURRENT_PROJECT_KEY, LAST_GOOD_PROJECT_KEY } from '../state/persistence'
 import './styles.css'
+
+export const SESSION_FLAG_KEY = 'calmkitchen-designer:session'
 
 const PlanWorkspace = lazy(() => import('../features/editor/PlanWorkspace').then((module) => ({ default: module.PlanWorkspace })))
 const SceneWorkspace = lazy(() => import('../features/scene/SceneWorkspace').then((module) => ({ default: module.SceneWorkspace })))
@@ -27,7 +31,7 @@ void Promise.all([
 ])
 
 export function App() {
-  const [stage, setStage] = useState<WorkflowStage>('equipment')
+  const [stage, setStage] = useState<WorkflowStage>('space')
   const [view, setView] = useState<ViewMode>('plan')
   const [overlay, setOverlay] = useState<WorkspaceOverlay>(null)
   const project = useStore(projectStore, (state) => state.project)
@@ -46,6 +50,21 @@ export function App() {
   const [sourceImageUrl, setSourceImageUrl] = useState('/reference/kitchen-sketch.png')
   const [closedLayout, setClosedLayout] = useState<{ name: string; revision: number; undo(): boolean } | null>(null)
   const [showStartScreen, setShowStartScreen] = useState(false)
+  const [helpOpen, setHelpOpen] = useState(false)
+
+  useEffect(() => {
+    const hasSession = typeof localStorage !== 'undefined' && Boolean(
+      localStorage.getItem(SESSION_FLAG_KEY)
+      ?? localStorage.getItem(CURRENT_PROJECT_KEY)
+      ?? localStorage.getItem(LAST_GOOD_PROJECT_KEY),
+    )
+    if (!hasSession) setShowStartScreen(true)
+  }, [])
+
+  const beginSession = () => {
+    localStorage.setItem(SESSION_FLAG_KEY, '1')
+    setShowStartScreen(false)
+  }
   const [aiToolsOpen, setAiToolsOpen] = useState(false)
 
   const dragResizeEnabled = Boolean(selectedItem && !selectedItem.dimensionsLocked)
@@ -124,12 +143,14 @@ export function App() {
             <ProjectStartScreen
               onCreateRoom={(architecture) => {
                 projectStore.getState().applySharedArchitecture(architecture)
-                setShowStartScreen(false)
+                beginSession()
                 setStage('space')
               }}
-              onDrawManually={() => { setShowStartScreen(false); setStage('space'); setWizardOpen(true); setWizardStartsAtRoom(true) }}
-              onTraceImage={(url) => { setSourceImageUrl(url); setShowReference(true) }}
-              onOpenProject={(opened) => { projectStore.getState().replaceProject(opened); setShowStartScreen(false) }}
+              onScratch={() => { projectStore.getState().replaceProject(createBlankProject()); setStage('space'); setView('plan') }}
+              onStarterKitchen={() => { beginSession(); setStage('space'); setView('plan') }}
+              onDrawManually={() => { beginSession(); setStage('space'); setWizardOpen(true); setWizardStartsAtRoom(true) }}
+              onTraceImage={(url) => { beginSession(); setSourceImageUrl(url); setShowReference(true); setStage('space') }}
+              onOpenProject={(opened) => { projectStore.getState().replaceProject(opened); beginSession(); setStage('space') }}
             />
           ) : (
           <section className={`workspace-surfaces${view === 'split' && overlay === null && stage !== 'simulate' ? ' split-workspace' : ''}`}>
@@ -212,12 +233,20 @@ export function App() {
         </Suspense>
         {aiToolsOpen && <AgentToolsPanel onClose={() => setAiToolsOpen(false)} />}
       </ErrorBoundary>
+      {helpOpen && <HelpDialog onClose={() => setHelpOpen(false)} />}
       <footer className="app-footer">
-        <span>CalmKitchen Designer · Part of the HotelOS suite</span>
+        <span className="footer-brand">
+          <svg viewBox="0 0 214.2 214.2" aria-hidden="true"><path fill="#b1d15b" d="M190.1,0l-27.9,45.9c-3.5,5.7-9.8,9.4-16.6,9.4h-76.8c-6.8,0-13.3-3.7-16.8-9.4L24.4,0H0v214.2h24.4l27.7-45.6c3.5-5.9,10-9.4,16.8-9.4h76.8c6.8,0,13.1,3.5,16.6,9.4l27.9,45.6h24.2V0h-24.2ZM133,133.2h-51.9v-51.8h51.9v51.8Z"/></svg>
+          CalmKitchen Designer <span style={{ fontWeight: 400 }}>by HotelOS</span>
+        </span>
         <span className="footer-sep" aria-hidden="true"></span>
-        <a href="https://kitchen.hotelos.ai" target="_blank" rel="noreferrer">CalmKitchen home</a>
+        <span className="footer-tag">Use your own agents and AI to help design your commercial kitchen</span>
         <span className="footer-right">
-          <a href="https://kitchen.hotelos.ai" target="_blank" rel="noreferrer">kitchen.hotelos.ai</a>
+          <button type="button" className="link-button" onClick={() => setHelpOpen(true)}>How to</button>
+          <span className="footer-sep" aria-hidden="true"></span>
+          <a href="https://hotelos.ai/kitchen" target="_blank" rel="noreferrer">hotelos.ai/kitchen</a>
+          <span className="footer-sep" aria-hidden="true"></span>
+          <a href="https://kitchen.hotelos.ai" target="_blank" rel="noreferrer">CalmKitchen home</a>
         </span>
       </footer>
       </main>

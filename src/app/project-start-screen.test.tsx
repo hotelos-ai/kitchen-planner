@@ -10,6 +10,7 @@ describe('project start screen', () => {
     const onCreateRoom = vi.fn()
     render(<ProjectStartScreen onCreateRoom={onCreateRoom} onDrawManually={vi.fn()} onOpenProject={vi.fn()} />)
 
+    await user.click(screen.getByRole('button', { name: /Design from scratch/i }))
     await user.click(screen.getByRole('button', { name: /Enter room dimensions/i }))
     await user.selectOptions(screen.getByLabelText('Room shape'), 'l')
     await user.click(screen.getByRole('button', { name: 'Create room' }))
@@ -23,6 +24,7 @@ describe('project start screen', () => {
     const onDrawManually = vi.fn()
     render(<ProjectStartScreen onCreateRoom={vi.fn()} onDrawManually={onDrawManually} onOpenProject={vi.fn()} />)
 
+    await user.click(screen.getByRole('button', { name: /Design from scratch/i }))
     await user.click(screen.getByRole('button', { name: /Trace a floor plan/i }))
     expect(screen.getByLabelText('Upload floor plan')).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Continue to drawing' }))
