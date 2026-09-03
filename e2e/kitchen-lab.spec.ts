@@ -5,9 +5,9 @@ test.beforeEach(async ({ page }) => {
   await page.addInitScript(() => localStorage.clear())
 })
 
-test('edits, simulates, compares, exports, and restores Manta Raja', async ({ page }) => {
+test('edits, simulates, compares, exports, and restores the example kitchen', async ({ page }) => {
   await page.goto('/')
-  await expect(page.getByRole('heading', { name: /Kitchen Planner/i })).toBeVisible()
+  await expect(page.getByRole('heading', { name: /CalmKitchen Designer/i })).toBeVisible()
 
   await page.getByRole('tab', { name: /Placed/i }).click()
   await page.getByRole('button', { name: /Select Tandoor, 700 mm by 700 mm/i }).click()
@@ -102,7 +102,7 @@ test('creates an advanced room and recommended essentials through the novice wiz
 
   await expect(wizard).toHaveCount(0)
   await expect(page.getByRole('tab', { name: /Jagged service concept/ })).toHaveAttribute('aria-selected', 'true')
-  await page.getByRole('button', { name: 'Check essentials' }).click()
+  await page.getByRole('button', { name: 'Check essentials' }).first().click()
   await expect(page.getByRole('dialog', { name: 'Check essentials' })).toContainText(/operational guidance, not regulatory certification/i)
 })
 
@@ -127,6 +127,7 @@ test('runs, inspects, compares, and atomically adopts an auto-layout finalist', 
   await page.getByRole('button', { name: 'Save Minimal change as new layout' }).click()
   await expect(page.getByRole('status')).toContainText(/saved as a new layout/i)
 
+  await page.getByRole('button', { name: 'Auto-layout', exact: true }).click()
   await page.getByRole('button', { name: 'Plan', exact: true }).click()
   await expect(page.getByRole('tab', { name: /Minimal change/ })).toBeVisible()
   expect(pageErrors).toEqual([])
@@ -153,7 +154,7 @@ test('keeps Plan controls and canvas in the phone viewport', async ({ page }) =>
   await page.goto('/')
 
   const workspace = page.getByRole('region', { name: '2D plan workspace' })
-  const toolbarBox = await workspace.locator('.workspace-toolbar').boundingBox()
+  const toolbarBox = await page.locator('.app-header-row-2').boundingBox()
   const canvasBox = await page.getByTestId('plan-canvas').boundingBox()
 
   expect(toolbarBox).not.toBeNull()
@@ -173,6 +174,7 @@ test('resizes the desktop Plan canvas without remounting it when drawers collaps
 
   await page.getByRole('button', { name: 'Toggle equipment catalog' }).click()
   await page.getByRole('button', { name: 'Toggle inspector' }).click()
+  await page.waitForTimeout(350)
   const after = await canvas.boundingBox()
 
   expect(nodeIdentity).toBe(true)
@@ -259,6 +261,7 @@ test('applies a typical equipment configuration and reflects it in 3D', async ({
   const pageErrors: string[] = []
   page.on('pageerror', (error) => pageErrors.push(error.message))
   await page.goto('/')
+  await page.getByRole('tab', { name: /Placed/i }).click()
 
   await page.getByRole('button', { name: /Select 2-door fridge, 1400 mm by 850 mm/i }).click()
   await expect(page.getByLabel('Equipment configuration')).toHaveValue('cold-upright-double')
