@@ -1,0 +1,182 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CalmKitchen Designer — Notebook design language</title>
+<link rel="stylesheet" href="studio.css">
+<style>
+  body { overflow-y: auto; }
+  .page { max-width: 1080px; margin: 0 auto; padding: 56px 40px 80px; }
+  .hero { display: grid; gap: 14px; margin-bottom: 48px; }
+  .hero h1 { font-family: var(--font-display); font-size: 40px; font-weight: 600; letter-spacing: -0.025em; line-height: 1.05; }
+  .hero h1 em { font-style: normal; color: var(--accent); }
+  .hero p { color: var(--text-mid); font-size: 15px; max-width: 62ch; line-height: 1.65; }
+  .screens { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-top: 10px; }
+  .screen-card {
+    display: grid; gap: 8px; padding: 14px; border-radius: var(--r-md);
+    background: var(--bg-surface); border: 1px solid var(--line-std);
+    transition: border-color 150ms ease, transform 150ms ease;
+  }
+  .screen-card:hover { border-color: rgba(255,255,255,.24); transform: translateY(-2px); }
+  .screen-card .thumb { height: 108px; border-radius: var(--r-sm); background: var(--bg-canvas); border: 1px solid var(--line-subtle); position: relative; overflow: hidden; }
+  .screen-card .thumb::before { content:''; position: absolute; inset: 0; background-image: radial-gradient(rgba(255,255,255,.07) 1px, transparent 1px); background-size: 14px 14px; }
+  .screen-card .t-bar { position: absolute; top: 8px; left: 8px; right: 8px; height: 8px; border-radius: 4px; background: var(--bg-elevated); }
+  .screen-card .t-chip { position: absolute; width: 34px; height: 34px; border-radius: 8px; background: var(--bg-elevated); border: 1px solid var(--line-subtle); }
+  .screen-card .t-chip.c1 { top: 24px; left: 8px; } .screen-card .t-chip.c2 { top: 66px; right: 8px; }
+  .screen-card .t-pill { position: absolute; bottom: 8px; left: 50%; transform: translateX(-50%); width: 84px; height: 10px; border-radius: 999px; background: var(--bg-elevated); }
+  .screen-card .t-dot { position: absolute; width: 7px; height: 7px; border-radius: 2px; background: var(--accent); top: 30px; left: 18px; }
+  .screen-card strong { font-size: 13.5px; font-weight: 590; }
+  .screen-card span { font-size: 11.5px; color: var(--text-low); line-height: 1.5; }
+  section { margin-top: 52px; }
+  section > h2 { font-size: 13px; font-weight: 590; color: var(--text-low); letter-spacing: .1em; text-transform: uppercase; margin-bottom: 18px; }
+  .swatches { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
+  .swatch { border-radius: var(--r-md); border: 1px solid var(--line-std); overflow: hidden; background: var(--bg-surface); }
+  .swatch .fill { height: 56px; }
+  .swatch dl { padding: 9px 11px; display: grid; gap: 2px; }
+  .swatch dt { font-size: 12px; font-weight: 590; }
+  .swatch dd { font-family: var(--font-mono); font-size: 10px; color: var(--text-low); }
+  .type-spec { display: grid; gap: 14px; }
+  .type-row { display: grid; grid-template-columns: 200px 1fr; align-items: baseline; gap: 18px; padding-bottom: 14px; border-bottom: 1px solid var(--line-subtle); }
+  .type-row .spec { font-family: var(--font-mono); font-size: 10.5px; color: var(--text-low); }
+  .specimen-d { font-size: 30px; font-weight: 590; letter-spacing: -0.02em; }
+  .specimen-h { font-size: 16px; font-weight: 590; }
+  .specimen-b { font-size: 13px; }
+  .specimen-c { font-size: 11px; color: var(--text-mid); }
+  .specimen-m { font-family: var(--font-mono); font-size: 13px; color: var(--accent); }
+  .components { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
+  .comp-demo { padding: 18px; border-radius: var(--r-md); background: var(--bg-canvas); border: 1px solid var(--line-subtle); display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+  .principles { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
+  .principle { padding: 16px; border-radius: var(--r-md); background: var(--bg-surface); border: 1px solid var(--line-subtle); }
+  .principle .p-n { font-family: var(--font-mono); font-size: 10.5px; color: var(--accent); }
+  .principle strong { display: block; font-size: 13.5px; font-weight: 590; margin: 6px 0 4px; }
+  .principle p { font-size: 12px; color: var(--text-mid); line-height: 1.55; }
+  footer { margin-top: 56px; padding-top: 18px; border-top: 1px solid var(--line-subtle); color: var(--text-faint); font-size: 11.5px; }
+</style>
+</head>
+<body>
+<div class="page">
+  <div class="hero">
+    <h1>The kitchen is the hero.<br>Everything else <em>recedes</em>.</h1>
+    <p>Notebook is the design language for CalmKitchen Designer — the HotelOS brand applied to a planning tool: warm paper, forest-green ink, green-tinted hairlines, and one magenta spot accent reserved for selection and action. Numbers set in monospace, panels summoned instead of permanent, one primary action per screen.</p>
+    <div class="screens">
+      <a class="screen-card" href="plan-editor.html">
+        <div class="thumb"><div class="t-bar"></div><div class="t-chip c1"></div><div class="t-dot"></div><div class="t-pill"></div></div>
+        <strong>Plan editor</strong><span>Equipment stage · selection context, library rail, review pill</span>
+      </a>
+      <a class="screen-card" href="3d-view.html">
+        <div class="thumb"><div class="t-bar"></div><div class="t-chip c2"></div><div class="t-pill"></div></div>
+        <strong>3D inspect</strong><span>Full-bleed viewport, floating view cluster, walk CTA</span>
+      </a>
+      <a class="screen-card" href="simulate.html">
+        <div class="thumb"><div class="t-bar"></div><div class="t-chip c1"></div><div class="t-chip c2"></div><div class="t-pill"></div></div>
+        <strong>Simulate</strong><span>Running service · HUD strip, playback, findings rail</span>
+      </a>
+      <a class="screen-card" href="autolayout.html">
+        <div class="thumb"><div class="t-bar"></div><div class="t-chip c1"></div><div class="t-dot"></div></div>
+        <strong>Auto-layout</strong><span>Three-step wizard · goal first, constraints visual</span>
+      </a>
+      <a class="screen-card" href="space.html">
+        <div class="thumb"><div class="t-bar"></div><div class="t-chip c2"></div><div class="t-pill"></div></div>
+        <strong>Space</strong><span>Room stage · outline editing, quiet canvas</span>
+      </a>
+      <a class="screen-card" href="compare.html">
+        <div class="thumb"><div class="t-bar"></div><div class="t-chip c1"></div><div class="t-chip c2"></div></div>
+        <strong>Compare</strong><span>Baseline vs candidate · delta table, findings</span>
+      </a>
+    </div>
+  </div>
+
+  <section>
+    <h2>Brand — HotelOS · CalmKitchen</h2>
+    <div class="components">
+      <div class="comp-demo" style="gap:16px;">
+        <svg width="34" height="34" viewBox="0 0 214.2 214.2" aria-label="HotelOS symbol"><path fill="#b1d15b" d="M190.1,0l-27.9,45.9c-3.5,5.7-9.8,9.4-16.6,9.4h-76.8c-6.8,0-13.3-3.7-16.8-9.4L24.4,0H0v214.2h24.4l27.7-45.6c3.5-5.9,10-9.4,16.8-9.4h76.8c6.8,0,13.1,3.5,16.6,9.4l27.9,45.6h24.2V0h-24.2ZM133,133.2h-51.9v-51.8h51.9v51.8Z"/></svg>
+        <div style="display:grid; gap:2px;">
+          <strong style="font-family:var(--font-display); font-size:15px; font-weight:600;">CalmKitchen <span style="color:var(--text-low); font-weight:500;">Designer</span></strong>
+          <span style="font-size:11px; color:var(--text-low);">HotelOS symbol · product lockup · top bar</span>
+        </div>
+      </div>
+      <div class="comp-demo" style="gap:16px;">
+        <svg width="30" height="30" viewBox="0 0 40 40" aria-label="CalmKitchen mark"><path d="M30.5997 17.8983C30.5997 12.0483 25.8597 7.30835 20.0097 7.30835C14.1597 7.30835 9.42969 12.0483 9.42969 17.8983C9.42969 19.9383 10.0197 21.8283 11.0097 23.4483H29.0097C30.0097 21.8283 30.5897 19.9383 30.5897 17.8983H30.5997Z" fill="#E38DBE"/><path d="M29.02 23.4482C27.16 26.4682 23.83 28.4882 20.02 28.4882C16.21 28.4882 12.88 26.4682 11.02 23.4482H4V33.5482H36V23.4482H29.02Z" fill="#E38DBE"/><path d="M20.0198 28.478C23.8298 28.478 27.1598 26.4582 29.0198 23.4382H11.0098C12.8698 26.4582 16.1998 28.478 20.0098 28.478H20.0198Z" fill="#CA4E8E"/></svg>
+        <div style="display:grid; gap:2px;">
+          <strong style="font-size:13.5px; font-weight:600;">CalmKitchen mark</strong>
+          <span style="font-size:11px; color:var(--text-low);">app icon · favicon · empty states</span>
+        </div>
+      </div>
+    </div>
+    <p style="margin-top:12px; color:var(--text-low); font-size:11.5px; line-height:1.6; max-width:72ch;">Lime #b1d15b belongs to the HotelOS symbol only. Magenta #ca4e8e is the CalmKitchen spot accent — active step, selection, focus ring, eyebrows. Primary buttons are ink-on-light (#0c1e03 on paper), per the brand rule. Projects get neutral names — <span class="mono">Kitchen 1</span> — the user's own name appears only if they set one.</p>
+  </section>
+
+  <section>
+    <h2>Color — paper · ink · one spot accent</h2>
+    <div class="swatches">
+      <div class="swatch"><div class="fill" style="background:#f3f1eb"></div><dl><dt>paper</dt><dd>#f3f1eb</dd></dl></div>
+      <div class="swatch"><div class="fill" style="background:#fbfaf5; border-bottom:1px solid var(--line-subtle);"></div><dl><dt>paper-hi / canvas</dt><dd>#fbfaf5</dd></dl></div>
+      <div class="swatch"><div class="fill" style="background:#e1ded5"></div><dl><dt>bone</dt><dd>#e1ded5</dd></dl></div>
+      <div class="swatch"><div class="fill" style="background:#0c1e03"></div><dl><dt>ink</dt><dd>#0c1e03</dd></dl></div>
+      <div class="swatch"><div class="fill" style="background:#5e6b5a"></div><dl><dt>ink-3 / sage</dt><dd>#5e6b5a</dd></dl></div>
+      <div class="swatch"><div class="fill" style="background:#ca4e8e"></div><dl><dt>accent — spot</dt><dd>#ca4e8e</dd></dl></div>
+      <div class="swatch"><div class="fill" style="background:#b1d15b"></div><dl><dt>lime — mark only</dt><dd>#b1d15b</dd></dl></div>
+      <div class="swatch"><div class="fill" style="background:#2d7c6f"></div><dl><dt>moss / ok</dt><dd>#2d7c6f</dd></dl></div>
+      <div class="swatch"><div class="fill" style="background:#c2934f"></div><dl><dt>ochre / warn</dt><dd>#c2934f</dd></dl></div>
+      <div class="swatch"><div class="fill" style="background:#a32f1d"></div><dl><dt>rust / danger</dt><dd>#a32f1d</dd></dl></div>
+      <div class="swatch"><div class="fill" style="background:#4b7ce1"></div><dl><dt>sky / cold</dt><dd>#4b7ce1</dd></dl></div>
+      <div class="swatch"><div class="fill" style="background:#cb6c55"></div><dl><dt>ochre-red / cooking</dt><dd>#cb6c55</dd></dl></div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Typography — Geist + Bricolage Grotesque + JetBrains Mono · floor 11px</h2>
+    <div class="type-spec">
+      <div class="type-row"><span class="spec">Bricolage Grotesque · 30 / 600 · -0.015em</span><span class="specimen-d">Pressure-test the dinner service</span></div>
+      <div class="type-row"><span class="spec">Geist · 16 / 600</span><span class="specimen-h">Equipment library</span></div>
+      <div class="type-row"><span class="spec">Geist · 13 / 400</span><span class="specimen-b">Twin-basket deep fryer — floor fryer with two baskets for high-throughput fried production.</span></div>
+      <div class="type-row"><span class="spec">Geist · 11 / 400</span><span class="specimen-c">Labels are sentence case, never uppercase micro-caps.</span></div>
+      <div class="type-row"><span class="spec">JetBrains Mono · tabular</span><span class="specimen-m">2400 × 1200 mm · P90 12:41 · 84 checks passed</span></div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Components</h2>
+    <div class="components">
+      <div class="comp-demo">
+        <button class="btn btn-primary">Run service</button>
+        <button class="btn btn-ghost">Tune scenario</button>
+        <button class="btn btn-outline">Export</button>
+        <button class="btn btn-sm btn-ghost btn-sm">Duplicate</button>
+      </div>
+      <div class="comp-demo">
+        <span class="badge ok">84 passed</span>
+        <span class="badge warn">12 attention</span>
+        <span class="badge danger">2 blocked</span>
+        <span class="badge accent mono">Rev 4</span>
+      </div>
+      <div class="comp-demo">
+        <div class="chiprow">
+          <span class="chip active">Cooking</span><span class="chip">Cold</span><span class="chip">Prep</span><span class="chip">Wash</span><span class="chip">Storage</span>
+        </div>
+      </div>
+      <div class="comp-demo">
+        <div class="seg"><button class="active">Plan</button><button>3D</button><button>Split</button></div>
+        <button class="iconbtn">⟲</button><button class="iconbtn">⟳</button>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Principles</h2>
+    <div class="principles">
+      <div class="principle"><span class="p-n">01</span><strong>Canvas first</strong><p>Full-bleed canvas; chrome never exceeds the 48px top bar. Panels float with 12px margins and can all dismiss.</p></div>
+      <div class="principle"><span class="p-n">02</span><strong>One primary action</strong><p>Each screen names its job: draw the room, fit out the kitchen, run the service. Everything else is secondary or contextual.</p></div>
+      <div class="principle"><span class="p-n">03</span><strong>Summoned, not shown</strong><p>Library opens on intent, inspector appears on selection, tuning lives in drawers, power features in ⌘K. Max two visible panels.</p></div>
+      <div class="principle"><span class="p-n">04</span><strong>Quiet by default</strong><p>No permanent warning badges. One Review pill aggregates health; issues light up contextually on hover and selection.</p></div>
+      <div class="principle"><span class="p-n">05</span><strong>Numbers are the product</strong><p>Every dimension, count and metric renders in monospace tabular figures. The app reads as a precision instrument.</p></div>
+      <div class="principle"><span class="p-n">06</span><strong>Motion explains structure</strong><p>150–250ms, transform/opacity only. Panels slide from where they belong. Nothing decorative; reduced-motion respected.</p></div>
+    </div>
+  </section>
+
+  <footer>Notebook · design language for CalmKitchen Designer · HotelOS brand tokens from calm-kitchen · paired with ../PLAN.md</footer>
+</div>
+</body>
+</html>

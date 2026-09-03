@@ -1,0 +1,194 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Simulate — CalmKitchen Designer</title>
+<link rel="stylesheet" href="studio.css">
+<style>
+  /* plan svg */
+  .room-wall { fill: none; stroke: #1b3a36; stroke-width: 2.5; }
+  .room-fill { fill: rgba(12,30,3,0.03); }
+  .eq rect { fill: #f3f1eb; stroke: rgba(12,30,3,0.38); stroke-width: 1.3; }
+  .eq .cat-mark { stroke-width: 2.5; }
+  .eq.hot rect { fill: rgba(203,108,85,0.12); }
+  .eq-label { font-family: var(--font-mono); font-size: 8.5px; fill: var(--text-low); }
+  .trail { fill: none; stroke: rgba(12,30,3,0.22); stroke-width: 1.4; stroke-dasharray: 3 5; }
+  .trail.accent { stroke: rgba(202,78,142,0.45); }
+  .staff { stroke: rgba(28,42,28,0.35); stroke-width: 1.5; }
+  .staff-label { font-family: var(--font-mono); font-size: 8px; fill: var(--text-mid); }
+  .queue-dot { fill: rgba(12,30,3,0.28); }
+  .heat-glow { fill: rgba(194,147,79,0.18); }
+
+  /* layout */
+  .findings { top: 118px; right: 12px; bottom: 76px; width: 300px; }
+  .finding { align-items: flex-start; }
+  .sev { width: 8px; height: 8px; border-radius: 50%; margin-top: 4px; flex: 0 0 auto; }
+  .sev.danger { background: var(--danger); }
+  .sev.warn { background: var(--warn); }
+  .sev.ok { background: var(--ok); }
+  .finding .f-body { min-width: 0; }
+  .finding .f-title { font-size: 12px; font-weight: 510; color: var(--text-hi); line-height: 1.4; }
+  .finding .f-sub { font-size: 10.5px; color: var(--text-low); margin-top: 2px; line-height: 1.45; }
+  .finding .show { margin-left: auto; flex: 0 0 auto; font-size: 10.5px; color: var(--accent); opacity: 0; }
+  .finding:hover .show { opacity: 1; }
+  .viewcluster {
+    position: absolute; z-index: 31; top: 118px; left: 50%; transform: translateX(-50%);
+    display: flex; align-items: center; gap: 6px;
+    padding: 4px; border-radius: 10px;
+    background: var(--bg-surface); border: 1px solid var(--line-subtle);
+    box-shadow: var(--shadow-panel); backdrop-filter: blur(14px);
+  }
+  .playback .follow {
+    height: 26px; padding: 0 8px; border-radius: 6px;
+    background: var(--bg-canvas); border: 1px solid var(--line-std);
+    color: var(--text-mid); font-size: 11.5px;
+    display: inline-flex; align-items: center; gap: 6px;
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="topbar">
+    <div class="brand">
+      <svg class="brand-mark" viewBox="0 0 214.2 214.2" aria-hidden="true"><path fill="#b1d15b" d="M190.1,0l-27.9,45.9c-3.5,5.7-9.8,9.4-16.6,9.4h-76.8c-6.8,0-13.3-3.7-16.8-9.4L24.4,0H0v214.2h24.4l27.7-45.6c3.5-5.9,10-9.4,16.8-9.4h76.8c6.8,0,13.1,3.5,16.6,9.4l27.9,45.6h24.2V0h-24.2ZM133,133.2h-51.9v-51.8h51.9v51.8Z"/></svg>
+      <span class="brand-name">CalmKitchen <em>Designer</em></span>
+    </div>
+    <button class="project-btn">Kitchen 1 <span class="save-dot" title="Saved"></span><span class="chev">▾</span></button>
+    <nav class="stepper" aria-label="Workflow stages">
+      <button class="step done"><span class="dot">✓</span>Space</button>
+      <span class="step-sep"></span>
+      <button class="step done"><span class="dot">✓</span>Fit-out</button>
+      <span class="step-sep"></span>
+      <button class="step active"><span class="dot">3</span>Simulate</button>
+    </nav>
+    <div class="topbar-spacer"></div>
+    <button class="cmdk">Search or run a command…<span class="kbd">⌘K</span></button>
+    <button class="iconbtn" title="Save state">⇩</button>
+  </header>
+
+  <main class="stage vignette" aria-label="Service simulation, running">
+    <!-- ============ 2D simulation view ============ -->
+    <svg style="position:absolute; inset:0; width:100%; height:100%;" viewBox="0 0 1440 860" preserveAspectRatio="xMidYMid meet" aria-label="Live service simulation on kitchen plan">
+      <!-- room -->
+      <polygon class="room-fill" points="420,140 960,140 960,350 840,350 840,700 420,700 420,590 360,590 360,230 420,230"/>
+      <polygon class="room-wall" points="420,140 960,140 960,350 840,350 840,700 420,700 420,590 360,590 360,230 420,230"/>
+      <!-- openings -->
+      <line x1="540" y1="140" x2="670" y2="140" stroke="#4b7ce1" stroke-width="5"/>
+      <line x1="960" y1="220" x2="960" y2="320" stroke="#c2934f" stroke-width="5"/>
+      <line x1="360" y1="420" x2="360" y2="500" stroke="#2d7c6f" stroke-width="5"/>
+
+      <!-- fry station pressure glow -->
+      <ellipse class="heat-glow" cx="560" cy="200" rx="110" ry="70"/>
+
+      <!-- hot line -->
+      <g class="eq"><rect x="440" y="158" width="120" height="80"/><line class="cat-mark" x1="440" y1="158" x2="560" y2="158" stroke="#cb6c55"/><text class="eq-label" x="448" y="174">flat-top + fryer</text></g>
+      <g class="eq"><rect x="576" y="158" width="104" height="80"/><line class="cat-mark" x1="576" y1="158" x2="680" y2="158" stroke="#cb6c55"/><text class="eq-label" x="584" y="174">6-burner range</text></g>
+      <g class="eq"><rect x="696" y="158" width="84" height="72"/><line class="cat-mark" x1="696" y1="158" x2="780" y2="158" stroke="#cb6c55"/><text class="eq-label" x="703" y="174">tandoor</text></g>
+
+      <!-- cold line -->
+      <g class="eq"><rect x="378" y="246" width="70" height="150"/><line class="cat-mark" x1="378" y1="246" x2="378" y2="396" stroke="#4b7ce1"/><text class="eq-label" x="386" y="262">fridge</text></g>
+
+      <!-- prep island -->
+      <g class="eq"><rect x="540" y="290" width="180" height="90"/><line class="cat-mark" x1="540" y1="290" x2="720" y2="290" stroke="#2d7c6f"/><text class="eq-label" x="548" y="306">chef prep table</text></g>
+      <g class="eq"><rect x="560" y="420" width="64" height="66"/><line class="cat-mark" x1="560" y1="420" x2="624" y2="420" stroke="#2d7c6f"/><text class="eq-label" x="566" y="436">mixer</text></g>
+      <g class="eq"><rect x="640" y="420" width="130" height="70"/><line class="cat-mark" x1="640" y1="420" x2="770" y2="420" stroke="#2d7c6f"/><text class="eq-label" x="647" y="436">work table</text></g>
+
+      <!-- wash line -->
+      <g class="eq"><rect x="420" y="550" width="110" height="80"/><line class="cat-mark" x1="420" y1="550" x2="530" y2="550" stroke="#c2934f"/><text class="eq-label" x="427" y="566">dirty landing</text></g>
+      <g class="eq"><rect x="546" y="550" width="92" height="80"/><line class="cat-mark" x1="546" y1="550" x2="638" y2="550" stroke="#c2934f"/><text class="eq-label" x="553" y="566">pre-rinse</text></g>
+      <g class="eq"><rect x="654" y="550" width="96" height="84"/><line class="cat-mark" x1="654" y1="550" x2="750" y2="550" stroke="#c2934f"/><text class="eq-label" x="661" y="566">dishwasher</text></g>
+      <g class="eq"><rect x="766" y="550" width="110" height="80"/><line class="cat-mark" x1="766" y1="550" x2="876" y2="550" stroke="#c2934f"/><text class="eq-label" x="773" y="566">clean landing</text></g>
+
+      <!-- motion trails -->
+      <path class="trail accent" d="M 500 230 C 520 320, 600 340, 660 380 S 700 480, 640 520"/>
+      <path class="trail" d="M 900 300 C 860 360, 820 420, 780 480 S 720 540, 700 545"/>
+      <path class="trail" d="M 460 500 C 480 460, 520 430, 560 430"/>
+
+      <!-- staff -->
+      <circle class="staff" cx="560" cy="250" r="9" fill="#cb6c55"/><text class="staff-label" x="573" y="247">HC</text>
+      <circle class="staff" cx="700" cy="330" r="9" fill="#2d7c6f"/><text class="staff-label" x="713" y="327">SC</text>
+      <circle class="staff" cx="640" cy="480" r="9" fill="#4b7ce1"/><text class="staff-label" x="653" y="477">C1</text>
+      <circle class="staff" cx="480" cy="420" r="9" fill="#c2934f"/><text class="staff-label" x="493" y="417">C2</text>
+      <circle class="staff" cx="820" cy="600" r="9" fill="#5e6b5a"/><text class="staff-label" x="833" y="597">BW</text>
+
+      <!-- fry station queue -->
+      <circle class="queue-dot" cx="500" cy="260" r="5"/>
+      <circle class="queue-dot" cx="512" cy="272" r="5"/>
+
+      <text x="590" y="130" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="10" fill="#4b7ce1">clean pass ▲</text>
+      <text x="978" y="278" font-family="JetBrains Mono, monospace" font-size="10" fill="#c2934f">dirty return ►</text>
+      <text x="470" y="288" font-family="JetBrains Mono, monospace" font-size="10" fill="#a47932">queue 2</text>
+    </svg>
+
+    <!-- ============ HUD strip ============ -->
+    <div class="hud" role="status" aria-label="Live service metrics">
+      <div class="cell"><span class="k">Orders served</span><span class="v accent">23<small>/50</small></span></div>
+      <div class="cell"><span class="k">Avg wait</span><span class="v ok">8:12</span></div>
+      <div class="cell"><span class="k">P90 wait</span><span class="v warn">12:41</span></div>
+      <div class="cell"><span class="k">Bottleneck</span><span class="v warn" style="font-size:12px;">Fry station</span></div>
+      <div class="cell"><span class="k">Congestion</span><span class="v ok" style="font-size:12px;">Low</span></div>
+      <div class="cell"><span class="k">Service clock</span><span class="v accent">24:18</span></div>
+    </div>
+
+    <!-- ============ view cluster ============ -->
+    <div class="viewcluster" aria-label="Simulation view">
+      <div class="seg"><button aria-pressed="true">2D</button><button>3D</button><button>Walk</button></div>
+      <button class="iconbtn" title="Layers — heatmap, trails, queues, flows">▦</button>
+      <span class="follow">Follow · Overview ▾</span>
+    </div>
+
+    <!-- ============ findings rail ============ -->
+    <aside class="panel findings" aria-label="Findings">
+      <div class="panel-head">
+        <span class="panel-title">Findings</span>
+        <span class="panel-sub mono">run 4 · 24:18</span>
+      </div>
+      <div class="panel-body">
+        <div class="verdict warn" style="margin-bottom:12px;">
+          <div class="v-head"><span class="v-badge">Strained</span><span class="mono" style="font-size:10.5px; color:var(--text-low);">dinner peak</span></div>
+          <p>Fry station queues past SLA between 00:18–00:32; the dirty return crosses the prep route at the pass window.</p>
+        </div>
+        <div class="row finding selected">
+          <span class="sev danger"></span>
+          <span class="f-body"><span class="f-title">Fry station queue exceeds SLA</span><span class="f-sub">2 tickets waiting at 24:18 · avg dwell 3:40</span></span>
+          <span class="show">Show on plan</span>
+        </div>
+        <div class="row finding">
+          <span class="sev warn"></span>
+          <span class="f-body"><span class="f-title">Dirty/clean crossing at pass window</span><span class="f-sub">busser route crosses CDP plating 3×/run</span></span>
+          <span class="show">Show on plan</span>
+        </div>
+        <div class="row finding">
+          <span class="sev ok"></span>
+          <span class="f-body"><span class="f-title">Cold line retrieval stays under 20 s</span><span class="f-sub">no contention observed this run</span></span>
+          <span class="show">Show on plan</span>
+        </div>
+        <div class="sect" style="margin-top:14px;">
+          <div class="sect-head collapsible"><h4>Assumptions · Model confidence: Medium</h4><span class="panel-sub">›</span></div>
+          <div class="sect collapsible" style="margin-top:8px;"><div class="sect-head collapsible"><h4>Layer settings</h4><span class="panel-sub">›</span></div></div>
+        </div>
+      </div>
+    </aside>
+
+    <!-- ============ playback bar ============ -->
+    <div class="playback" aria-label="Playback controls">
+      <button class="iconbtn" title="Pause">⏸</button>
+      <span class="time">24:18</span>
+      <div class="scrub" role="slider" aria-label="Scrub service timeline" aria-valuenow="24"><div class="fill"></div><div class="head"></div></div>
+      <span class="time" style="color:var(--text-low); min-width:52px;">60:00</span>
+      <div class="seg" style="padding:2px;"><button>1×</button><button aria-pressed="true">2×</button><button>4×</button></div>
+      <span class="follow">Follow · Overview ▾</span>
+      <button class="btn btn-ghost btn-sm">Exit results</button>
+    </div>
+
+    <!-- ============ toast ============ -->
+    <div class="toast">
+      <span class="mono" style="color:var(--ok);">✓</span>
+      Run 4 complete · seed 20260831 — deterministic
+      <button class="btn btn-ghost btn-sm" style="height:24px;">View results</button>
+    </div>
+  </main>
+</div>
+</body>
+</html>

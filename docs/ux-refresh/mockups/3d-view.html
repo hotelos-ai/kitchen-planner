@@ -1,0 +1,225 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>3D inspect — CalmKitchen Designer</title>
+<link rel="stylesheet" href="studio.css">
+<style>
+  .stage.no-grid::before { display: none; }
+  .scene-glow {
+    position: absolute; inset: 0; pointer-events: none;
+    background:
+      radial-gradient(60% 42% at 62% 30%, rgba(203, 108, 85, 0.05), transparent 70%),
+      radial-gradient(90% 70% at 50% 55%, rgba(251, 250, 245, 0.9), transparent 75%);
+  }
+  .floor { fill: #e6e2d8; stroke: #3d4743; stroke-width: 1; }
+  .floor-edge { fill: none; stroke: #1b3a36; stroke-width: 2; }
+  .wall { fill: rgba(251, 250, 245, 0.6); stroke: rgba(12, 30, 3, 0.28); stroke-width: 1; }
+  .contact { fill: rgba(28, 42, 28, 0.15); }
+  .box .top { fill: #f3f1eb; stroke: rgba(12, 30, 3, 0.38); stroke-width: 1; }
+  .box .south { fill: #cfccc0; }
+  .box .east { fill: #c0bdb2; }
+  .box .mark { stroke-width: 3; fill: none; }
+  .box.hot .top { fill: #efdcd3; }
+  .box.cold .top { fill: #dbe4ee; }
+  .box.prep .top { fill: #dbe6e0; }
+  .box.wash .top { fill: #eee2cb; }
+  .box.store .top { fill: #e3e1d7; }
+  .box.selected .top { fill: #f4dcea; stroke: #ca4e8e; stroke-width: 1.6; }
+  .box.selected .south { fill: #dcc3d3; }
+  .box.selected .east { fill: #d0b5c6; }
+  .box.selected { filter: drop-shadow(0 0 12px rgba(202, 78, 142, 0.32)); }
+  .viewcluster {
+    position: absolute; z-index: 31; top: 64px; left: 50%; transform: translateX(-50%);
+    display: flex; align-items: center; gap: 4px;
+    padding: 4px; border-radius: 10px;
+    background: var(--bg-surface); border: 1px solid var(--line-subtle);
+    box-shadow: var(--shadow-panel);
+  }
+  .legend { left: 68px; bottom: 14px; width: 208px; top: auto; }
+  .legend .l-row { display: flex; align-items: center; gap: 8px; padding: 4px 2px; color: var(--text-mid); font-size: 11px; }
+  .legend .l-row i { width: 8px; height: 8px; border-radius: 2.5px; flex: 0 0 auto; }
+  .legend .l-row span { color: var(--text-low); font-size: 10px; margin-left: auto; }
+  .walkcta {
+    position: absolute; z-index: 32; right: 14px; bottom: 62px;
+    display: grid; justify-items: center; gap: 4px;
+  }
+  .walkcta .btn { height: 40px; padding: 0 18px; font-size: 13px; }
+  .walkcta small { color: var(--text-low); font-size: 10.5px; }
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="topbar">
+    <div class="brand">
+      <svg class="brand-mark" viewBox="0 0 214.2 214.2" aria-hidden="true"><path fill="#b1d15b" d="M190.1,0l-27.9,45.9c-3.5,5.7-9.8,9.4-16.6,9.4h-76.8c-6.8,0-13.3-3.7-16.8-9.4L24.4,0H0v214.2h24.4l27.7-45.6c3.5-5.9,10-9.4,16.8-9.4h76.8c6.8,0,13.1,3.5,16.6,9.4l27.9,45.6h24.2V0h-24.2ZM133,133.2h-51.9v-51.8h51.9v51.8Z"/></svg>
+      <span class="brand-name">CalmKitchen <em>Designer</em></span>
+    </div>
+    <button class="project-btn">Kitchen 1 <span class="save-dot" title="Saved"></span><span class="chev">▾</span></button>
+    <nav class="stepper" aria-label="Workflow stages">
+      <button class="step done"><span class="dot">✓</span>Space</button>
+      <span class="step-sep"></span>
+      <button class="step active"><span class="dot">2</span>Fit-out</button>
+      <span class="step-sep"></span>
+      <button class="step warn"><span class="dot">3</span>Simulate</button>
+    </nav>
+    <div class="topbar-spacer"></div>
+    <button class="cmdk">Search or run a command…<span class="kbd">⌘K</span></button>
+    <div class="seg" aria-label="View mode">
+      <button>Plan</button>
+      <button aria-pressed="true">3D</button>
+      <button>Split</button>
+    </div>
+    <button class="iconbtn" title="Save state">⇩</button>
+  </header>
+
+  <main class="stage no-grid vignette" aria-label="3D kitchen workspace">
+    <div class="scene-glow" aria-hidden="true"></div>
+
+    <!-- ============ isometric scene ============ -->
+    <svg style="position:absolute; inset:0; width:100%; height:100%;" viewBox="0 0 1440 860" preserveAspectRatio="xMidYMid meet" aria-label="3D view of the kitchen">
+      <!-- floor -->
+      <polygon class="floor" points="694,249 995,423 878,491 811,452 615,565 381,430 443,394 409,375 610,259"/>
+      <polygon class="floor-edge" points="694,249 995,423 878,491 811,452 615,565 381,430 443,394 409,375 610,259"/>
+
+      <!-- back walls -->
+      <polygon class="wall" points="694,249 995,423 995,371 694,197"/>
+      <polygon class="wall" points="995,423 878,491 878,439 995,371"/>
+      <!-- openings: clean pass (teal) on long wall, dirty return (brass) on right wall -->
+      <line x1="725" y1="268" x2="786" y2="303" stroke="#4b7ce1" stroke-width="5"/>
+      <line x1="960" y1="444" x2="920" y2="473" stroke="#c2934f" stroke-width="5"/>
+
+      <!-- contact shadows -->
+      <ellipse class="contact" cx="695" cy="292" rx="78" ry="26"/>
+      <ellipse class="contact" cx="768" cy="338" rx="66" ry="22"/>
+      <ellipse class="contact" cx="822" cy="285" rx="45" ry="16"/>
+      <ellipse class="contact" cx="612" cy="297" rx="48" ry="24"/>
+      <ellipse class="contact" cx="690" cy="368" rx="88" ry="26"/>
+      <ellipse class="contact" cx="630" cy="412" rx="45" ry="18"/>
+      <ellipse class="contact" cx="508" cy="462" rx="128" ry="34"/>
+      <ellipse class="contact" cx="708" cy="500" rx="58" ry="18"/>
+
+      <!-- flat-top + fryer (hot, left of hot line) -->
+      <g class="box hot">
+        <polygon class="south" points="713,316 637,272 637,240 713,284"/>
+        <polygon class="east"  points="753,292 713,316 713,284 753,260"/>
+        <polygon class="top"   points="678,217 753,260 713,284 637,240"/>
+        <polyline class="mark" points="678,217 753,260" stroke="#cb6c55"/>
+      </g>
+      <!-- 6-burner range -->
+      <g class="box hot">
+        <polygon class="south" points="776,358 715,323 715,291 776,326"/>
+        <polygon class="east"  points="821,332 776,358 776,326 821,300"/>
+        <polygon class="top"   points="760,265 821,300 776,326 715,291"/>
+        <polyline class="mark" points="760,265 821,300" stroke="#cb6c55"/>
+      </g>
+      <!-- tandoor (tall) -->
+      <g class="box hot">
+        <polygon class="south" points="826,297 791,277 791,231 826,251"/>
+        <polygon class="east"  points="861,271 826,297 826,251 861,225"/>
+        <polygon class="top"   points="826,205 861,225 826,251 791,231"/>
+        <polyline class="mark" points="826,205 861,225" stroke="#cb6c55"/>
+      </g>
+      <!-- upright fridge (cold, tall) -->
+      <g class="box cold">
+        <polygon class="south" points="610,308 575,288 575,222 610,242"/>
+        <polygon class="east"  points="650,285 610,308 610,242 650,219"/>
+        <polygon class="top"   points="615,199 650,219 610,242 575,222"/>
+        <polyline class="mark" points="615,199 650,219" stroke="#4b7ce1"/>
+      </g>
+      <!-- chef prep table (SELECTED) -->
+      <g class="box prep selected">
+        <polygon class="south" points="735,394 645,342 645,310 735,362"/>
+        <polygon class="east"  points="776,371 735,394 735,362 776,339"/>
+        <polygon class="top"   points="685,287 776,339 735,362 645,310"/>
+        <polyline class="mark" points="685,287 776,339" stroke="var(--accent)"/>
+      </g>
+      <!-- selection chip anchor -->
+      <!-- mixer -->
+      <g class="box prep">
+        <polygon class="south" points="630,424 597,406 597,367 630,385"/>
+        <polygon class="east"  points="668,403 630,424 630,385 668,364"/>
+        <polygon class="top"   points="635,350 668,364 630,385 597,367"/>
+        <polyline class="mark" points="635,350 668,364" stroke="#2d7c6f"/>
+      </g>
+      <!-- wash bench (dirty → clean, along bottom wall) -->
+      <g class="box wash">
+        <polygon class="south" points="572,513 402,414 402,382 572,481"/>
+        <polygon class="east"  points="615,488 572,513 572,481 615,456"/>
+        <polygon class="top"   points="444,358 615,456 572,481 402,382"/>
+        <polyline class="mark" points="444,358 615,456" stroke="#c2934f"/>
+      </g>
+      <!-- storage shelving (right zone, tall) -->
+      <g class="box store">
+        <polygon class="south" points="725,517 665,482 665,419 725,454"/>
+        <polygon class="east"  points="750,503 725,517 725,454 750,440"/>
+        <polygon class="top"   points="690,405 750,440 725,454 665,419"/>
+        <polyline class="mark" points="690,405 750,440" stroke="#5e6b5a"/>
+      </g>
+
+      <!-- staff presence -->
+      <circle cx="700" cy="350" r="7" fill="#cb6c55" stroke="rgba(28,42,28,.4)" stroke-width="1.5"/>
+      <circle cx="500" cy="430" r="7" fill="#c2934f" stroke="rgba(28,42,28,.4)" stroke-width="1.5"/>
+
+      <!-- dimension annotation on selected box -->
+      <line x1="776" y1="339" x2="810" y2="330" stroke="var(--accent)" stroke-width="1" stroke-dasharray="2 3"/>
+      <text x="816" y="334" font-family="JetBrains Mono, monospace" font-size="10" fill="var(--accent)">chef prep table · 1800 × 800</text>
+    </svg>
+
+    <!-- ============ variant tabs ============ -->
+    <div class="vtabs" aria-label="Layout variants">
+      <button class="vtab">Room <span class="rev">base</span></button>
+      <button class="vtab active">Layout A <span class="rev">r4</span></button>
+      <button class="vtab">Layout B <span class="rev">r1</span></button>
+      <button class="vtab-add" title="New layout">＋</button>
+    </div>
+
+    <!-- ============ view cluster ============ -->
+    <div class="viewcluster" aria-label="3D view controls">
+      <div class="seg"><button aria-pressed="true">Perspective</button><button>Top</button></div>
+      <button class="iconbtn" title="Fit room">⛶</button>
+      <button class="iconbtn" title="Layers">▦</button>
+      <button class="iconbtn active" title="Clearances">⌠</button>
+      <button class="iconbtn" title="Transparent walls">▢</button>
+      <button class="iconbtn active" title="Labels">▲</button>
+    </div>
+
+    <!-- ============ legend ============ -->
+    <aside class="panel legend" aria-label="Legend">
+      <div class="panel-head" style="padding: 8px 10px 7px;"><span class="panel-title" style="font-size:12px;">Legend</span></div>
+      <div class="panel-body tight" style="padding: 6px 10px;">
+        <div class="l-row"><i style="background:var(--cat-cooking)"></i>Cooking<span>hot line</span></div>
+        <div class="l-row"><i style="background:var(--cat-cold)"></i>Cold<span>fridges</span></div>
+        <div class="l-row"><i style="background:var(--cat-prep)"></i>Prep<span>islands</span></div>
+        <div class="l-row"><i style="background:var(--cat-wash)"></i>Wash<span>dish line</span></div>
+        <div class="l-row"><i style="background:var(--cat-storage)"></i>Storage<span>shelving</span></div>
+        <div class="l-row"><i style="background:var(--cat-cold); border-radius:50%;"></i>Clean pass<span>in</span></div>
+        <div class="l-row"><i style="background:var(--cat-wash); border-radius:50%;"></i>Dirty return<span>out</span></div>
+      </div>
+    </aside>
+
+    <!-- ============ walk CTA ============ -->
+    <div class="walkcta">
+      <button class="btn btn-primary">⌨&nbsp; Walk the kitchen</button>
+      <small>First-person · W · Esc to exit</small>
+    </div>
+
+    <!-- ============ status pill ============ -->
+    <div class="statuspill" role="status">
+      <span class="grp"><span class="ok">✓</span><span class="n">84</span></span>
+      <span class="sep"></span>
+      <span class="grp"><span class="warn">▲</span><span class="n">12</span> checks</span>
+      <span class="sep"></span>
+      <button class="mini-btn">Review</button>
+    </div>
+
+    <!-- ============ toast ============ -->
+    <div class="toast" style="bottom: 116px;">
+      <span class="mono" style="color:var(--ok);">✓</span>
+      WebGL context recovered — your plan is safe
+    </div>
+  </main>
+</div>
+</body>
+</html>
