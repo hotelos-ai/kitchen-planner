@@ -12,6 +12,7 @@ import { ArchitectureLayer } from './ArchitectureLayer'
 import { EquipmentLayer } from './EquipmentNode'
 import { GridLayer } from './GridLayer'
 import { OpeningOverlayLayer } from './OpeningOverlayLayer'
+import { RoomOutlineLayer } from './RoomOutlineLayer'
 import { ComponentContextMenu, type ComponentContextAction, type OverlayPosition } from './ComponentContextMenu'
 import { QuickConfigurationPopover, type QuickConfigurationMode } from './QuickConfigurationPopover'
 
@@ -163,6 +164,16 @@ export function PlanCanvas({ store, showReference, sourceImageUrl = '/reference/
           />
         )}
         <OpeningOverlayLayer architecture={variant.architecture} pixelsPerMm={pixelsPerMm} originX={originX} originY={originY} />
+        {mode === 'space' && !readOnly && (
+          <RoomOutlineLayer
+            architecture={variant.architecture}
+            pixelsPerMm={pixelsPerMm}
+            originX={originX}
+            originY={originY}
+            snapMm={project.snapMm}
+            onCommit={(next) => { store.getState().applySharedArchitecture(next) }}
+          />
+        )}
       </Stage>
       {contextRequest && contextItem && <ComponentContextMenu
         item={contextItem}
