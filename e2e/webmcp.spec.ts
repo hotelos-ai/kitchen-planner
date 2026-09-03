@@ -53,6 +53,46 @@ test.beforeEach(async ({ page }) => {
   await page.addInitScript(() => localStorage.clear())
 })
 
+test('agent activity leaves the homepage and keeps the affected design visible', async ({ page }) => {
+  await page.addInitScript(installWebMcpShim)
+  await page.goto('/')
+  await expect(page.getByRole('heading', { name: /Design commercial kitchens/i })).toBeVisible()
+  await page.waitForFunction(() => Object.keys((window as unknown as ShimWindow).__webmcpTools ?? {}).length >= 11)
+  const call = (name: string, input: unknown): Promise<Envelope> =>
+    page.evaluate(([toolName, toolInput]: [string, unknown]) => {
+      const entry = (window as unknown as ShimWindow).__webmcpTools[toolName]
+      return Promise.resolve(entry.execute(toolInput)).then((result) => (
+        result && typeof result === 'object' && 'structuredContent' in result
+          ? (result as { structuredContent: Envelope }).structuredContent
+          : result as Envelope
+      ))
+    }, [name, input])
+
+  expect(await call('get_workspace_guide', {})).toMatchObject({ ok: true })
+  await expect(page.getByRole('heading', { name: /Design commercial kitchens/i })).toHaveCount(0)
+  await expect(page.getByLabel('2D plan workspace')).toBeVisible()
+
+  const layout = await call('get_layout', {})
+  const tandoor = layout.components?.find((component) => component.id === 'tandoor')
+  const applied = await call('apply_layout_changes', {
+    expectedRevision: layout.revision,
+    intent: 'Move the tandoor where the user can see it',
+    operations: [{
+      type: 'nudge_components',
+      variantId: 'baseline-trace',
+      componentIds: ['tandoor'],
+      delta: { xMm: 100, yMm: 0 },
+    }],
+  })
+  expect(applied).toMatchObject({ ok: true, changedIds: ['tandoor'] })
+  await expect(page.locator('[data-app="calmkitchen-designer"]')).toHaveAttribute('data-app-stage', 'equipment')
+  await expect(page.getByLabel('Equipment label')).toHaveValue('Tandoor')
+  await expect(page.getByLabel('Agent activity')).toContainText('Move the tandoor where the user can see it')
+  await expect(page.getByLabel('Agent activity').getByRole('button', { name: 'Undo' })).toBeVisible()
+  const after = await call('get_layout', {})
+  expect(after.components?.find((component) => component.id === 'tandoor')?.xMm).toBe((tandoor?.xMm ?? 0) + 100)
+})
+
 test('agents discover tools, edit the plan, run simulations, and export — without a reload', async ({ page }) => {
   await page.addInitScript(installWebMcpShim)
   await openApp(page)

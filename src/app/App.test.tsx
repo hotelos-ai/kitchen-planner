@@ -2,6 +2,7 @@ import { fireEvent, render, screen, waitFor, within } from '@testing-library/rea
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it } from 'vitest'
 import { createSeedProject } from '../domain/seed-project'
+import { appStateStore } from '../state/app-state-store'
 import { getActiveItem, getVariantItem, projectStore } from '../state/project-store'
 import { App } from './App'
 
@@ -90,6 +91,22 @@ describe('App', () => {
     expect(screen.getByRole('button', { name: /Start designing/i })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /Design from scratch/i })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /Upload a file/i })).toBeInTheDocument()
+  })
+
+  it('leaves the homepage as soon as an agent starts using the workspace', async () => {
+    localStorage.removeItem('calmkitchen-designer:session')
+    localStorage.removeItem('kitchen-planner:project:v2')
+    localStorage.removeItem('kitchen-planner:project:last-good:v2')
+    render(<App />)
+    expect(await screen.findByRole('heading', { name: /Design commercial kitchens/i })).toBeInTheDocument()
+
+    appStateStore.getState().beginAgentActivity()
+    appStateStore.getState().setAgentIntent('Read current layout')
+
+    expect(await screen.findByLabelText('2D plan workspace')).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: /Design commercial kitchens/i })).not.toBeInTheDocument()
+    expect(screen.getByLabelText('Agent activity')).toHaveTextContent('Agent workingRead current layout')
+    expect(localStorage.getItem('calmkitchen-designer:session')).toBe('1')
   })
 
   it('switches workflow stages with the 1 2 3 keys', async () => {

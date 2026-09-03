@@ -64,6 +64,7 @@ select:hover:not(:disabled) { border-color: rgba(17, 34, 28, 0.35); }
 button { cursor: pointer; }
 
 .app-shell { width: 100dvw; height: 100dvh; min-height: 100dvh; display: grid; grid-template-rows: auto minmax(0, 1fr) auto; grid-template-columns: minmax(0, 1fr); overflow: hidden; background: var(--paper); }
+.app-shell.has-agent-activity { grid-template-rows: auto auto minmax(0, 1fr) auto; }
 .app-footer { display: flex; align-items: center; gap: 12px; min-height: 34px; padding: 5px 16px; border-top: 1px solid var(--rule); background: linear-gradient(180deg, var(--paper) 0%, #edeae1 100%); color: var(--ink-3); font-size: 11.5px; }
 .app-footer .footer-brand { display: flex; align-items: center; gap: 7px; color: var(--ink); font-weight: 600; }
 .app-footer .footer-brand svg { width: 14px; height: 14px; }
@@ -519,10 +520,13 @@ button { cursor: pointer; }
 .catalog-collapsed .catalog-drawer, .inspector-collapsed .inspector-drawer { visibility: hidden; pointer-events: none; }
 .workspace-toast { position: fixed; z-index: 110; right: 18px; bottom: 18px; display: flex; align-items: center; gap: 10px; border: 1px solid var(--rule-2); border-radius: var(--control-radius); padding: 10px 12px; color: var(--paper); background: var(--ink); box-shadow: var(--shadow-pop); font-size: 12px; }
 .workspace-toast button { min-height: 28px; border: 1px solid rgba(251, 250, 245, 0.3); border-radius: var(--control-radius); padding: 4px 8px; color: var(--paper); background: var(--ink-2); font-size: 11.5px; font-weight: 510; }
-.agent-working-indicator { position: fixed; z-index: 109; top: 72px; left: 50%; transform: translateX(-50%); border: 1px solid rgba(177, 209, 91, 0.45); border-radius: 999px; padding: 7px 12px; color: var(--paper); background: rgba(34, 38, 30, 0.94); box-shadow: var(--shadow-pop); font-size: 12px; font-weight: 600; }
-.agent-action-toast { max-width: min(520px, calc(100vw - 36px)); }
-.agent-action-toast span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.agent-action-toast button:disabled { opacity: 0.45; cursor: not-allowed; }
+.agent-activity-bar { z-index: 108; min-width: 0; min-height: 36px; display: flex; align-items: center; gap: 10px; border-bottom: 1px solid rgba(177, 209, 91, 0.34); padding: 5px 14px; color: var(--paper); background: var(--ink); box-shadow: 0 5px 18px -14px rgba(12, 30, 3, 0.75); font-size: 12px; }
+.agent-activity-state { flex: 0 0 auto; display: inline-flex; align-items: center; gap: 7px; color: #dce9d7; font-weight: 600; }
+.agent-activity-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--lime); }
+.agent-activity-state.working .agent-activity-dot { animation: agent-pulse 1.4s ease-out infinite; }
+.agent-activity-instruction { min-width: 0; flex: 1 1 auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--paper-hi); }
+.agent-activity-bar button { flex: 0 0 auto; min-height: 26px; border: 1px solid rgba(251, 250, 245, 0.34); border-radius: var(--control-radius); padding: 3px 10px; color: var(--paper); background: var(--ink-2); font-size: 11.5px; font-weight: 600; }
+.agent-activity-bar button:disabled { opacity: 0.45; cursor: not-allowed; }
 
 /* equipment library */
 .equipment-library, .right-panel { min-height: 0; background: var(--paper-hi); }

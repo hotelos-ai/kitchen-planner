@@ -122,6 +122,22 @@ export function createRunTools(deps: RunToolDependencies): WebMcpToolDefinition[
         const scenario = state.project.scenarios.find((candidate) => candidate.id === (parsed.value.scenarioId ?? state.project.activeScenarioId))
         if (!scenario) return failure(state.revision, 'missing-scenario', `Scenario ${parsed.value.scenarioId ?? state.project.activeScenarioId} does not exist.`)
         const seed = parsed.value.seed ?? scenario.seed
+        const navigateToSimulation = parsed.value.navigateTo ?? true
+        const previousPresentation = {
+          stage: appStateStore.getState().stage,
+          overlay: appStateStore.getState().overlay,
+        }
+        if (navigateToSimulation) {
+          appStateStore.getState().setOverlay(null)
+          appStateStore.getState().setStage('simulate')
+        }
+        const restorePresentation = () => {
+          if (!navigateToSimulation) return
+          const current = appStateStore.getState()
+          if (current.stage !== 'simulate' || current.overlay !== null) return
+          current.setStage(previousPresentation.stage)
+          appStateStore.getState().setOverlay(previousPresentation.overlay)
+        }
         let result: unknown
         try {
           // High-cover runs move to a cancellable Worker; small runs avoid its
@@ -138,21 +154,32 @@ export function createRunTools(deps: RunToolDependencies): WebMcpToolDefinition[
             : await runSimulationResponsive(simulationInput, { signal: context?.signal })
         } catch (error) {
           const scopeFailure = simulationScopeFailure(deps, state.documentId, state.revision)
-          if (scopeFailure) return scopeFailure
+          if (scopeFailure) {
+            restorePresentation()
+            return scopeFailure
+          }
           if (error instanceof SimulationRunCancelledError || context?.signal?.aborted) {
+            restorePresentation()
             return simulationCancelledFailure(state.revision, 'The simulation request was cancelled.')
           }
+          restorePresentation()
           return failure(state.revision, 'simulation-failed', unknownErrorMessage(error))
         }
         const scopeFailure = simulationScopeFailure(deps, state.documentId, state.revision)
-        if (scopeFailure) return scopeFailure
+        if (scopeFailure) {
+          restorePresentation()
+          return scopeFailure
+        }
         if (isFacadeFailure(result)) {
+          restorePresentation()
           return { ok: false as const, revision: result.revision, code: result.code, message: result.message }
         }
         if (!isFullSimulationResult(result)) {
+          restorePresentation()
           return failure(state.revision, 'simulation-failed', 'The simulation service did not return a complete result for presentation.')
         }
         if (context?.signal?.aborted) {
+          restorePresentation()
           return simulationCancelledFailure(currentRevision(deps), 'The simulation request was cancelled before publishing its result.')
         }
 
@@ -166,10 +193,6 @@ export function createRunTools(deps: RunToolDependencies): WebMcpToolDefinition[
           active: playback !== 'none',
         })
 
-        if (parsed.value.navigateTo ?? true) {
-          appStateStore.getState().setOverlay(null)
-          appStateStore.getState().setStage('simulate')
-        }
         if (playback !== 'none') {
           appStateStore.getState().requestSimulationRun({
             scenarioId: scenario.id,

@@ -60,6 +60,7 @@ export interface AppState {
   requestedSimulationRun: SimulationRunRequest | null
   simulationViewTarget: SimulationViewTarget | null
   agentIntent: string | null
+  agentActivityVersion: number
   lastAgentAction: AgentAction | null
   agentActionHistory: AgentAction[]
   setStage(stage: WorkflowStage): void
@@ -82,6 +83,7 @@ export interface AppState {
   consumeSimulationRun(id?: string): SimulationRunRequest | null
   clearSimulationRun(): void
   setAgentIntent(intent: string | null): void
+  beginAgentActivity(): void
   setLastAgentAction(action: AgentAction | null): void
   clearLastAgentAction(id?: string): void
   reset(): void
@@ -112,6 +114,7 @@ const initialState = {
   requestedSimulationRun: null,
   simulationViewTarget: null,
   agentIntent: null,
+  agentActivityVersion: 0,
   lastAgentAction: null,
   agentActionHistory: [],
 }
@@ -173,6 +176,7 @@ export function createAppStateStore(): AppStateStore {
     },
     clearSimulationRun: () => set({ requestedSimulationRun: null, simulationViewTarget: null }),
     setAgentIntent: (agentIntent) => set({ agentIntent }),
+    beginAgentActivity: () => set((state) => ({ agentActivityVersion: state.agentActivityVersion + 1 })),
     setLastAgentAction: (lastAgentAction) => set((state) => ({
       lastAgentAction,
       agentActionHistory: lastAgentAction

@@ -338,6 +338,20 @@ export function createWriteTools(deps: WriteToolDependencies): WebMcpToolDefinit
         )
         const visibleChangedIds = result.changedIds.filter((id) => activeEquipmentIds.has(id))
         if (visibleChangedIds.length > 0) committedState.selectItems(visibleChangedIds)
+        const appState = appStateStore.getState()
+        const scenarioIds = new Set(committedState.project.scenarios.map((scenario) => scenario.id))
+        const changedArchitecture = result.changedIds.includes('architecture')
+        const changedScenario = result.changedIds.some((id) => scenarioIds.has(id))
+        appState.setOverlay(null)
+        if (visibleChangedIds.length > 0 || (!changedArchitecture && !changedScenario)) {
+          appState.setStage('equipment')
+          appStateStore.getState().setView('plan')
+        } else if (changedArchitecture) {
+          appState.setStage('space')
+          appStateStore.getState().setView('plan')
+        } else {
+          appState.setStage('simulate')
+        }
         if (result.intent) {
           appStateStore.getState().setLastAgentAction({
             id: `agent-action-${committedState.documentId}-${result.revision}`,

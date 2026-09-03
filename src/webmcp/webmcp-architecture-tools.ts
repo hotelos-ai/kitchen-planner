@@ -374,6 +374,11 @@ export function createArchitectureTools(deps: ArchitectureToolDependencies): Web
           return failure(state.revision, 'locked-architecture', 'Architecture must be explicitly unlocked before it can be changed.')
         }
 
+        const appState = appStateStore.getState()
+        appState.setOverlay(null)
+        appState.setView('plan')
+        appState.setStage('space')
+
         const edited = applyEdits(
           variant.architecture,
           parsed.value.operations,

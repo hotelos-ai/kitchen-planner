@@ -46,6 +46,7 @@ export function App() {
   const dialogsOpen = useStore(appStateStore, (state) => state.dialogsOpen)
   const setDialogOpen = useStore(appStateStore, (state) => state.setDialogOpen)
   const agentIntent = useStore(appStateStore, (state) => state.agentIntent)
+  const agentActivityVersion = useStore(appStateStore, (state) => state.agentActivityVersion)
   const lastAgentAction = useStore(appStateStore, (state) => state.lastAgentAction)
   const clearLastAgentAction = useStore(appStateStore, (state) => state.clearLastAgentAction)
   const project = useStore(projectStore, (state) => state.project)
@@ -75,6 +76,8 @@ export function App() {
       ?? localStorage.getItem(LEGACY_LAST_GOOD_PROJECT_KEY)
     ) && !hasMatchingDeepLink
   })
+  const [agentActivityBaseline, setAgentActivityBaseline] = useState(agentActivityVersion)
+  const startScreenVisible = showStartScreen && agentActivityVersion === agentActivityBaseline
   const [activatedWorkspaceViews, setActivatedWorkspaceViews] = useState({ plan: false, scene: false })
 
   useEffect(() => () => appStateStore.getState().reset(), [])
@@ -94,11 +97,16 @@ export function App() {
     localStorage.setItem(SESSION_FLAG_KEY, '1')
     setShowStartScreen(false)
   }
+
+  useEffect(() => {
+    if (agentActivityVersion === agentActivityBaseline) return
+    localStorage.setItem(SESSION_FLAG_KEY, '1')
+  }, [agentActivityBaseline, agentActivityVersion])
   const dragResizeEnabled = Boolean(selectedItem && !selectedItem.dimensionsLocked)
   const canCompare = project.variants.length >= 2 || project.scenarios.length >= 2
   const showAutoLayout = stage !== 'space'
-  const planViewActive = !showStartScreen && overlay === null && stage !== 'simulate' && (view === 'plan' || view === 'split')
-  const sceneViewActive = !showStartScreen && overlay === null && stage !== 'simulate' && (view === 'scene' || view === 'split')
+  const planViewActive = !startScreenVisible && overlay === null && stage !== 'simulate' && (view === 'plan' || view === 'split')
+  const sceneViewActive = !startScreenVisible && overlay === null && stage !== 'simulate' && (view === 'scene' || view === 'split')
   const mountPlanWorkspace = planViewActive || activatedWorkspaceViews.plan
   const mountSceneWorkspace = sceneViewActive || activatedWorkspaceViews.scene
   if ((planViewActive && !activatedWorkspaceViews.plan) || (sceneViewActive && !activatedWorkspaceViews.scene)) {
@@ -139,9 +147,9 @@ export function App() {
   const openWizard = () => { setWizardStartsAtRoom(false); setDialogOpen('layout-wizard', true) }
 
   useEffect(() => {
-    if (showStartScreen) return
+    if (startScreenVisible) return
     projectStore.getState().captureWorkingSnapshot()
-  }, [stage, showStartScreen])
+  }, [stage, startScreenVisible])
 
   const focusTourStep = (step: number) => {
     setOverlay(null)
@@ -154,9 +162,9 @@ export function App() {
 
   return (
     <WebMcpProvider>
-      <main className="app-shell" data-app="calmkitchen-designer" data-app-stage={stage} data-app-view={view} data-app-overlay={overlay ?? 'none'}>
+      <main className={`app-shell${agentIntent || lastAgentAction ? ' has-agent-activity' : ''}`} data-app="calmkitchen-designer" data-app-stage={stage} data-app-view={view} data-app-overlay={overlay ?? 'none'}>
         <AppHeader
-          minimal={showStartScreen}
+          minimal={startScreenVisible}
           store={projectStore}
           view={view}
           stage={stage}
@@ -176,13 +184,34 @@ export function App() {
           setStage('space')
           setView('plan')
           setOverlay(null)
+          setAgentActivityBaseline(appStateStore.getState().agentActivityVersion)
           setShowStartScreen(true)
         }}
         onOpenSettings={() => setPanels({ inspector: true, revisions: false, essentials: false })}
       />
+      {(agentIntent || lastAgentAction) && (
+        <section className="agent-activity-bar" role="status" aria-label="Agent activity">
+          <span className={`agent-activity-state${agentIntent ? ' working' : ''}`}>
+            <span className="agent-activity-dot" aria-hidden="true" />
+            {agentIntent ? 'Agent working' : 'Latest agent instruction'}
+          </span>
+          <span className="agent-activity-instruction">{agentIntent ?? lastAgentAction?.intent}</span>
+          {lastAgentAction && (
+            <button
+              type="button"
+              disabled={revision !== lastAgentAction.revision}
+              title={revision === lastAgentAction.revision ? 'Undo this agent batch' : 'Undo is unavailable after another edit'}
+              onClick={() => {
+                projectStore.getState().undo()
+                clearLastAgentAction(lastAgentAction.id)
+              }}
+            >Undo</button>
+          )}
+        </section>
+      )}
       <ErrorBoundary>
         <Suspense fallback={<section className="workspace-placeholder">Loading workspace…</section>}>
-          {showStartScreen ? (
+          {startScreenVisible ? (
             <ProjectStartScreen
               onCreateRoom={(architecture) => {
                 projectStore.getState().applySharedArchitecture(architecture)
@@ -281,7 +310,6 @@ export function App() {
         </Suspense>
         {aiToolsOpen && <AgentToolsPanel onClose={() => setDialogOpen('agent-tools', false)} />}
       </ErrorBoundary>
-      {agentIntent && <div className="agent-working-indicator" role="status">Agent is working · {agentIntent}</div>}
       {autoFixStatus && (
         <div className="workspace-toast autofix-result-toast" role="status">
           <span>{autoFixStatus}</span>
@@ -294,20 +322,6 @@ export function App() {
           onClose={() => setAutoFixStrategyOpen(false)}
           onResult={(result) => setAutoFixStatus(result.message)}
         />
-      )}
-      {lastAgentAction && (
-        <div className="workspace-toast agent-action-toast" role="status">
-          <span><strong>Agent:</strong> {lastAgentAction.intent}</span>
-          <button
-            type="button"
-            disabled={revision !== lastAgentAction.revision}
-            title={revision === lastAgentAction.revision ? 'Undo this agent batch' : 'Undo is unavailable after another edit'}
-            onClick={() => {
-              projectStore.getState().undo()
-              clearLastAgentAction(lastAgentAction.id)
-            }}
-          >Undo</button>
-        </div>
       )}
       {helpOpen && <HelpDialog onClose={() => setDialogOpen('help', false)} />}
       <footer className="app-footer">

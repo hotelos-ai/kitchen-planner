@@ -1,10 +1,13 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import { createSeedProject } from '../domain/seed-project'
+import { runSimulation } from '../simulation/engine'
+import type { SimulationResult } from '../simulation/types'
 import { appStateStore } from '../state/app-state-store'
 import { createProjectStore, getWorkspaceFacade } from '../state/project-store'
 import { createSimulationRunStore } from '../state/simulation-run-store'
 import type { WebMcpToolDefinition } from './model-context'
 import { createWebMcpTools } from './webmcp-tools'
+import { createRunTools } from './webmcp-run-tools'
 
 const setup = () => {
   const store = createProjectStore(createSeedProject())
@@ -75,6 +78,35 @@ describe('visible WebMCP actions', () => {
       changedIds: ['tandoor'],
       revision: revision + 1,
     })
+    expect(appStateStore.getState()).toMatchObject({ stage: 'equipment', view: 'plan', overlay: null })
+    expect(store.getState().selectedIds).toEqual(['tandoor'])
     expect(store.getState().past).toHaveLength(1)
+  })
+
+  it('opens Simulate while an agent test is still running', async () => {
+    const store = createProjectStore(createSeedProject())
+    const variant = store.getState().project.variants[0]
+    const scenario = store.getState().project.scenarios[0]
+    const result = runSimulation({
+      architecture: variant.architecture,
+      equipment: variant.equipment,
+      scenario,
+      layoutConstraints: variant.layoutConstraints,
+    }) as SimulationResult
+    let finish!: (result: SimulationResult) => void
+    const pendingResult = new Promise<SimulationResult>((resolve) => { finish = resolve })
+    const runTool = createRunTools({
+      store,
+      getFacade: () => getWorkspaceFacade(store),
+      runSimulation: () => pendingResult,
+    }).find((candidate) => candidate.name === 'run_simulation')!
+
+    appStateStore.getState().setStage('space')
+    const running = runTool.execute({ playback: 'play' })
+    expect(appStateStore.getState()).toMatchObject({ stage: 'simulate', overlay: null })
+
+    finish(result)
+    await expect(running).resolves.toMatchObject({ ok: true })
+    expect(appStateStore.getState().requestedSimulationRun).toMatchObject({ playback: true })
   })
 })

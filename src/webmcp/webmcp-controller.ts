@@ -158,7 +158,12 @@ export function createWebMcpController(deps: WebMcpControllerDependencies): WebM
     ...tool,
     execute: async (input: unknown, context?: WebMcpToolExecutionContext) => {
       let result: unknown
-      appStateStore.getState().setAgentIntent(tool.title ?? tool.name.replaceAll('_', ' '))
+      const requestedIntent = input !== null && typeof input === 'object' && 'intent' in input
+        && typeof (input as { intent?: unknown }).intent === 'string'
+        ? (input as { intent: string }).intent.trim()
+        : ''
+      appStateStore.getState().beginAgentActivity()
+      appStateStore.getState().setAgentIntent(requestedIntent || tool.title || tool.name.replaceAll('_', ' '))
       try {
         result = await tool.execute(input, context)
       } catch (error) {
