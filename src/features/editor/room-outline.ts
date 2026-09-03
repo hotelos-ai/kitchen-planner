@@ -74,3 +74,48 @@ export function polygonCentroid(polygon: PointMm[]): PointMm {
   const sum = polygon.reduce((acc, point) => ({ x: acc.x + point.x, y: acc.y + point.y }), { x: 0, y: 0 })
   return { x: sum.x / polygon.length, y: sum.y / polygon.length }
 }
+
+const segmentOf = (architecture: Architecture, opening: { segmentIndex?: number; wall?: string }): { start: PointMm; end: PointMm } | null => {
+  const polygon = architecture.roomPolygon
+  if (opening.segmentIndex !== undefined && opening.segmentIndex >= 0 && opening.segmentIndex < polygon.length) {
+    return { start: polygon[opening.segmentIndex], end: polygon[(opening.segmentIndex + 1) % polygon.length] }
+  }
+  return null
+}
+
+export function openingCenter(architecture: Architecture, opening: { wall?: string; segmentIndex?: number; offsetMm: number; widthMm: number }): PointMm {
+  const segment = segmentOf(architecture, opening)
+  const along = opening.offsetMm + opening.widthMm / 2
+  if (segment) {
+    const dx = segment.end.x - segment.start.x
+    const dy = segment.end.y - segment.start.y
+    const length = Math.hypot(dx, dy) || 1
+    return { x: segment.start.x + (dx / length) * along, y: segment.start.y + (dy / length) * along }
+  }
+  if (opening.wall === 'right') return { x: architecture.widthMm, y: along }
+  if (opening.wall === 'bottom') return { x: along, y: architecture.depthMm }
+  if (opening.wall === 'left') return { x: 0, y: along }
+  return { x: along, y: 0 }
+}
+
+export function moveOpening(architecture: Architecture, index: number, point: PointMm, snapMm: number): Architecture {
+  if (index < 0 || index >= architecture.openings.length) return architecture
+  const opening = architecture.openings[index]
+  const segment = segmentOf(architecture, opening)
+  if (!segment) return architecture
+  const dx = segment.end.x - segment.start.x
+  const dy = segment.end.y - segment.start.y
+  const length = Math.hypot(dx, dy) || 1
+  const projected = ((point.x - segment.start.x) * dx + (point.y - segment.start.y) * dy) / length
+  const maxOffset = Math.max(0, length - opening.widthMm)
+  const offsetMm = Math.max(0, Math.min(maxOffset, Math.round((projected - opening.widthMm / 2) / snapMm) * snapMm))
+  const openings = architecture.openings.map((candidate, position) => position === index ? { ...candidate, offsetMm } : candidate)
+  return { ...architecture, openings }
+}
+
+export function movePillar(architecture: Architecture, index: number, point: PointMm, snapMm: number): Architecture {
+  if (index < 0 || index >= architecture.pillars.length) return architecture
+  const snapped = snapPoint(point, snapMm)
+  const pillars = architecture.pillars.map((candidate, position) => position === index ? { ...candidate, xMm: snapped.x, yMm: snapped.y } : candidate)
+  return { ...architecture, pillars }
+}
