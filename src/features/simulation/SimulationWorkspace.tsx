@@ -178,7 +178,7 @@ export function SimulationWorkspace({
           <div><span className="eyebrow">Active layout</span><strong>{variant.name}</strong></div>
           <div className="layer-toggles">{(Object.keys(layers) as (keyof Layers)[]).map((key) => <button type="button" key={key} aria-pressed={layers[key]} onClick={() => toggleLayer(key)}>{key[0].toUpperCase() + key.slice(1)}</button>)}</div>
           <label className="follow-control">Follow<select aria-label="Follow staff role" value={followRole} onChange={(event) => setFollowRole(event.target.value as StaffRole | 'overview')}><option value="overview">Overview</option><option value="head-chef">Head chef</option><option value="sous-chef">Sous chef</option><option value="cdp">CDP</option><option value="busser-washer">Busser / washer</option></select></label>
-          {hasValidationErrors && <button type="button" className="primary-button" onClick={() => setAutoFixOpen(true)}>Auto-fix plan</button>}
+          {hasValidationErrors && <button type="button" className="simulation-autofix-button" onClick={() => setAutoFixOpen(true)}>Auto-fix plan</button>}
           <button type="button" className="run-simulation" disabled={hasValidationErrors} onClick={startRun}>Run {scenario.durationMinutes}-minute service</button>
         </div>
         {validationErrors.length > 0 && <div role="alert" className="simulation-validation"><strong>Resolve before simulation</strong>{validationErrors.map((error, index) => <button type="button" key={`${error.code}-${index}`} onClick={() => error.itemIds.length && store.getState().selectItems(error.itemIds)}>{error.message}{error.itemIds.length ? ' Select affected equipment, then open Plan.' : ''}</button>)}</div>}
@@ -214,7 +214,7 @@ export function SimulationWorkspace({
     {autoFixOpen && (
       <div className="workspace-modal-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) setAutoFixOpen(false) }}>
         <section
-          className="essentials-dialog"
+          className="essentials-dialog simulation-autofix-dialog"
           role="dialog"
           aria-modal="true"
           aria-label="Auto-fix simulation plan"
@@ -225,7 +225,7 @@ export function SimulationWorkspace({
           <p>Review geometry first, then add any missing operational essentials. Changes use the same undoable workspace actions as the plan editor.</p>
           <LayoutDiagnostics store={store} />
           <EssentialsChecker store={store} onEditRoom={editRoom} />
-          {!hasValidationErrors && <p role="status">Simulation blockers resolved — close to run.</p>}
+          {!hasValidationErrors && <p className="simulation-autofix-status" role="status">Simulation blockers resolved — close to run.</p>}
           <section aria-label="Simulation validation details">
             <h3>Remaining simulation blockers</h3>
             {hasValidationErrors

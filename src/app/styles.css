@@ -140,6 +140,8 @@ button { cursor: pointer; }
 .header-contextual-tools button[aria-pressed="true"] { color: var(--accent); background: var(--accent-soft); }
 .header-contextual-tools button:disabled { opacity: 0.35; cursor: not-allowed; }
 .header-contextual-tools .icon-action { width: 26px; min-width: 26px; padding: 0; font-size: 13px; }
+.header-contextual-tools .toolbar-autofix { color: var(--paper-hi); background: var(--accent); }
+.header-contextual-tools .toolbar-autofix:hover:not(:disabled) { color: var(--paper-hi); background: var(--accent-hover); }
 .base-space-tab {
   min-height: 28px; height: 28px; display: flex; align-items: center; border: 1px solid transparent;
   border-radius: 9px 9px 0 0; padding: 0 12px; color: var(--ink-3); background: transparent; font-size: 11.5px; font-weight: 510; white-space: nowrap;
@@ -242,11 +244,13 @@ button { cursor: pointer; }
 .simulation-toolbar strong { overflow-wrap: anywhere; font-size: 12.5px; font-weight: 510; }
 .layer-toggles { min-width: 0; max-width: 100%; display: flex; gap: 5px; overflow-x: auto; }
 .layer-toggles button { flex: 0 0 auto; }
-.layer-toggles button, .run-simulation { min-height: 28px; border: 1px solid var(--rule); border-radius: var(--control-radius); padding: 0 10px; background: var(--paper-hi); color: var(--ink-2); font-size: 11.5px; font-weight: 510; }
+.layer-toggles button, .simulation-autofix-button, .run-simulation { min-height: 28px; border: 1px solid var(--rule); border-radius: var(--control-radius); padding: 0 10px; background: var(--paper-hi); color: var(--ink-2); font-size: 11.5px; font-weight: 510; }
 .layer-toggles button:hover { color: var(--ink); border-color: rgba(17, 34, 28, 0.35); }
 .layer-toggles button[aria-pressed="true"] { color: var(--accent); border-color: rgba(202, 78, 142, 0.35); background: var(--accent-soft); }
 .follow-control { display: flex; align-items: center; gap: 6px; color: var(--ink-3); font-size: 11px; font-weight: 510; }
 .follow-control select { min-height: 28px; border: 1px solid var(--rule-2); border-radius: var(--control-radius); padding: 4px 6px; background: var(--paper-hi); font-size: 11px; }
+.simulation-autofix-button { color: var(--paper-hi); border-color: var(--accent); background: var(--accent); white-space: nowrap; }
+.simulation-autofix-button:hover { border-color: var(--accent-hover); background: var(--accent-hover); }
 .run-simulation { margin-left: auto; color: var(--paper); border-color: var(--ink); background: var(--ink); font-weight: 510; white-space: nowrap; }
 .run-simulation:hover { background: var(--ink-2); }
 .run-simulation:disabled { opacity: 0.5; }
@@ -688,6 +692,17 @@ button { cursor: pointer; }
 .essentials-checker > header { padding-right: 42px; }
 .essentials-checker > header strong { display: block; margin: 3px 0; font-family: var(--font-display); font-size: 17px; font-weight: 600; }
 .essentials-checker > header p { margin: 0; color: var(--ink-3); font-size: 11.5px; }
+.essentials-quick-fixes { display: grid; gap: 7px; border: 1px solid rgba(202, 78, 142, 0.28); border-radius: var(--control-radius); padding: 10px; background: var(--accent-soft); }
+.essentials-dialog .essentials-quick-fixes .primary-action { color: var(--paper-hi); border-color: var(--accent); background: var(--accent); }
+.essentials-dialog .essentials-quick-fixes .primary-action:hover { color: var(--paper-hi); border-color: var(--accent-hover); background: var(--accent-hover); }
+.essentials-dialog > .layout-diagnostics { margin: 0 0 12px; border: 1px solid var(--rule); border-radius: var(--control-radius); }
+.simulation-autofix-dialog > h2 { margin: 2px 42px 5px 0; font-family: var(--font-display); font-size: 19px; letter-spacing: -0.015em; }
+.simulation-autofix-dialog > p { margin: 0 42px 14px 0; color: var(--ink-3); font-size: 11.5px; line-height: 1.45; }
+.simulation-autofix-dialog .simulation-autofix-status { margin: 12px 0; border: 1px solid rgba(45, 124, 111, 0.3); border-radius: var(--control-radius); padding: 10px; color: var(--ok); background: var(--ok-soft); font-weight: 510; }
+.simulation-autofix-dialog > section[aria-label="Simulation validation details"] { margin-top: 12px; border-top: 1px solid var(--rule); padding-top: 12px; }
+.simulation-autofix-dialog > section[aria-label="Simulation validation details"] h3 { margin: 0 0 7px; font-size: 12.5px; }
+.simulation-autofix-dialog > section[aria-label="Simulation validation details"] p,
+.simulation-autofix-dialog > section[aria-label="Simulation validation details"] ul { margin: 0; color: var(--ink-3); font-size: 11.5px; line-height: 1.45; }
 .essentials-group { display: grid; grid-template-columns: 1fr auto; align-items: center; border: 1px solid rgba(194, 147, 79, 0.45); border-left: 3px solid var(--warn); border-radius: var(--control-radius); padding: 11px; background: var(--warn-soft); }
 .essentials-group.blocker { border-color: rgba(163, 47, 29, 0.4); border-left-color: var(--danger); background: var(--danger-soft); }
 .essentials-group.professional-review { border-color: var(--rule-2); border-left-color: var(--ink-3); background: var(--paper); }
@@ -979,7 +994,7 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px s
   .simulation-toolbar { align-items: stretch; flex-direction: column; flex-wrap: nowrap; }
   .simulation-toolbar > * { width: 100%; }
   .follow-control select { min-width: 0; flex: 1 1 auto; }
-  .run-simulation { width: 100%; margin: 0; }
+  .simulation-autofix-button, .run-simulation { width: 100%; margin: 0; }
   .live-service-hud { grid-template-columns: repeat(3, minmax(100px, 1fr)); }
   .live-service-hud article:nth-child(3) { border-right: 0; }
   .live-ticket-rail { width: 152px; max-height: 220px; }

@@ -148,10 +148,10 @@ export function StageToolbar({
           <button type="button" aria-label="Toggle equipment catalog" aria-pressed={catalogOpen} onClick={onToggleCatalog}>Catalog</button>
         )}
         <button type="button" aria-label="Toggle inspector" aria-pressed={inspectorOpen} onClick={onToggleInspector}>Inspector</button>
+        {showAutoFix && <button type="button" className="toolbar-autofix" onClick={onOpenEssentials}>Auto-fix</button>}
         <button type="button" onClick={onOpenEssentials}>
           {stage === 'space' ? 'Validate Plan' : 'Validate Fit-Out'}{essentialsCount > 0 ? ` · ${essentialsCount}` : ''}
         </button>
-        {showAutoFix && <button type="button" onClick={onOpenEssentials}>Auto-fix</button>}
         <button type="button" aria-label="Undo" title="Undo (⌘Z)" disabled={!canUndo} onClick={onUndo}>↺</button>
         <button type="button" aria-label="Redo" title="Redo (⌘⇧Z)" disabled={!canRedo} onClick={onRedo}>↻</button>
         {stage !== 'simulate' && (
