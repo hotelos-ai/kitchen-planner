@@ -123,6 +123,40 @@ test('creates an advanced room and recommended essentials through the novice wiz
   await expect(page.getByRole('dialog', { name: 'Validate plan' })).toContainText(/operational guidance, not regulatory certification/i)
 })
 
+test('repairs an automatable invalid model with one click in Fit-out, Space, and Sim', async ({ page }) => {
+  const project = createSeedProject()
+  const variant = project.variants.find((candidate) => candidate.id === project.activeVariantId)!
+  variant.equipment = variant.equipment.filter((item) => !item.capabilities.includes('hand-wash'))
+  variant.equipment.find((item) => item.id === 'mixer')!.xMm = -500
+  await page.addInitScript(({ json }) => {
+    localStorage.setItem('manta-raja:project:v1', json)
+  }, { json: JSON.stringify(project) })
+
+  await openApp(page)
+
+  const fitOutAutoFix = page.getByRole('button', { name: 'Auto-fix', exact: true })
+  await expect(fitOutAutoFix).toBeVisible()
+  await fitOutAutoFix.click()
+  await expect(fitOutAutoFix).toHaveCount(0)
+
+  await page.getByRole('button', { name: 'Undo' }).click()
+  await expect(page.getByRole('button', { name: 'Auto-fix', exact: true })).toBeVisible()
+  await page.getByRole('button', { name: '1 Space' }).click()
+  const spaceAutoFix = page.getByRole('button', { name: 'Auto-fix', exact: true })
+  await expect(spaceAutoFix).toBeVisible()
+  await spaceAutoFix.click()
+  await expect(spaceAutoFix).toHaveCount(0)
+
+  await page.getByRole('button', { name: 'Undo' }).click()
+  await page.getByRole('button', { name: '3 Simulate' }).click()
+  const run = page.getByRole('button', { name: /Run 60-minute service/i })
+  await expect(run).toBeDisabled()
+  await page.getByRole('button', { name: 'Auto-fix plan' }).click()
+
+  await expect(run).toBeEnabled()
+  await expect(page.getByRole('dialog', { name: 'Auto-fix simulation plan' })).toHaveCount(0)
+})
+
 test('runs, inspects, compares, and atomically adopts an auto-layout finalist', async ({ page }) => {
   const pageErrors: string[] = []
   page.on('pageerror', (error) => pageErrors.push(error.message))

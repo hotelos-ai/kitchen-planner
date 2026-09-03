@@ -1,14 +1,31 @@
 import type { ComponentProps } from 'react'
-import { act, fireEvent, render, screen, within } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createSeedProject } from '../../domain/seed-project'
+import { analyzeLayout } from '../../domain/layout-diagnostics'
 import { createProjectStore, getActiveItem, projectStore } from '../../state/project-store'
 import { PlanWorkspace } from './PlanWorkspace'
 
 const workspace = (props: Partial<ComponentProps<typeof PlanWorkspace>> = {}) => (
   <PlanWorkspace showCanvas={false} includeToolbar {...props} />
 )
+
+const automatableInvalidProject = () => {
+  const project = createSeedProject()
+  const variant = project.variants[0]
+  variant.equipment = variant.equipment.filter((item) => !item.capabilities.includes('hand-wash'))
+  variant.equipment.find((item) => item.id === 'mixer')!.xMm = -500
+  return project
+}
+
+const expectAutomaticProblemsResolved = (store: ReturnType<typeof createProjectStore>) => {
+  const state = store.getState()
+  const variant = state.project.variants.find((candidate) => candidate.id === state.project.activeVariantId)!
+  expect(analyzeLayout(variant.architecture, variant.equipment, { layoutConstraints: variant.layoutConstraints })
+    .filter((issue) => issue.severity === 'error')).toHaveLength(0)
+  expect(variant.equipment.some((item) => item.capabilities.includes('hand-wash'))).toBe(true)
+}
 
 async function selectPlacedItem(user: ReturnType<typeof userEvent.setup>, pattern: RegExp) {
   await user.click(screen.getByRole('tab', { name: /Placed/i }))
@@ -159,41 +176,40 @@ describe('plan workspace', () => {
     expect(screen.queryByRole('dialog', { name: 'Validate plan' })).not.toBeInTheDocument()
   })
 
-  it('promotes auto-fix in Space and keeps layout checks first with an active selection', async () => {
+  it.each([
+    ['Space', 'space' as const],
+    ['Fit-out', 'equipment' as const],
+  ])('repairs geometry and missing essentials from the first Auto-fix click in %s', async (_label, stage) => {
     const user = userEvent.setup()
-    const project = createSeedProject()
-    project.scenarios[0].staff = []
-    const store = createProjectStore(project)
+    const store = createProjectStore(automatableInvalidProject())
     store.getState().selectItems(['tandoor'])
+    const beforeRevision = store.getState().revision
 
-    render(workspace({ store, stage: 'space' }))
+    render(workspace({ store, stage }))
 
     await user.click(screen.getByRole('button', { name: 'Auto-fix' }))
-    const dialog = screen.getByRole('dialog', { name: 'Validate plan' })
-    const checks = within(dialog).getByRole('region', { name: 'Layout checks' })
-    const report = within(dialog).getByRole('region', { name: 'Operational essentials' })
 
-    expect(checks.compareDocumentPosition(report) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
-    expect(store.getState().selectedIds).toEqual(['tandoor'])
+    await waitFor(() => expectAutomaticProblemsResolved(store))
+    expect(store.getState().revision).toBe(beforeRevision + 1)
+    expect(screen.queryByRole('dialog', { name: 'Validate plan' })).not.toBeInTheDocument()
   })
 
-  it('promotes auto-fix in Fit-out and does not duplicate layout checks in validation', async () => {
+  it('puts one-click repair before collapsed validation details', async () => {
     const user = userEvent.setup()
-    const project = createSeedProject()
-    project.variants[0].equipment.find((item) => item.id === 'mixer')!.xMm = -500
-    const store = createProjectStore(project)
+    const store = createProjectStore(automatableInvalidProject())
 
     render(workspace({ store, stage: 'equipment' }))
 
-    expect(screen.getByRole('button', { name: 'Validate Fit-Out' })).toBeInTheDocument()
-    await user.click(screen.getByRole('button', { name: 'Auto-fix' }))
+    await user.click(screen.getByRole('button', { name: 'Validate Fit-Out' }))
     const dialog = screen.getByRole('dialog', { name: 'Validate plan' })
-    const checks = within(dialog).getAllByRole('region', { name: 'Layout checks' })
-    const report = within(dialog).getByRole('region', { name: 'Operational essentials' })
+    const fixEverything = within(dialog).getByRole('button', { name: 'Fix everything automatically' })
+    const details = within(dialog).getByText('Review details')
 
-    expect(checks).toHaveLength(1)
-    expect(checks[0].compareDocumentPosition(report) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
-    expect(within(checks[0]).getByRole('button', { name: 'Auto-fix…' })).toBeInTheDocument()
+    expect(fixEverything.compareDocumentPosition(details) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(details.closest('details')).not.toHaveAttribute('open')
+
+    await user.click(fixEverything)
+    await waitFor(() => expectAutomaticProblemsResolved(store))
   })
 
   it('uses Escape to close transient workspace UI before clearing selection', async () => {

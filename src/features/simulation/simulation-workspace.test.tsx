@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { createSeedProject } from '../../domain/seed-project'
 import { runSimulation } from '../../simulation/engine'
+import { validateSimulationInput } from '../../simulation/validation'
 import { createProjectStore, projectStore } from '../../state/project-store'
 import { appStateStore } from '../../state/app-state-store'
 import { createSimulationRunStore, simulationRunStore } from '../../state/simulation-run-store'
@@ -112,39 +113,36 @@ describe('simulation workspace', () => {
     expect(screen.getAllByLabelText(/live queue/i).length).toBeGreaterThan(0)
   })
 
-  it('opens the top auto-fix plan and enables Run after adding a missing essential', async () => {
+  it('repairs geometry and missing essentials from the first Auto-fix click and enables Run', async () => {
     const project = createSeedProject()
     const variant = project.variants.find((candidate) => candidate.id === project.activeVariantId)!
     variant.equipment = variant.equipment.filter((item) => !item.capabilities.includes('hand-wash'))
+    variant.equipment.find((item) => item.id === 'mixer')!.xMm = -500
     const store = createProjectStore(project)
     const run = vi.fn(runSimulation)
     render(<SimulationWorkspace store={store} run={run} />)
 
     const runButton = screen.getByRole('button', { name: /Run 60-minute service/i })
     expect(runButton).toBeDisabled()
+    const beforeRevision = store.getState().revision
 
     await userEvent.click(screen.getByRole('button', { name: 'Auto-fix plan' }))
 
-    const dialog = screen.getByRole('dialog', { name: 'Auto-fix simulation plan' })
-    expect(within(dialog).getByLabelText('Layout checks')).toBeInTheDocument()
-    expect(within(dialog).getByLabelText('Operational essentials')).toBeInTheDocument()
-    expect(within(dialog).getAllByText(/dedicated handwashing station is required/i)).not.toHaveLength(0)
-
-    const aggregateFix = within(dialog).getByRole('button', { name: 'Auto-fix missing essentials' })
-    const blockerHeading = within(dialog).getByRole('heading', { name: 'Blockers' })
-    const validationDetails = within(dialog).getByLabelText('Simulation validation details')
-    expect(aggregateFix.compareDocumentPosition(blockerHeading) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
-    expect(aggregateFix.compareDocumentPosition(validationDetails) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
-
-    await userEvent.click(aggregateFix)
-
     await waitFor(() => expect(runButton).toBeEnabled())
-    expect(screen.getByRole('dialog', { name: 'Auto-fix simulation plan' })).toBeInTheDocument()
-    expect(within(dialog).getByText('Simulation blockers resolved — close to run.')).toHaveAttribute('role', 'status')
+    const next = store.getState()
+    const fixedVariant = next.project.variants.find((candidate) => candidate.id === next.project.activeVariantId)!
+    const scenario = next.project.scenarios.find((candidate) => candidate.id === next.project.activeScenarioId)!
+    expect(validateSimulationInput({
+      architecture: fixedVariant.architecture,
+      equipment: fixedVariant.equipment,
+      scenario,
+      layoutConstraints: fixedVariant.layoutConstraints,
+    })).toHaveLength(0)
+    expect(fixedVariant.equipment.some((item) => item.capabilities.includes('hand-wash'))).toBe(true)
+    expect(next.revision).toBe(beforeRevision + 1)
+    expect(screen.queryByRole('dialog', { name: 'Auto-fix simulation plan' })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Auto-fix plan' })).not.toBeInTheDocument()
 
-    await userEvent.click(screen.getByRole('button', { name: 'Close auto-fix plan' }))
-    expect(screen.queryByRole('dialog', { name: 'Auto-fix simulation plan' })).not.toBeInTheDocument()
     await userEvent.click(runButton)
     expect(await screen.findByText(/Total staff travel/i)).toBeInTheDocument()
     expect(run).toHaveBeenCalledOnce()
