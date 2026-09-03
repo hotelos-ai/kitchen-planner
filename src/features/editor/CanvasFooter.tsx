@@ -40,8 +40,8 @@ export function CanvasFooter({ store, stage, selectedCount, onEditSpace }: Props
             )}
           </span>
         )}
-        {stage === 'space' && variant.architecture.locked && (
-          <span className="space-lock-indicator">Space editable</span>
+        {stage === 'space' && (
+          <span className="space-lock-indicator">Drag the outline to reshape — changes apply to every layout</span>
         )}
       </div>
     </footer>

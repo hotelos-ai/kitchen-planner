@@ -217,7 +217,7 @@ export function createProjectStore(initialProject: KitchenProject): ProjectStore
         if (entry.category === 'architecture') {
           const variant = getActiveVariant(get())
           const architecture = variant.architecture
-          if (architecture.locked || catalogId === 'architecture-no-go-zone') return null
+          if (catalogId === 'architecture-no-go-zone') return null
           let patch: Record<string, unknown> | undefined
           if (catalogId === 'architecture-door' || catalogId === 'architecture-service-window') {
             const segments = architecture.roomPolygon.map((start, segmentIndex) => {
@@ -248,7 +248,8 @@ export function createProjectStore(initialProject: KitchenProject): ProjectStore
             patch = { storageZones: [...architecture.storageZones, { id, label: entry.displayName, xMm: position.xMm, yMm: position.yMm, widthMm: entry.typicalDimensions.widthMm, depthMm: entry.typicalDimensions.depthMm, adjacent: false }] }
           }
           if (!patch) return null
-          const result = applyOperations([{ type: 'update_architecture', variantId: activeVariantId(), patch }], 'Add architectural component')
+          const operations = get().project.variants.map((target) => ({ type: 'update_architecture' as const, variantId: target.id, patch: { ...patch, locked: false } }))
+          const result = applyOperations(operations, 'Add architectural component')
           if (result.ok) set({ selectedIds: [] })
           return result.ok ? id : null
         }

@@ -305,3 +305,22 @@ describe('project store', () => {
     expect(store.getState().project.variants).toHaveLength(1)
   })
 })
+
+describe('architecture catalog adds', () => {
+  it('adds a door opening to the shared floor plan from the catalog', () => {
+    const store = createProjectStore(createSeedProject())
+    const before = store.getState().project.variants[0].architecture.openings.length
+    const id = store.getState().addCatalogItem('architecture-door', { xMm: 1950, yMm: 3300 })
+    expect(id).not.toBeNull()
+    expect(store.getState().project.variants[0].architecture.openings).toHaveLength(before + 1)
+    expect(store.getState().project.variants[1]?.architecture.openings ?? store.getState().project.variants[0].architecture.openings).toHaveLength(before + 1)
+  })
+
+  it('adds a structural pillar even when the architecture is locked', () => {
+    const store = createProjectStore(createSeedProject())
+    const before = store.getState().project.variants[0].architecture.pillars.length
+    const id = store.getState().addCatalogItem('architecture-pillar', { xMm: 1950, yMm: 3300 })
+    expect(id).not.toBeNull()
+    expect(store.getState().project.variants[0].architecture.pillars).toHaveLength(before + 1)
+  })
+})
