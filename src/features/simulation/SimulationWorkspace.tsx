@@ -6,6 +6,8 @@ import type { SimulationInput, SimulationResult } from '../../simulation/types'
 import { validateSimulationInput } from '../../simulation/validation'
 import { getActiveVariant, projectStore, type ProjectStore } from '../../state/project-store'
 import { appStateStore } from '../../state/app-state-store'
+import { EssentialsChecker } from '../editor/EssentialsChecker'
+import { LayoutDiagnostics } from '../editor/LayoutDiagnostics'
 import {
   selectSimulationRun,
   simulationRunStore,
@@ -56,6 +58,7 @@ export function SimulationWorkspace({
   const view = useStore(appStateStore, (state) => state.simulationView)
   const setView = useStore(appStateStore, (state) => state.setSimulationView)
   const [scenarioCollapsed, setScenarioCollapsed] = useState(false)
+  const [autoFixOpen, setAutoFixOpen] = useState(false)
   const staffCount = scenario.staff.reduce((sum, entry) => sum + entry.count, 0)
   const validationErrors = useMemo(() => validateSimulationInput({
     architecture: variant.architecture,
@@ -114,9 +117,17 @@ export function SimulationWorkspace({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [requestedRun?.id, requestedSimulationInput, runStore, store])
   const toggleLayer = (key: keyof Layers) => setLayers((current) => ({ ...current, [key]: !current[key] }))
+  const editRoom = () => {
+    setAutoFixOpen(false)
+    const appState = appStateStore.getState()
+    appState.setOverlay(null)
+    appState.setView('plan')
+    appState.setStage('space')
+  }
   const bottleneck = result ? Object.entries(result.metrics.stationUtilization).sort((left, right) => right[1] - left[1])[0]?.[0] : undefined
 
   return (
+    <>
     <section className={`simulation-workspace three-panel${scenarioCollapsed ? ' scenario-collapsed' : ''}`}>
       <aside className="simulation-scenario-panel" aria-label="Scenario" data-collapsed={scenarioCollapsed}>
         {scenarioCollapsed && (
@@ -167,6 +178,7 @@ export function SimulationWorkspace({
           <div><span className="eyebrow">Active layout</span><strong>{variant.name}</strong></div>
           <div className="layer-toggles">{(Object.keys(layers) as (keyof Layers)[]).map((key) => <button type="button" key={key} aria-pressed={layers[key]} onClick={() => toggleLayer(key)}>{key[0].toUpperCase() + key.slice(1)}</button>)}</div>
           <label className="follow-control">Follow<select aria-label="Follow staff role" value={followRole} onChange={(event) => setFollowRole(event.target.value as StaffRole | 'overview')}><option value="overview">Overview</option><option value="head-chef">Head chef</option><option value="sous-chef">Sous chef</option><option value="cdp">CDP</option><option value="busser-washer">Busser / washer</option></select></label>
+          {hasValidationErrors && <button type="button" className="primary-button" onClick={() => setAutoFixOpen(true)}>Auto-fix plan</button>}
           <button type="button" className="run-simulation" disabled={hasValidationErrors} onClick={startRun}>Run {scenario.durationMinutes}-minute service</button>
         </div>
         {validationErrors.length > 0 && <div role="alert" className="simulation-validation"><strong>Resolve before simulation</strong>{validationErrors.map((error, index) => <button type="button" key={`${error.code}-${index}`} onClick={() => error.itemIds.length && store.getState().selectItems(error.itemIds)}>{error.message}{error.itemIds.length ? ' Select affected equipment, then open Plan.' : ''}</button>)}</div>}
@@ -199,5 +211,30 @@ export function SimulationWorkspace({
         <p className="simulation-assumptions-line">{scenario.covers} covers over {scenario.durationMinutes} minutes · {staffCount} staff · seed {scenario.seed}</p>
       </div>
     </section>
+    {autoFixOpen && (
+      <div className="workspace-modal-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) setAutoFixOpen(false) }}>
+        <section
+          className="essentials-dialog"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Auto-fix simulation plan"
+          onKeyDown={(event) => { if (event.key === 'Escape') setAutoFixOpen(false) }}
+        >
+          <button type="button" className="workspace-modal-close" aria-label="Close auto-fix plan" onClick={() => setAutoFixOpen(false)}>×</button>
+          <h2>Resolve simulation blockers</h2>
+          <p>Review geometry first, then add any missing operational essentials. Changes use the same undoable workspace actions as the plan editor.</p>
+          <LayoutDiagnostics store={store} />
+          <EssentialsChecker store={store} onEditRoom={editRoom} />
+          {!hasValidationErrors && <p role="status">Simulation blockers resolved — close to run.</p>}
+          <section aria-label="Simulation validation details">
+            <h3>Remaining simulation blockers</h3>
+            {hasValidationErrors
+              ? <ul>{validationErrors.map((validationError, index) => <li key={`${validationError.code}-${index}`}>{validationError.message}</li>)}</ul>
+              : <p>None.</p>}
+          </section>
+        </section>
+      </div>
+    )}
+    </>
   )
 }

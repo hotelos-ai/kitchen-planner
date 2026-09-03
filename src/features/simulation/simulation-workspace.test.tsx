@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { createSeedProject } from '../../domain/seed-project'
@@ -110,6 +110,61 @@ describe('simulation workspace', () => {
     expect(screen.getByLabelText(/Playback speed/i)).toHaveValue('25')
     fireEvent.change(screen.getByLabelText(/Simulation time/i), { target: { value: '2000' } })
     expect(screen.getAllByLabelText(/live queue/i).length).toBeGreaterThan(0)
+  })
+
+  it('opens the top auto-fix plan and enables Run after adding a missing essential', async () => {
+    const project = createSeedProject()
+    const variant = project.variants.find((candidate) => candidate.id === project.activeVariantId)!
+    variant.equipment = variant.equipment.filter((item) => !item.capabilities.includes('hand-wash'))
+    const store = createProjectStore(project)
+    const run = vi.fn(runSimulation)
+    render(<SimulationWorkspace store={store} run={run} />)
+
+    const runButton = screen.getByRole('button', { name: /Run 60-minute service/i })
+    expect(runButton).toBeDisabled()
+
+    await userEvent.click(screen.getByRole('button', { name: 'Auto-fix plan' }))
+
+    const dialog = screen.getByRole('dialog', { name: 'Auto-fix simulation plan' })
+    expect(within(dialog).getByLabelText('Layout checks')).toBeInTheDocument()
+    expect(within(dialog).getByLabelText('Operational essentials')).toBeInTheDocument()
+    expect(within(dialog).getAllByText(/dedicated handwashing station is required/i)).not.toHaveLength(0)
+
+    const aggregateFix = within(dialog).getByRole('button', { name: 'Auto-fix missing essentials' })
+    const blockerHeading = within(dialog).getByRole('heading', { name: 'Blockers' })
+    const validationDetails = within(dialog).getByLabelText('Simulation validation details')
+    expect(aggregateFix.compareDocumentPosition(blockerHeading) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(aggregateFix.compareDocumentPosition(validationDetails) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+
+    await userEvent.click(aggregateFix)
+
+    await waitFor(() => expect(runButton).toBeEnabled())
+    expect(screen.getByRole('dialog', { name: 'Auto-fix simulation plan' })).toBeInTheDocument()
+    expect(within(dialog).getByText('Simulation blockers resolved — close to run.')).toHaveAttribute('role', 'status')
+    expect(screen.queryByRole('button', { name: 'Auto-fix plan' })).not.toBeInTheDocument()
+
+    await userEvent.click(screen.getByRole('button', { name: 'Close auto-fix plan' }))
+    expect(screen.queryByRole('dialog', { name: 'Auto-fix simulation plan' })).not.toBeInTheDocument()
+    await userEvent.click(runButton)
+    expect(await screen.findByText(/Total staff travel/i)).toBeInTheDocument()
+    expect(run).toHaveBeenCalledOnce()
+  })
+
+  it('closes auto-fix and opens Space in Plan view for room remediation', async () => {
+    const project = createSeedProject()
+    const variant = project.variants.find((candidate) => candidate.id === project.activeVariantId)!
+    variant.architecture.openings = variant.architecture.openings.filter((opening) => opening.flow !== 'entry')
+    const store = createProjectStore(project)
+    appStateStore.getState().setStage('simulate')
+    appStateStore.getState().setView('scene')
+    appStateStore.getState().setOverlay('compare')
+    render(<SimulationWorkspace store={store} run={runSimulation} />)
+
+    await userEvent.click(screen.getByRole('button', { name: 'Auto-fix plan' }))
+    await userEvent.click(within(screen.getByRole('dialog', { name: 'Auto-fix simulation plan' })).getByRole('button', { name: 'Fix room setup' }))
+
+    expect(screen.queryByRole('dialog', { name: 'Auto-fix simulation plan' })).not.toBeInTheDocument()
+    expect(appStateStore.getState()).toMatchObject({ stage: 'space', view: 'plan', overlay: null })
   })
 
   it('switches among operations, 3D, and Walk without rerunning or resetting time', async () => {
