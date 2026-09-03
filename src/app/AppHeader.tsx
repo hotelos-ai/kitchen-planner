@@ -222,11 +222,16 @@ export function AppHeader({
       </a>
       <ProjectMenu store={store} onNewProject={onNewProject} onOpenSettings={onOpenSettings} />
       <nav className="topbar-nav" aria-label="HotelOS">
-        <a href="https://hotelos.ai/kitchen" target="_blank" rel="noreferrer" className="topbar-nav-brand">HotelOS</a>
-        <a href="https://hotelos.ai/platform" target="_blank" rel="noreferrer">Platform</a>
+        <a href="https://hotelos.ai/kitchen" target="_blank" rel="noreferrer" className="topbar-nav-brand" title="HotelOS">
+          <svg viewBox="0 0 214.2 214.2" aria-hidden="true"><path fill="#b1d15b" d={HOTElOS_SYMBOL_PATH} /></svg>
+          HotelOS
+        </a>
+        <a href="https://hotelos.ai/#platform" target="_blank" rel="noreferrer">Platform</a>
+        <a href="https://hotelos.ai/roadmap" target="_blank" rel="noreferrer">Roadmap</a>
         <a href="https://hotelos.ai/integrations" target="_blank" rel="noreferrer">Integrations</a>
         <a href="https://hotelos.ai/pricing" target="_blank" rel="noreferrer">Pricing</a>
         <a href="https://hotelos.ai/trust" target="_blank" rel="noreferrer">Trust</a>
+        <a href="https://hotelos.ai/contact" target="_blank" rel="noreferrer">Contact</a>
         <a href="https://auth.hotelos.ai/login" target="_blank" rel="noreferrer" className="topbar-nav-login">Log in</a>
       </nav>
       <nav aria-label="Workflow stages" className="workflow-navigator">
