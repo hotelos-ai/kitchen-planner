@@ -78,7 +78,26 @@ export function EquipmentInspector({ store }: Props) {
         <LengthField key={`x-${item.id}-${item.xMm}-${project.displayUnit}`} label="X position" valueMm={item.xMm} unit={project.displayUnit} onCommit={(xMm) => store.getState().moveItems([item.id], { x: xMm, y: item.yMm })} />
         <LengthField key={`y-${item.id}-${item.yMm}-${project.displayUnit}`} label="Y position" valueMm={item.yMm} unit={project.displayUnit} onCommit={(yMm) => store.getState().moveItems([item.id], { x: item.xMm, y: yMm })} />
       </div>
-      <LengthField key={`clearance-${item.id}-${item.clearance?.frontMm ?? 1}-${project.displayUnit}`} label="Front clearance" valueMm={item.clearance?.frontMm ?? 1} unit={project.displayUnit} onCommit={(frontMm) => update({ clearance: { kind: item.clearance?.kind ?? (item.category === 'cooking' ? 'heat' : 'work'), frontMm } })} />
+      <details className="capability-editor clearance-editor" open>
+        <summary>Clearances{item.clearance ? '' : ' (none set)'}</summary>
+        <div>
+          <label>Clearance kind
+            <select aria-label="Clearance kind" value={item.clearance?.kind ?? (item.category === 'cooking' ? 'heat' : 'work')} onChange={(event) => update({ clearance: { kind: event.target.value as NonNullable<EquipmentItem['clearance']>['kind'], frontMm: item.clearance?.frontMm ?? 900, leftMm: item.clearance?.leftMm, rightMm: item.clearance?.rightMm, backMm: item.clearance?.backMm } })}>
+              <option value="work">Work space</option>
+              <option value="heat">Heat / hot equipment</option>
+              <option value="door-swing">Door swing</option>
+              <option value="service">Service access</option>
+            </select>
+          </label>
+          <div className="field-pair">
+            <LengthField key={`cf-${item.id}-${item.clearance?.frontMm ?? 1}-${project.displayUnit}`} label="Front" valueMm={item.clearance?.frontMm ?? 1} unit={project.displayUnit} onCommit={(frontMm) => update({ clearance: { kind: item.clearance?.kind ?? (item.category === 'cooking' ? 'heat' : 'work'), frontMm } })} />
+            <LengthField key={`cb-${item.id}-${item.clearance?.backMm ?? 0}-${project.displayUnit}`} label="Back" valueMm={item.clearance?.backMm ?? 0} unit={project.displayUnit} onCommit={(backMm) => update({ clearance: { kind: item.clearance?.kind ?? (item.category === 'cooking' ? 'heat' : 'work'), frontMm: item.clearance?.frontMm ?? 1, backMm } })} />
+            <LengthField key={`cl-${item.id}-${item.clearance?.leftMm ?? 0}-${project.displayUnit}`} label="Left" valueMm={item.clearance?.leftMm ?? 0} unit={project.displayUnit} onCommit={(leftMm) => update({ clearance: { kind: item.clearance?.kind ?? (item.category === 'cooking' ? 'heat' : 'work'), frontMm: item.clearance?.frontMm ?? 1, leftMm } })} />
+            <LengthField key={`cr-${item.id}-${item.clearance?.rightMm ?? 0}-${project.displayUnit}`} label="Right" valueMm={item.clearance?.rightMm ?? 0} unit={project.displayUnit} onCommit={(rightMm) => update({ clearance: { kind: item.clearance?.kind ?? (item.category === 'cooking' ? 'heat' : 'work'), frontMm: item.clearance?.frontMm ?? 1, rightMm } })} />
+          </div>
+          <p className="field-error" style={{ color: 'var(--ink-4)' }}>Clearances drive plan checks and 3D overlays.</p>
+        </div>
+      </details>
       <details className="capability-editor"><summary>Simulation capabilities ({item.capabilities.length})</summary><div>{CAPABILITIES.map((capability) => <label className="checkbox-row" key={capability}><input type="checkbox" checked={item.capabilities.includes(capability)} onChange={(event) => update({ capabilities: event.target.checked ? [...item.capabilities, capability] : item.capabilities.filter((value) => value !== capability) })} />{capability.replaceAll('-', ' ')}</label>)}</div></details>
       {item.notes && <p className="item-note">{item.notes}</p>}
       <div className="inspector-actions">

@@ -98,7 +98,7 @@ export function SimulationWorkspace({ store = projectStore, run = runSimulation,
       <div className="simulation-sidebar">
         {result && (
           <section className="scorecard-heading simulation-primary-summary" aria-label={`${scenario.name} result`}>
-            <h2>{scenario.name} result</h2>
+            <div className="panel-heading"><span className="eyebrow">Results</span><h2>{scenario.name} result</h2></div>
             <p>At {scenario.covers} covers per hour, this layout is likely to experience delays at the {bottleneck?.replaceAll('-', ' ') ?? 'hot line'}.</p>
             <dl>
               <div><dt>Orders completed</dt><dd>{result.metrics.completedOrders} of {result.metrics.totalOrders}</dd></div>

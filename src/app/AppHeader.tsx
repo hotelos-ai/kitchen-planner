@@ -148,8 +148,8 @@ export function StageToolbar({
         <button type="button" onClick={onOpenEssentials}>
           Check essentials{essentialsCount > 0 ? ` · ${essentialsCount}` : ''}
         </button>
-        <button type="button" aria-label="Undo" disabled={!canUndo} onClick={onUndo}>Undo</button>
-        <button type="button" aria-label="Redo" disabled={!canRedo} onClick={onRedo}>Redo</button>
+        <button type="button" aria-label="Undo" title="Undo (⌘Z)" disabled={!canUndo} onClick={onUndo}>↺</button>
+        <button type="button" aria-label="Redo" title="Redo (⌘⇧Z)" disabled={!canRedo} onClick={onRedo}>↻</button>
         {stage !== 'simulate' && (
           <button type="button" aria-pressed={showReference} onClick={onToggleReference}>Source reference</button>
         )}
@@ -221,6 +221,14 @@ export function AppHeader({
         <h1>CalmKitchen <em>Designer</em></h1>
       </a>
       <ProjectMenu store={store} onNewProject={onNewProject} onOpenSettings={onOpenSettings} />
+      <nav className="topbar-nav" aria-label="HotelOS">
+        <a href="https://hotelos.ai/kitchen" target="_blank" rel="noreferrer" className="topbar-nav-brand">HotelOS</a>
+        <a href="https://hotelos.ai/platform" target="_blank" rel="noreferrer">Platform</a>
+        <a href="https://hotelos.ai/integrations" target="_blank" rel="noreferrer">Integrations</a>
+        <a href="https://hotelos.ai/pricing" target="_blank" rel="noreferrer">Pricing</a>
+        <a href="https://hotelos.ai/trust" target="_blank" rel="noreferrer">Trust</a>
+        <a href="https://auth.hotelos.ai/login" target="_blank" rel="noreferrer" className="topbar-nav-login">Log in</a>
+      </nav>
       <nav aria-label="Workflow stages" className="workflow-navigator">
         {WORKFLOW_STAGES.map((entry) => {
           const active = stage === entry.id && overlay === null
