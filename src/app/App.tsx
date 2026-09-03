@@ -3,7 +3,7 @@ import { useStore } from 'zustand'
 import { createBrowserAutoLayoutRunner } from '../features/optimizer/browser-auto-layout-runner'
 import { evaluateOperationalRequirements } from '../domain/requirements/operational-requirements'
 import { configureWorkspaceAutoLayout, getWorkspaceFacade, getActiveVariant, projectStore } from '../state/project-store'
-import { AppHeader } from './AppHeader'
+import { AppHeader, StageToolbar } from './AppHeader'
 import { ProjectStartScreen } from './ProjectStartScreen'
 import { createBlankProject } from '../domain/blank-project'
 import type { ViewMode, WorkflowStage, WorkspaceOverlay } from './workflow'
@@ -41,7 +41,7 @@ export function App() {
   const [wizardStartsAtRoom, setWizardStartsAtRoom] = useState(false)
   const [essentialsOpen, setEssentialsOpen] = useState(false)
   const [revisionsOpen, setRevisionsOpen] = useState(false)
-  const [sourceImageUrl, setSourceImageUrl] = useState('/reference/manta-raja-layout.png')
+  const [sourceImageUrl, setSourceImageUrl] = useState('/reference/kitchen-sketch.png')
   const [closedLayout, setClosedLayout] = useState<{ name: string; revision: number; undo(): boolean } | null>(null)
   const [showStartScreen, setShowStartScreen] = useState(false)
 
@@ -82,8 +82,7 @@ export function App() {
   return (
     <main className="app-shell">
       <AppHeader
-        projectName={project.name}
-        saveLabel="Saved on this device"
+        store={projectStore}
         view={view}
         stage={stage}
         overlay={overlay}
@@ -102,27 +101,6 @@ export function App() {
           setShowStartScreen(true)
         }}
         onOpenSettings={() => { setInspectorOpen(true); setRevisionsOpen(false); setEssentialsOpen(false) }}
-        onOpenRevisions={() => { setInspectorOpen(true); setRevisionsOpen(true); setEssentialsOpen(false) }}
-        store={projectStore}
-        catalogOpen={catalogOpen}
-        inspectorOpen={inspectorOpen}
-        essentialsCount={essentialsCount}
-        showReference={showReference}
-        canUndo={canUndo}
-        canRedo={canRedo}
-        dragResizeEnabled={dragResizeEnabled}
-        hasSelection={selectedIds.length > 0}
-        onToggleCatalog={() => setCatalogOpen((open) => !open)}
-        onToggleInspector={() => setInspectorOpen((open) => !open)}
-        onOpenEssentials={() => { setEssentialsOpen(true); setRevisionsOpen(false); setInspectorOpen(true) }}
-        onUndo={() => projectStore.getState().undo()}
-        onRedo={() => projectStore.getState().redo()}
-        onToggleReference={() => setShowReference((value) => !value)}
-        onRotateLeft={() => projectStore.getState().rotateItems(selectedIds, -90)}
-        onRotateRight={() => projectStore.getState().rotateItems(selectedIds, 90)}
-        onToggleResize={() => selectedItem && projectStore.getState().setDimensionsLocked(selectedItem.id, !selectedItem.dimensionsLocked)}
-        onAddLayout={openWizard}
-        onClosedLayout={(closed) => setClosedLayout(closed)}
       />
       <ErrorBoundary>
         <Suspense fallback={<section className="workspace-placeholder">Loading workspace…</section>}>
@@ -142,6 +120,34 @@ export function App() {
             {overlay === 'compare' && <div className="workspace-surface active"><CompareWorkspace /></div>}
             {overlay === 'auto-layout' && <div className="workspace-surface active"><AutoLayoutWorkspace runner={autoLayoutRunner} /></div>}
             {overlay === null && stage === 'simulate' && <div className="workspace-surface active"><SimulationWorkspace /></div>}
+            {overlay === null && stage !== 'simulate' && view === 'plan' && (
+              <div className="canvas-toolbar-wrap">
+                <StageToolbar
+                  store={projectStore}
+                  stage={stage}
+                  catalogOpen={catalogOpen}
+                  inspectorOpen={inspectorOpen}
+                  essentialsCount={essentialsCount}
+                  showReference={showReference}
+                  canUndo={canUndo}
+                  canRedo={canRedo}
+                  dragResizeEnabled={dragResizeEnabled}
+                  hasSelection={selectedIds.length > 0}
+                  onToggleCatalog={() => setCatalogOpen((open) => !open)}
+                  onToggleInspector={() => setInspectorOpen((open) => !open)}
+                  onOpenEssentials={() => { setEssentialsOpen(true); setRevisionsOpen(false); setInspectorOpen(true) }}
+                  onOpenRevisions={() => { setInspectorOpen(true); setRevisionsOpen(true); setEssentialsOpen(false) }}
+                  onUndo={() => projectStore.getState().undo()}
+                  onRedo={() => projectStore.getState().redo()}
+                  onToggleReference={() => setShowReference((value) => !value)}
+                  onRotateLeft={() => projectStore.getState().rotateItems(selectedIds, -90)}
+                  onRotateRight={() => projectStore.getState().rotateItems(selectedIds, 90)}
+                  onToggleResize={() => selectedItem && projectStore.getState().setDimensionsLocked(selectedItem.id, !selectedItem.dimensionsLocked)}
+                  onAddLayout={openWizard}
+                  onClosedLayout={(closed) => setClosedLayout(closed)}
+                />
+              </div>
+            )}
             {overlay === null && stage !== 'simulate' && (
               <>
                 <div

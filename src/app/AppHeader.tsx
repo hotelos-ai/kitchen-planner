@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useEffect, useMemo } from 'react'
 import { useStore } from 'zustand'
 import { analyzeLayout } from '../domain/layout-diagnostics'
 import { evaluateOperationalRequirements } from '../domain/requirements/operational-requirements'
@@ -6,7 +6,7 @@ import { validateSimulationInput } from '../simulation/validation'
 import { getActiveVariant, projectStore, type ProjectStore } from '../state/project-store'
 import { formatBaseSpaceLabel, formatLayoutTabLabel } from './layout-labels'
 import type { ViewMode, WorkflowStage, WorkspaceOverlay } from './workflow'
-import { VIEW_MODES, WORKFLOW_STAGES } from './workflow'
+import { VIEW_MODES, WORKFLOW_STAGES, workflowStageFromDigit } from './workflow'
 import { LayoutVariants, type ClosedLayout } from '../features/editor/LayoutVariants'
 import { ProjectExchange } from './ProjectExchange'
 import { ProjectMenu } from './ProjectMenu'
@@ -38,9 +38,8 @@ export type StageToolbarProps = {
   onGenerateAlternatives?(): void
 }
 
-type AppHeaderProps = StageToolbarProps & {
-  projectName: string
-  saveLabel: string
+type AppHeaderProps = {
+  store?: ProjectStore
   view: ViewMode
   stage: WorkflowStage
   overlay: WorkspaceOverlay
@@ -53,6 +52,12 @@ type AppHeaderProps = StageToolbarProps & {
   onCloseOverlay(): void
   onNewProject(): void
   onOpenSettings(): void
+}
+
+const HOTElOS_SYMBOL_PATH = 'M190.1,0l-27.9,45.9c-3.5,5.7-9.8,9.4-16.6,9.4h-76.8c-6.8,0-13.3-3.7-16.8-9.4L24.4,0H0v214.2h24.4l27.7-45.6c3.5-5.9,10-9.4,16.8-9.4h76.8c6.8,0,13.1,3.5,16.6,9.4l27.9,45.6h24.2V0h-24.2ZM133,133.2h-51.9v-51.8h51.9v51.8Z'
+
+function isTypingTarget(target: EventTarget | null) {
+  return target instanceof HTMLElement && target.closest('input, textarea, select, [contenteditable]:not([contenteditable="false"])') !== null
 }
 
 function useWorkflowIssues(store: ProjectStore) {
@@ -138,7 +143,7 @@ export function StageToolbar({
         )}
         <button type="button" aria-label="Toggle inspector" aria-pressed={inspectorOpen} onClick={onToggleInspector}>Inspector</button>
         <button type="button" onClick={onOpenEssentials}>
-          Check essentials{essentialsCount > 0 ? ` ${essentialsCount}` : ''}
+          Check essentials{essentialsCount > 0 ? ` · ${essentialsCount}` : ''}
         </button>
         <button type="button" aria-label="Undo" disabled={!canUndo} onClick={onUndo}>Undo</button>
         <button type="button" aria-label="Redo" disabled={!canRedo} onClick={onRedo}>Redo</button>
@@ -171,8 +176,6 @@ export function StageToolbar({
 
 export function AppHeader({
   store = projectStore,
-  projectName: _projectName,
-  saveLabel: _saveLabel,
   view,
   stage,
   overlay,
@@ -185,77 +188,77 @@ export function AppHeader({
   onCloseOverlay,
   onNewProject,
   onOpenSettings,
-  ...toolbarProps
 }: AppHeaderProps) {
   const issues = useWorkflowIssues(store)
+  const activeEntry = WORKFLOW_STAGES.find((entry) => entry.id === stage)
+
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.metaKey || event.ctrlKey || event.altKey) return
+      if (isTypingTarget(event.target)) return
+      const next = workflowStageFromDigit(event.key)
+      if (!next) return
+      event.preventDefault()
+      onCloseOverlay()
+      onStageChange(next)
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [onCloseOverlay, onStageChange])
 
   return (
     <header className="app-header">
-      <div className="app-header-row app-header-row-1">
-        <div className="brand-lockup">
-          <span className="brand-mark" aria-hidden="true">KP</span>
-          <div>
-            <h1>Kitchen Planner</h1>
-            <p className="brand-subtitle">Commercial kitchen planning and service simulation</p>
-          </div>
-        </div>
-        <ProjectMenu store={store} onNewProject={onNewProject} onOpenSettings={onOpenSettings} />
-        <nav aria-label="Workflow stages" className="workflow-navigator">
-          {WORKFLOW_STAGES.map((entry) => {
-            const active = stage === entry.id && overlay === null
-            const issueCount = issues[entry.id]
-            const label = issueCount > 0 && entry.id !== 'space'
-              ? `${entry.label} · ${issueCount} issue${issueCount === 1 ? '' : 's'}`
-              : issueCount === 0 && entry.id === 'space'
-                ? `✓ ${entry.label}`
-                : entry.label
-            return (
-              <button
-                key={entry.id}
-                type="button"
-                className={`workflow-step${active ? ' active' : ''}`}
-                aria-current={active ? 'step' : undefined}
-                onClick={() => { onCloseOverlay(); onStageChange(entry.id) }}
-              >
-                <span className="workflow-step-number">{entry.step}</span>
-                {label}
-              </button>
-            )
-          })}
-        </nav>
-        {stage !== 'simulate' && overlay === null && (
-          <nav aria-label="View mode" className="view-switcher compact-view-switcher">
-            {VIEW_MODES.map((entry) => (
-              <button
-                key={entry.id}
-                type="button"
-                aria-pressed={view === entry.id}
-                onClick={() => onViewChange(entry.id)}
-              >
-                {entry.label}
-              </button>
-            ))}
-          </nav>
-        )}
-        <div className="global-actions">
-          {canCompare && (
-            <button type="button" aria-pressed={overlay === 'compare'} onClick={onOpenCompare}>Compare</button>
-          )}
-          {showAutoLayout && (
-            <button type="button" aria-pressed={overlay === 'auto-layout'} onClick={onOpenAutoLayout}>Auto-layout</button>
-          )}
-          <ProjectExchange store={store} />
-        </div>
+      <div className="brand-lockup">
+        <svg className="brand-mark" viewBox="0 0 214.2 214.2" aria-hidden="true" focusable="false">
+          <path fill="#b1d15b" d={HOTElOS_SYMBOL_PATH} />
+        </svg>
+        <h1>CalmKitchen <em>Designer</em></h1>
       </div>
-      {overlay === null && stage !== 'simulate' && (
-        <StageToolbar
-          store={store}
-          stage={stage}
-          onCompare={onOpenCompare}
-          onGenerateAlternatives={onOpenAutoLayout}
-          {...toolbarProps}
-        />
+      <ProjectMenu store={store} onNewProject={onNewProject} onOpenSettings={onOpenSettings} />
+      <nav aria-label="Workflow stages" className="workflow-navigator">
+        {WORKFLOW_STAGES.map((entry) => {
+          const active = stage === entry.id && overlay === null
+          const issueCount = issues[entry.id]
+          const done = !active && activeEntry !== undefined && entry.step < activeEntry.step && overlay === null
+          return (
+            <button
+              key={entry.id}
+              type="button"
+              className={`workflow-step${active ? ' active' : ''}${done ? ' done' : ''}${issueCount > 0 && !active ? ' has-issues' : ''}`}
+              aria-current={active ? 'step' : undefined}
+              aria-label={`${entry.step} ${entry.label}`}
+              title={`${entry.step} ${entry.label}${issueCount > 0 ? ` · ${issueCount} issue${issueCount === 1 ? '' : 's'}` : ''}`}
+              onClick={() => { onCloseOverlay(); onStageChange(entry.id) }}
+            >
+              <span className="workflow-step-number" aria-hidden="true">{done ? '✓' : entry.step}</span>
+              {entry.label}
+            </button>
+          )
+        })}
+      </nav>
+      {stage !== 'simulate' && overlay === null && (
+        <nav aria-label="View mode" className="seg view-switcher">
+          {VIEW_MODES.map((entry) => (
+            <button
+              key={entry.id}
+              type="button"
+              aria-pressed={view === entry.id}
+              onClick={() => onViewChange(entry.id)}
+            >
+              {entry.label}
+            </button>
+          ))}
+        </nav>
       )}
+      <div className="global-actions">
+        {canCompare && (
+          <button type="button" aria-pressed={overlay === 'compare'} onClick={onOpenCompare}>Compare</button>
+        )}
+        {showAutoLayout && (
+          <button type="button" aria-pressed={overlay === 'auto-layout'} onClick={onOpenAutoLayout}>Auto-layout</button>
+        )}
+        <ProjectExchange store={store} />
+      </div>
     </header>
   )
 }

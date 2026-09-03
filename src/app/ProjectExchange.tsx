@@ -65,10 +65,11 @@ export function ProjectExchange({ store = projectStore }: { store?: ProjectStore
           </div>
         )}
       </div>
-      <button type="button" aria-expanded={showHelp} onClick={() => setShowHelp((value) => !value)} aria-label="Help and keyboard shortcuts">?</button>
+      <button type="button" className="icon-btn" aria-expanded={showHelp} onClick={() => setShowHelp((value) => !value)} aria-label="Help and keyboard shortcuts">?</button>
       {showHelp && (
         <div className="shortcut-popover" role="dialog" aria-label="Keyboard shortcuts">
           <strong>Keyboard shortcuts</strong>
+          <span>1 / 2 / 3 · Space / Equipment / Simulate</span>
           <span>Arrow keys · move by snap</span>
           <span>Shift + arrows · move by 5× snap</span>
           <span>⌘/Ctrl Z · undo</span>

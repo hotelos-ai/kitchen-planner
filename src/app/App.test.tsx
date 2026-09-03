@@ -7,9 +7,9 @@ import { App } from './App'
 
 describe('App', () => {
   beforeEach(() => projectStore.getState().replaceProject(createSeedProject()))
-  it('opens the Manta Raja planning workspace', async () => {
+  it('opens the Kitchen 1 planning workspace', async () => {
     render(<App />)
-    expect(screen.getByRole('heading', { name: /Kitchen Planner/i })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: /CalmKitchen Designer/i })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Plan' })).toHaveAttribute('aria-pressed', 'true')
     const user = userEvent.setup()
     await screen.findByLabelText('2D plan workspace', {}, { timeout: 5000 })
@@ -41,9 +41,28 @@ describe('App', () => {
     expect(screen.getByText(/best observed feasible layouts/i)).toBeInTheDocument()
   })
 
-  it('switches to simulation via the workflow navigator', async () => {
+  it('toggles Space, Equipment, and Simulate with the numbered steps', async () => {
     render(<App />)
-    await userEvent.click(screen.getByRole('button', { name: /^3 Simulate$/ }))
+    const user = userEvent.setup()
+    await user.click(screen.getByRole('button', { name: '1 Space' }))
+    expect(screen.getByRole('button', { name: '1 Space' })).toHaveAttribute('aria-current', 'step')
+    expect(screen.getByLabelText('Shared base space')).toBeInTheDocument()
+    expect(screen.getByLabelText('Space components catalog')).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: '2 Fit-out' }))
+    expect(screen.getByRole('button', { name: '2 Fit-out' })).toHaveAttribute('aria-current', 'step')
+    expect(await screen.findByLabelText('Equipment catalog')).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: '3 Simulate' }))
+    expect(screen.getByRole('button', { name: '3 Simulate' })).toHaveAttribute('aria-current', 'step')
+    expect(await screen.findByText(/Pressure-test this layout/i)).toBeInTheDocument()
+  })
+
+  it('switches workflow stages with the 1 2 3 keys', async () => {
+    render(<App />)
+    fireEvent.keyDown(window, { key: '1' })
+    expect(screen.getByRole('button', { name: '1 Space' })).toHaveAttribute('aria-current', 'step')
+    fireEvent.keyDown(window, { key: '3' })
     expect(await screen.findByText(/Pressure-test this layout/i)).toBeInTheDocument()
   })
 
