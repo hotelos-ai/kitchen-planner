@@ -4,12 +4,16 @@ import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { EquipmentItem } from '../../domain/project'
 import { createSeedProject } from '../../domain/seed-project'
+import { appStateStore } from '../../state/app-state-store'
 import { projectStore } from '../../state/project-store'
 import { SceneWorkspace, type SceneRendererProps } from './SceneWorkspace'
 import { buildWallSegments } from './ArchitectureMesh'
 
 describe('3D scene synchronization', () => {
-  beforeEach(() => projectStore.getState().replaceProject(createSeedProject()))
+  beforeEach(() => {
+    projectStore.getState().replaceProject(createSeedProject())
+    appStateStore.getState().reset()
+  })
   afterEach(() => vi.restoreAllMocks())
 
   it('uses the active item geometry and synchronizes selection', async () => {
@@ -113,6 +117,28 @@ describe('3D scene synchronization', () => {
     await user.click(screen.getByRole('button', { name: 'Transparent walls' }))
     expect(screen.getByTestId('wall-state')).toHaveTextContent('true')
     expect(screen.getByRole('button', { name: 'Transparent walls' })).toHaveAttribute('aria-pressed', 'true')
+  })
+
+  it('synchronizes visible scene controls with shared app state', () => {
+    const Renderer = ({ showClearances, wallsTransparent, showLabels, walkMode, walkView }: SceneRendererProps) => (
+      <output data-testid="shared-scene-state">{[showClearances, wallsTransparent, showLabels, walkMode, walkView].join(':')}</output>
+    )
+    render(<SceneWorkspace renderer={Renderer} />)
+
+    act(() => {
+      const state = appStateStore.getState()
+      state.setShowClearances(true)
+      state.setWallsTransparent(true)
+      state.setShowLabels(false)
+      state.setWalkView('third-person')
+      state.setWalkMode(true)
+    })
+
+    expect(screen.getByTestId('shared-scene-state')).toHaveTextContent('true:true:false:true:third-person')
+    expect(screen.getByRole('button', { name: 'Clearances' })).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByRole('button', { name: 'Transparent walls' })).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByRole('button', { name: 'Labels' })).toHaveAttribute('aria-pressed', 'false')
+    expect(screen.getByRole('button', { name: 'Third-person view' })).toHaveAttribute('aria-pressed', 'true')
   })
 
   it('updates an edited mesh without remounting the renderer', () => {

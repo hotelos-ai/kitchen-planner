@@ -17,7 +17,7 @@ async function openApp(page: Page) {
 type ShimmedTool = {
   name: string
   description: string
-  execute: (input: unknown) => Promise<unknown>
+  execute: (input: unknown, context?: { signal?: AbortSignal }) => Promise<unknown>
 }
 
 type ShimWindow = Window & {
@@ -35,6 +35,7 @@ type Envelope = {
   changedIds?: string[]
   projectJson?: string
   stepped?: boolean
+  recovery?: string
 }
 
 const installWebMcpShim = () => {
@@ -123,6 +124,113 @@ test('agents discover tools, edit the plan, run simulations, and export — with
 
   await expect(page.getByText(/preview_layout_changes/).first()).toBeVisible()
   await expect(page.getByText(/No agent activity yet/i)).toHaveCount(0)
+})
+
+test('an agent recovers from a stale preview by re-reading and recomputing its delta', async ({ page }) => {
+  await page.addInitScript(installWebMcpShim)
+  await openApp(page)
+  await page.waitForFunction(() => Object.keys((window as unknown as ShimWindow).__webmcpTools ?? {}).length >= 11)
+  const call = (name: string, input: unknown): Promise<Envelope> =>
+    page.evaluate(([toolName, toolInput]: [string, unknown]) => {
+      const entry = (window as unknown as ShimWindow).__webmcpTools[toolName]
+      if (!entry) throw new Error(`Tool ${toolName} was not registered`)
+      return Promise.resolve(entry.execute(toolInput)).then((result) => (
+        result && typeof result === 'object' && 'structuredContent' in result
+          ? (result as { structuredContent: Envelope }).structuredContent
+          : result as Envelope
+      ))
+    }, [name, input])
+
+  const before = await call('get_layout', {})
+  const tandoor = before.components?.find((component) => component.id === 'tandoor')
+  expect(tandoor).toBeDefined()
+  const originalPreview = await call('preview_layout_changes', {
+    expectedRevision: before.revision,
+    operations: [{
+      type: 'move_components',
+      variantId: 'baseline-trace',
+      componentIds: ['tandoor'],
+      anchor: { xMm: (tandoor?.xMm ?? 0) + 100, yMm: tandoor?.yMm ?? 0 },
+    }],
+  })
+  expect(originalPreview.ok).toBe(true)
+
+  const competingEdit = await call('apply_layout_changes', {
+    expectedRevision: before.revision,
+    idempotencyKey: 'e2e-competing-edit',
+    operations: [{
+      type: 'nudge_components',
+      variantId: 'baseline-trace',
+      componentIds: ['six-burner'],
+      delta: { xMm: 100, yMm: 0 },
+    }],
+  })
+  expect(competingEdit).toMatchObject({ ok: true, revision: 1 })
+
+  const stale = await call('apply_layout_changes', { previewToken: originalPreview.previewToken })
+  expect(stale).toMatchObject({
+    ok: false,
+    code: 'preview-revision-changed',
+    revision: 1,
+    recovery: expect.stringMatching(/re-read.*preview again/i),
+  })
+
+  const refreshed = await call('get_layout', {})
+  expect(refreshed.revision).toBe(1)
+  const recoveryPreview = await call('preview_layout_changes', {
+    expectedRevision: refreshed.revision,
+    operations: [{
+      type: 'move_components',
+      variantId: 'baseline-trace',
+      componentIds: ['tandoor'],
+      anchor: { xMm: (tandoor?.xMm ?? 0) + 100, yMm: tandoor?.yMm ?? 0 },
+    }],
+  })
+  const recovered = await call('apply_layout_changes', { previewToken: recoveryPreview.previewToken })
+  expect(recovered).toMatchObject({ ok: true, revision: 2 })
+  const finalLayout = await call('get_layout', {})
+  expect(finalLayout.components?.find((component) => component.id === 'tandoor')?.xMm).toBe((tandoor?.xMm ?? 0) + 100)
+  await expect(page.getByText(/Rev 2/).first()).toBeVisible()
+})
+
+test('a high-cover simulation can be cancelled without freezing the workspace', async ({ page }) => {
+  await page.addInitScript(installWebMcpShim)
+  await openApp(page)
+  await page.waitForFunction(() => Boolean((window as unknown as ShimWindow).__webmcpTools?.run_simulation))
+
+  const prepared = await page.evaluate(async () => {
+    const entry = (window as unknown as ShimWindow).__webmcpTools.apply_layout_changes
+    const result = await entry.execute({
+      expectedRevision: 0,
+      idempotencyKey: 'e2e-high-cover-scenario',
+      intent: 'Stress-test cancellation',
+      operations: [{
+        type: 'update_scenario',
+        variantId: 'baseline-trace',
+        scenarioId: 'dinner-peak',
+        patch: { covers: 5_000 },
+      }],
+    })
+    return (result as { structuredContent?: Envelope }).structuredContent ?? result
+  }) as Envelope
+  expect(prepared).toMatchObject({ ok: true, revision: 1 })
+
+  const cancellation = page.evaluate(async () => {
+    const entry = (window as unknown as ShimWindow).__webmcpTools.run_simulation
+    const controller = new AbortController()
+    const promise = entry.execute(
+      { scenarioId: 'dinner-peak', variantId: 'baseline-trace', playback: 'none', navigateTo: false },
+      { signal: controller.signal },
+    )
+    setTimeout(() => controller.abort(), 0)
+    const result = await promise
+    return (result as { structuredContent?: Envelope }).structuredContent ?? result
+  }) as Promise<Envelope>
+
+  await page.getByRole('button', { name: '3 Simulate' }).click()
+  await expect(page.getByRole('button', { name: '2 Fit-out' })).toBeEnabled()
+  await expect(cancellation).resolves.toMatchObject({ ok: false, code: 'cancelled' })
+  await expect(page.getByRole('heading', { name: /Service simulation/i })).toBeVisible()
 })
 
 test('browsers without WebMCP keep the full interface with setup guidance', async ({ page }) => {

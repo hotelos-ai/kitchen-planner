@@ -35,4 +35,17 @@ describe('layout comparison workspace', () => {
 
     expect(screen.getByLabelText('Different room plan preview')).toHaveAttribute('viewBox', '-80 -80 8160 8160')
   })
+
+  it('prepares ReportView print and HTML export from the shared report generator', async () => {
+    render(<CompareWorkspace />)
+
+    await userEvent.click(screen.getByRole('button', { name: 'Report' }))
+
+    const generated = screen.getByTitle('Generated planning report for print').getAttribute('srcdoc') ?? ''
+    expect(generated).toMatch(/^<!doctype html>/)
+    expect(generated).toMatch(/<svg[\s\S]*Scenario and menu assumptions/)
+    expect(generated).toMatch(/Station utilization and queues[\s\S]*Ranked findings/)
+    expect(screen.getByRole('button', { name: 'Print / save PDF' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Export HTML' })).toBeInTheDocument()
+  })
 })

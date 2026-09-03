@@ -78,7 +78,7 @@ describe('WebMCP protocol conformance', () => {
     for (const tool of tools) {
       for (const key of Object.keys(tool.annotations ?? {})) expect(allowed.has(key)).toBe(true)
     }
-    for (const name of ['get_layout', 'get_simulation_guide', 'export_project', 'preview_layout_changes', 'apply_layout_changes', 'run_simulation']) {
+    for (const name of ['get_component_catalog', 'get_layout', 'get_simulation_guide', 'export_project', 'preview_layout_changes', 'apply_layout_changes', 'run_simulation']) {
       expect(tools.find((tool) => tool.name === name)?.annotations?.untrustedContentHint).toBe(true)
     }
     controller.dispose()

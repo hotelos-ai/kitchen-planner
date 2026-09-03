@@ -127,7 +127,7 @@ describe('webmcp tools', () => {
   })
 
   it('reads and navigates app state without changing the document revision', async () => {
-    const { store, call } = setup()
+    const { store, runStore, call } = setup()
     const revision = store.getState().revision
     const initial = await call('get_app_state', {})
     expect(initial).toMatchObject({
@@ -136,19 +136,83 @@ describe('webmcp tools', () => {
       stage: 'space',
       view: 'plan',
       overlay: null,
+      walkMode: false,
+      walkView: 'first-person',
+      cameraMode: 'perspective',
+      showClearances: false,
+      wallsTransparent: false,
+      showLabels: true,
+      simulationView: 'operations-2d',
+      panels: { catalog: true, inspector: true, essentials: false, revisions: false },
+      showReference: false,
+      dialogsOpen: [],
       selectedIds: [],
+      hasSimulationResult: false,
       canUndo: false,
       canRedo: false,
     })
 
-    const navigated = await call('set_app_view', { stage: 'simulate', view: 'scene', overlay: 'compare' })
-    expect(navigated).toMatchObject({ ok: true, revision, stage: 'simulate', view: 'scene', overlay: 'compare' })
+    const project = store.getState().project
+    runStore.getState().storeRun({
+      variantId: project.activeVariantId,
+      scenarioId: project.activeScenarioId,
+      result: {} as never,
+      seed: 1,
+      ranAtRevision: revision,
+    })
+    expect(await call('get_app_state', {})).toMatchObject({ hasSimulationResult: true })
+
+    const navigated = await call('set_app_view', {
+      stage: 'simulate',
+      view: 'scene',
+      overlay: 'compare',
+      walkMode: true,
+      walkView: 'third-person',
+      cameraMode: 'top',
+      showClearances: true,
+      wallsTransparent: true,
+      showLabels: false,
+      simulationView: 'walk',
+      panels: { catalog: false, essentials: true },
+      showReference: true,
+    })
+    expect(navigated).toMatchObject({
+      ok: true,
+      revision,
+      stage: 'simulate',
+      view: 'scene',
+      overlay: 'compare',
+      walkMode: true,
+      walkView: 'third-person',
+      cameraMode: 'top',
+      showClearances: true,
+      wallsTransparent: true,
+      showLabels: false,
+      simulationView: 'walk',
+      panels: { catalog: false, inspector: true, essentials: true, revisions: false },
+      showReference: true,
+    })
     expect(store.getState().revision).toBe(revision)
-    expect(appStateStore.getState()).toMatchObject({ stage: 'simulate', view: 'scene', overlay: 'compare' })
+    expect(appStateStore.getState()).toMatchObject({
+      stage: 'simulate',
+      view: 'scene',
+      overlay: 'compare',
+      walkMode: true,
+      walkView: 'third-person',
+      cameraMode: 'top',
+      showClearances: true,
+      wallsTransparent: true,
+      showLabels: false,
+      simulationView: 'walk',
+      panels: { catalog: false, inspector: true, essentials: true, revisions: false },
+      showReference: true,
+    })
 
     const closed = await call('set_app_view', { overlay: null })
     expect(closed).toMatchObject({ ok: true, stage: 'simulate', view: 'scene', overlay: null })
     expect(await call('set_app_view', {})).toMatchObject({ ok: false, code: 'invalid-input' })
+    expect(await call('set_app_view', { panels: {} })).toMatchObject({ ok: false, code: 'invalid-input' })
+    expect(await call('set_app_view', { dialogsOpen: ['help'] })).toMatchObject({ ok: false, code: 'invalid-input' })
     expect(await call('set_app_view', { drawer: 'catalog' })).toMatchObject({ ok: false, code: 'invalid-input' })
   })
 

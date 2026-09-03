@@ -56,8 +56,8 @@ const operationSchemaDescription: JsonSchemaObject = {
     expectedRevision: { type: 'number', description: 'The document revision you read via get_layout or get_workspace_guide; rejects concurrent writes.' },
     operations: {
       type: 'array',
-      description: 'Ordered batch of spatial operations executed atomically: add_component, add_custom_component, move_components, nudge_components, rotate_components, resize_component, update_component, duplicate_components, remove_components, update_architecture, update_scenario, create_layout, activate_layout, rename_layout, remove_layout, update_workspace_settings, and related kinds. Each is validated strictly; one failure rejects the whole batch.',
-      items: { type: 'object', description: 'One strict workspace operation. Call get_workspace_guide for the complete discriminated JSON Schema before constructing a batch.' },
+      description: 'Ordered atomic workspace batch. Call get_workspace_guide once for the complete discriminated operation JSON Schema and numeric constraints. Every item is validated strictly at execution; one failure rejects the whole batch.',
+      items: {},
     },
     intent: { type: 'string', description: 'Optional human-readable description of the change, recorded in history.' },
   },
@@ -131,7 +131,7 @@ export function createWriteTools(deps: WriteToolDependencies): WebMcpToolDefinit
       properties: {
         previewToken: { type: 'string', description: 'Single-use token from preview_layout_changes. Do not combine with direct batch fields.' },
         expectedRevision: { type: 'number', description: 'For direct apply, the latest revision read by the agent.' },
-        operations: { type: 'array', items: { type: 'object', description: 'One strict operation; exact discriminated schema is returned by get_workspace_guide.' }, description: 'For direct apply, 1–200 strict workspace operations committed atomically.' },
+        operations: { type: 'array', items: {}, description: 'For direct apply, 1–200 strict workspace operations committed atomically. The complete discriminated operation schema and numeric constraints are returned by get_workspace_guide.' },
         intent: { type: 'string', description: 'Optional human-readable intent recorded with a direct batch.' },
         idempotencyKey: { type: 'string', description: 'Required for direct apply. Reusing it with the same batch returns the original result; different content is rejected.' },
       },
@@ -169,6 +169,7 @@ export function createWriteTools(deps: WriteToolDependencies): WebMcpToolDefinit
             expectedRevision: parsed.value.expectedRevision!,
             operations: parsed.value.operations!,
             ...(parsed.value.intent === undefined ? {} : { intent: parsed.value.intent }),
+            source: 'agent',
           }) as PreviewResult | FacadeFailure
           if (isFacadeFailure(preview)) return { ...preview, recovery: applyRecoveryHint(preview.code) }
           previewToken = preview.previewToken
@@ -194,7 +195,8 @@ export function createWriteTools(deps: WriteToolDependencies): WebMcpToolDefinit
         if (visibleChangedIds.length > 0) committedState.selectItems(visibleChangedIds)
         if (result.intent) {
           appStateStore.getState().setLastAgentAction({
-            id: `agent-action-${result.revision}`,
+            id: `agent-action-${committedState.documentId}-${result.revision}`,
+            documentId: committedState.documentId,
             intent: result.intent,
             changedIds: [...result.changedIds],
             revision: result.revision,

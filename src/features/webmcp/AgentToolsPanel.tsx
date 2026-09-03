@@ -49,6 +49,10 @@ export function AgentToolsPanel({ onClose, controller: controllerProp }: AgentTo
   const controller = controllerProp ?? contextController
   const promptRef = useRef<HTMLPreElement>(null)
   const [copyState, setCopyState] = useState<'idle' | 'copied' | 'selected'>('idle')
+  const [retrying, setRetrying] = useState(false)
+  const [, setControllerVersion] = useState(0)
+
+  useEffect(() => controller?.subscribe(() => setControllerVersion((version) => version + 1)), [controller])
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -65,6 +69,15 @@ export function AgentToolsPanel({ onClose, controller: controllerProp }: AgentTo
   const tools = controller.getTools()
   const activity = controller.getActivity()
   const starterPrompt = controller.getStarterPrompt()
+
+  const retryRegistration = async () => {
+    setRetrying(true)
+    try {
+      await controller.register()
+    } finally {
+      setRetrying(false)
+    }
+  }
 
   const copyStarterPrompt = async () => {
     try {
@@ -97,12 +110,20 @@ export function AgentToolsPanel({ onClose, controller: controllerProp }: AgentTo
         <button type="button" className="ai-tools-close" aria-label="Close AI tools" onClick={onClose}>✕</button>
       </header>
 
-      {status !== 'available' && status !== 'partial' && (
-        <p className="ai-tools-guidance" role="note">{status === 'idle' ? statusMessage : SETUP_GUIDANCE}</p>
-      )}
-      {status === 'partial' && <p className="ai-tools-guidance" role="note">{statusMessage}</p>}
+      {status !== 'available' && <p className="ai-tools-guidance" role="note">{statusMessage}</p>}
+      {status === 'unavailable' && <p className="ai-tools-guidance secondary" role="note">{SETUP_GUIDANCE}</p>}
+      <div className="ai-tools-retry-row">
+        <button type="button" disabled={retrying} onClick={() => void retryRegistration()}>
+          {retrying ? 'Retrying registration…' : 'Retry registration'}
+        </button>
+      </div>
 
       <div className="ai-tools-body">
+        <section aria-label="Agent tool scope">
+          <h3>Tool scope</h3>
+          <p>Tools act only in this tab and this document. They cannot upload or transmit files, or reach other sites.</p>
+        </section>
+
         <section aria-label="Reference image policy">
           <h3>Who sees your images</h3>
           <p>{IMAGE_POLICY}</p>
@@ -132,6 +153,7 @@ export function AgentToolsPanel({ onClose, controller: controllerProp }: AgentTo
               <li key={tool.name}>
                 <span className={`ai-tools-tool-badge${tool.readOnly ? ' read' : ' write'}`}>{tool.readOnly ? 'read' : 'write'}</span>
                 <code>{tool.name}</code>
+                {tool.untrustedContentHint && <span className="ai-tools-untrusted-badge">untrusted content</span>}
               </li>
             ))}
           </ul>

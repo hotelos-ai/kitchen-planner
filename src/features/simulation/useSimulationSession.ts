@@ -31,7 +31,7 @@ export type SimulationSessionTarget = {
 
 type UseSimulationSessionInput = {
   input: SimulationInput
-  run: (input: SimulationInput) => SimulationResult
+  run: (input: SimulationInput, signal?: AbortSignal) => SimulationResult | Promise<SimulationResult>
   variantId?: string
   scenarioId?: string
   revision?: number
@@ -56,6 +56,7 @@ export function useSimulationSession({
   const lastTick = useRef(0)
   const lastResult = useRef(result)
   const locallyStartedResult = useRef<SimulationResult | null>(null)
+  const activeRun = useRef<AbortController | null>(null)
   const liveState = useMemo(() => result ? deriveLiveServiceState(result, elapsedSeconds) : null, [elapsedSeconds, result])
 
   useEffect(() => {
@@ -87,22 +88,40 @@ export function useSimulationSession({
     return () => cancelAnimationFrame(frameId)
   }, [playing, result, speed])
 
+  useEffect(() => () => activeRun.current?.abort(), [])
+
   return {
     result, liveState, elapsedSeconds, playing, speed,
     startRun: (inputOverride, autoplay = true, targetOverride) => {
       const simulationInput = inputOverride ?? input
-      const nextResult = run(simulationInput)
-      locallyStartedResult.current = nextResult
+      activeRun.current?.abort()
+      const controller = new AbortController()
+      activeRun.current = controller
       const target = targetOverride ?? { variantId, scenarioId, revision }
-      runStore.getState().storeRun({
-        variantId: target.variantId,
-        scenarioId: target.scenarioId,
-        result: nextResult,
-        seed: simulationInput.scenario.seed,
-        ranAtRevision: target.revision,
-      })
       setElapsedSeconds(0)
-      setPlaying(autoplay)
+      setPlaying(false)
+      let pending: SimulationResult | Promise<SimulationResult>
+      try {
+        pending = run.length >= 2 ? run(simulationInput, controller.signal) : run(simulationInput)
+      } catch {
+        if (activeRun.current === controller) activeRun.current = null
+        return
+      }
+      void Promise.resolve(pending).then((nextResult) => {
+        if (controller.signal.aborted) return
+        locallyStartedResult.current = nextResult
+        runStore.getState().storeRun({
+          variantId: target.variantId,
+          scenarioId: target.scenarioId,
+          result: nextResult,
+          seed: simulationInput.scenario.seed,
+          ranAtRevision: target.revision,
+        })
+        setElapsedSeconds(0)
+        setPlaying(autoplay)
+      }).catch(() => undefined).finally(() => {
+        if (activeRun.current === controller) activeRun.current = null
+      })
     },
     presentRun: (autoplay = true) => {
       setElapsedSeconds(0)

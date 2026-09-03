@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState, type ComponentType } from 'react'
 import { useStore } from 'zustand'
 import type { StaffRole } from '../../domain/project'
-import { runSimulation } from '../../simulation/engine'
+import { runSimulationResponsive } from '../../simulation/responsive-runner'
 import type { SimulationInput, SimulationResult } from '../../simulation/types'
 import { validateSimulationInput } from '../../simulation/validation'
 import { getActiveVariant, projectStore, type ProjectStore } from '../../state/project-store'
@@ -19,14 +19,14 @@ import { ScenarioEditor } from './ScenarioEditor'
 import { Scorecard } from './Scorecard'
 import { SimulationScene } from './SimulationScene'
 import { SimulationThreeScene, type SimulationThreeSceneProps } from './SimulationThreeScene'
-import { SimulationViewSwitcher, type SimulationView } from './SimulationViewSwitcher'
+import { SimulationViewSwitcher } from './SimulationViewSwitcher'
 import { WaitTimeDistribution } from './WaitTimeDistribution'
 import { useSimulationSession } from './useSimulationSession'
 import { ConfidenceLedger, SimulationSetup, StressTestPresets } from './SimulationSetup'
 
 type Props = {
   store?: ProjectStore
-  run?: (input: SimulationInput) => SimulationResult
+  run?: (input: SimulationInput, signal?: AbortSignal) => SimulationResult | Promise<SimulationResult>
   runStore?: SimulationRunStore
   threeRenderer?: ComponentType<SimulationThreeSceneProps>
 }
@@ -39,7 +39,7 @@ const minutes = (seconds: number) => {
 
 export function SimulationWorkspace({
   store = projectStore,
-  run = runSimulation,
+  run = (input, signal) => runSimulationResponsive(input, { signal }),
   runStore = simulationRunStore,
   threeRenderer: ThreeRenderer = SimulationThreeScene,
 }: Props) {
@@ -53,7 +53,8 @@ export function SimulationWorkspace({
   const requestedRun = useStore(appStateStore, (state) => state.requestedSimulationRun)
   const [layers, setLayers] = useState<Layers>({ heatmap: true, trails: true, queues: true, clearances: false, flows: true, labels: true })
   const [followRole, setFollowRole] = useState<StaffRole | 'overview'>('overview')
-  const [view, setView] = useState<SimulationView>('operations-2d')
+  const view = useStore(appStateStore, (state) => state.simulationView)
+  const setView = useStore(appStateStore, (state) => state.setSimulationView)
   const [scenarioCollapsed, setScenarioCollapsed] = useState(false)
   const staffCount = scenario.staff.reduce((sum, entry) => sum + entry.count, 0)
   const validationErrors = useMemo(() => validateSimulationInput({

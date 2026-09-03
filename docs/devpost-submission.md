@@ -24,7 +24,7 @@ A kitchen layout is too precise for screenshot clicking and too visual for a hea
 
 ## Implementation summary
 
-CalmKitchen is a React/TypeScript browser application deployed as static assets on Cloudflare Workers. It registers 26 strict-schema tools through `document.modelContext` and falls back to the legacy navigator surface. Tool results use interoperable MCP text and structured content with explicit error flags and a 256 KiB cap. Registration retries transient failures, reconciles unexpected tool removal, and restores across back/forward cache navigation. Project writes pass through the same Zod-validated workspace facade as human edits, use optimistic revision checks, and produce one undo step. Simulation and optimization use deterministic seeds so agents and people see reproducible evidence.
+CalmKitchen is a React/TypeScript browser application deployed as static assets on Cloudflare Workers. It registers 26 strict-schema tools through `document.modelContext` and falls back to the legacy navigator surface. Tool results use interoperable MCP text and structured content with explicit error flags and a 256 KiB cap. Registration retries transient failures, reconciles unexpected tool removal, and restores across back/forward cache navigation. Project writes pass through the same Zod-validated workspace facade as human edits, use optimistic revision checks, and produce one labeled, undoable history step. High-cover simulation runs move off the UI thread into an abortable Web Worker while preserving the exact deterministic result shared by the app and agent. A stable error taxonomy supplies recovery guidance, and self-contained reports carry assumptions, metrics, station evidence, ranked findings, and the SVG plan.
 
 ## Three-minute demo script
 
@@ -38,7 +38,7 @@ Open **AI tools**. Show the registered-tool count and live activity. Ask the age
 
 ### 0:45–1:20 — Shared visible editing
 
-Prompt: “Create a prep table beside the cold line, keep the aisle clear, and show me the change in 3D.” The agent should use placement guidance, preview/apply, selection, and camera focus. Show the selected item, agent intent toast, and one-click Undo. Emphasize that the user never leaves the shared canvas.
+Prompt: “Create a prep table beside the cold line, keep the aisle clear, and show me the change in 3D.” The agent should use placement guidance, preview/apply, selection, and camera focus. Show the selected item, agent intent toast, the labeled Agent entry in Revision History, and one-click Undo. Emphasize that the user never leaves the shared canvas.
 
 ### 1:20–1:55 — Operational intelligence
 
@@ -72,4 +72,3 @@ Say: “WebMCP turns a complex professional canvas into a trustworthy shared ins
 - Public YouTube demo shorter than three minutes with audio.
 - Paste the description above and cover WebMCP fit, user experience, human-agent collaboration, and implementation.
 - Verify an anonymous/incognito visitor can open both app and repository.
-

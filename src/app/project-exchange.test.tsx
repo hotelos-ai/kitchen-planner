@@ -5,6 +5,9 @@ import { createSeedProject } from '../domain/seed-project'
 import { createWorkspaceFacade } from '../core/workspace/workspace-facade'
 import { exportProject } from '../state/persistence'
 import { createProjectStore, projectStore } from '../state/project-store'
+import { createSimulationRunStore } from '../state/simulation-run-store'
+import { emptyMetrics } from '../simulation/metrics'
+import type { SimulationResult } from '../simulation/types'
 import { ProjectExchange } from './ProjectExchange'
 
 describe('project exchange', () => {
@@ -72,6 +75,49 @@ describe('project exchange', () => {
     expect(clickedDownload).toBe('kitchen-1-report.html')
     expect(await exportedBlob!.text()).toMatch(/<svg[\s\S]*Equipment schedule[\s\S]*Professional review required/)
     expect(screen.queryByRole('menuitem', { name: /current view as image/i })).not.toBeInTheDocument()
+  })
+
+  it('includes the current stored simulation evidence in the exported report', async () => {
+    const store = createProjectStore(createSeedProject())
+    const runStore = createSimulationRunStore()
+    const project = store.getState().project
+    const metrics = emptyMetrics()
+    Object.assign(metrics, {
+      totalOrders: 12,
+      completedOrders: 10,
+      stationUtilization: { dishwasher: .82 },
+      queueSeconds: { dishwasher: 180 },
+    })
+    const result: SimulationResult = {
+      seed: project.scenarios[0].seed,
+      durationSeconds: 3600,
+      metrics,
+      warnings: [],
+      frames: [],
+      events: [],
+      taskTimeline: [],
+      orders: [],
+    }
+    runStore.getState().storeRun({
+      variantId: project.activeVariantId,
+      scenarioId: project.activeScenarioId,
+      result,
+      seed: result.seed,
+      ranAtRevision: store.getState().revision,
+    })
+    let exportedBlob: Blob | undefined
+    vi.stubGlobal('URL', {
+      ...URL,
+      createObjectURL: vi.fn((blob: Blob) => { exportedBlob = blob; return 'blob:simulation-report' }),
+      revokeObjectURL: vi.fn(),
+    })
+    vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => undefined)
+
+    render(<ProjectExchange store={store} runStore={runStore} />)
+    await userEvent.click(screen.getByRole('button', { name: 'Export' }))
+    await userEvent.click(screen.getByRole('menuitem', { name: 'Export simulation report' }))
+
+    expect(await exportedBlob!.text()).toMatch(/Station utilization and queues[\s\S]*Dishwasher[\s\S]*82%[\s\S]*3\.0 min/)
   })
 
   it('copies a scoped deep link for the active project and workspace view', async () => {

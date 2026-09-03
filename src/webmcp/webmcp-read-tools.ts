@@ -3,6 +3,7 @@ import type { WorkspaceFacade } from '../core/workspace/workspace-facade'
 import { WORKSPACE_OPERATION_TYPES } from '../core/workspace/workspace-operation'
 import { analyzeLayout, type LayoutIssue } from '../domain/layout-diagnostics'
 import type { CapabilityManifest } from './capability-manifest'
+import { WEBMCP_ERROR_TAXONOMY } from './error-taxonomy'
 import type { JsonSchemaObject, WebMcpToolDefinition } from './model-context'
 import { workspaceOperationJsonSchema } from './webmcp-write-tools'
 import {
@@ -95,6 +96,7 @@ export function createReadTools(deps: ReadToolDependencies): WebMcpToolDefinitio
           uncertaintyGuidance: deps.manifest.uncertaintyGuidance,
           supportedOperations: [...WORKSPACE_OPERATION_TYPES],
           operationSchema: structuredClone(workspaceOperationJsonSchema),
+          errorCodeTaxonomy: WEBMCP_ERROR_TAXONOMY.map((entry) => ({ ...entry })),
           tools: deps.getToolSummaries(),
           limitations: [...deps.manifest.limitations],
         })

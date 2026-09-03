@@ -2,8 +2,9 @@ import { useEffect, useState, type ChangeEvent } from 'react'
 import { useStore } from 'zustand'
 import { exportProject, importProject } from '../state/persistence'
 import { projectStore, type ProjectStore } from '../state/project-store'
-import { buildReportHtml } from '../webmcp/project-artifacts'
+import { downloadArtifact, projectArtifact } from '../webmcp/project-artifacts'
 import { appStateStore } from '../state/app-state-store'
+import { selectSimulationRun, simulationRunStore, type SimulationRunStore } from '../state/simulation-run-store'
 import { buildWorkspaceDeepLink } from './workspace-deep-link'
 
 const TOUR_STEPS = [
@@ -24,8 +25,10 @@ function downloadText(filename: string, contents: string, type = 'application/js
   setTimeout(() => URL.revokeObjectURL(url), 0)
 }
 
-export function ProjectExchange({ store = projectStore, onTourFocus }: { store?: ProjectStore; onTourFocus?(step: number): void }) {
+export function ProjectExchange({ store = projectStore, runStore = simulationRunStore, onTourFocus }: { store?: ProjectStore; runStore?: SimulationRunStore; onTourFocus?(step: number): void }) {
   const project = useStore(store, (state) => state.project)
+  const revision = useStore(store, (state) => state.revision)
+  const storedRun = useStore(runStore, (state) => selectSimulationRun(state, project.activeVariantId, project.activeScenarioId))
   const [message, setMessage] = useState<{ kind: 'status' | 'error'; text: string } | null>(null)
   const [showHelp, setShowHelp] = useState(false)
   const [showExport, setShowExport] = useState(false)
@@ -53,15 +56,21 @@ export function ProjectExchange({ store = projectStore, onTourFocus }: { store?:
   }
   const exportSchedule = () => {
     const variant = project.variants.find((entry) => entry.id === project.activeVariantId) ?? project.variants[0]
-    const rows = ['Item,Category,Width mm,Depth mm,X mm,Y mm', ...variant.equipment.map((item) => `${item.label},${item.category},${item.widthMm},${item.depthMm},${item.xMm},${item.yMm}`)]
-    downloadText(`${slug}-equipment-schedule.csv`, rows.join('\n'), 'text/csv')
+    downloadArtifact(projectArtifact({ project, variant, revision, format: 'equipment-schedule-csv' }))
     setShowExport(false)
     setMessage({ kind: 'status', text: 'Equipment schedule exported.' })
   }
   const exportReport = () => {
     const variant = project.variants.find((entry) => entry.id === project.activeVariantId) ?? project.variants[0]
-    const html = buildReportHtml({ project, variant })
-    downloadText(`${slug}-report.html`, html, 'text/html')
+    const scenario = project.scenarios.find((entry) => entry.id === project.activeScenarioId) ?? project.scenarios[0]
+    downloadArtifact(projectArtifact({
+      project,
+      variant,
+      revision,
+      format: 'report-html',
+      scenario,
+      simulation: storedRun?.ranAtRevision === revision ? storedRun.result : null,
+    }))
     setShowExport(false)
     setMessage({ kind: 'status', text: 'Report exported.' })
   }

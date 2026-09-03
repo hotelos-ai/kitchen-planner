@@ -27,11 +27,11 @@ export type WebMcpToolDependencies = ToolDependencies & {
 export function createWebMcpTools(deps: WebMcpToolDependencies): WebMcpToolDefinition[] {
   const manifest = deps.manifest ?? kitchenCapabilityManifest
   const readTools = createReadTools({ store: deps.store, getFacade: deps.getFacade, manifest, getToolSummaries: () => [] })
-  const appTools = createAppTools({ store: deps.store })
+  const appTools = createAppTools({ store: deps.store, runStore: deps.runStore })
   const analysisTools = createAnalysisTools({ store: deps.store, getFacade: deps.getFacade })
   const writeTools = createWriteTools({ store: deps.store, getFacade: deps.getFacade })
   const runTools = createRunTools({ store: deps.store, getFacade: deps.getFacade, runStore: deps.runStore })
-  const lifecycleTools = createLifecycleTools({ store: deps.store })
+  const lifecycleTools = createLifecycleTools({ store: deps.store, runStore: deps.runStore })
   const sharingTools = createSharingTools({ store: deps.store, runStore: deps.runStore })
   const layoutIntelligenceTools = createLayoutIntelligenceTools({ store: deps.store, getFacade: deps.getFacade })
   const architectureTools = createArchitectureTools({ store: deps.store, getFacade: deps.getFacade })

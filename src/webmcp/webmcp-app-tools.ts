@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { appStateStore } from '../state/app-state-store'
+import { selectSimulationRun, simulationRunStore, type SimulationRunStore } from '../state/simulation-run-store'
 import type { JsonSchemaObject, WebMcpToolDefinition } from './model-context'
 import {
   currentRevision,
@@ -17,9 +18,34 @@ const setAppViewInput = z.object({
   view: z.enum(['plan', 'scene', 'split']).optional(),
   overlay: z.enum(['compare', 'auto-layout']).nullable().optional(),
   walkMode: z.boolean().optional(),
+  walkView: z.enum(['first-person', 'third-person']).optional(),
   cameraMode: z.enum(['perspective', 'top']).optional(),
+  showClearances: z.boolean().optional(),
+  wallsTransparent: z.boolean().optional(),
+  showLabels: z.boolean().optional(),
+  simulationView: z.enum(['operations-2d', 'overview-3d', 'walk']).optional(),
+  panels: z.object({
+    catalog: z.boolean().optional(),
+    inspector: z.boolean().optional(),
+    essentials: z.boolean().optional(),
+    revisions: z.boolean().optional(),
+  }).strict().refine((panels) => Object.keys(panels).length > 0, { message: 'Provide at least one panel field.' }).optional(),
+  showReference: z.boolean().optional(),
 }).strict().refine(
-  ({ stage, view, overlay, walkMode, cameraMode }) => stage !== undefined || view !== undefined || overlay !== undefined || walkMode !== undefined || cameraMode !== undefined,
+  ({ stage, view, overlay, walkMode, walkView, cameraMode, showClearances, wallsTransparent, showLabels, simulationView, panels, showReference }) => (
+    stage !== undefined
+    || view !== undefined
+    || overlay !== undefined
+    || walkMode !== undefined
+    || walkView !== undefined
+    || cameraMode !== undefined
+    || showClearances !== undefined
+    || wallsTransparent !== undefined
+    || showLabels !== undefined
+    || simulationView !== undefined
+    || panels !== undefined
+    || showReference !== undefined
+  ),
   { message: 'Provide at least one view field.' },
 )
 
@@ -43,19 +69,33 @@ const focusCameraInput = z.object({
   if (input.target === 'point' && !input.point) context.addIssue({ code: 'custom', path: ['point'], message: 'point is required for point focus.' })
 })
 
-const appStatePayload = (deps: ToolDependencies) => {
+type AppToolDependencies = ToolDependencies & { runStore?: SimulationRunStore }
+
+const appStatePayload = (deps: AppToolDependencies) => {
   const projectState = deps.store.getState()
   const appState = appStateStore.getState()
+  const variantId = appState.simulationViewTarget?.variantId ?? projectState.project.activeVariantId
+  const scenarioId = appState.simulationViewTarget?.scenarioId ?? projectState.project.activeScenarioId
+  const runStore = deps.runStore ?? simulationRunStore
   return {
     documentId: projectState.documentId,
     stage: appState.stage,
     view: appState.view,
     overlay: appState.overlay,
     walkMode: appState.walkMode,
+    walkView: appState.walkView,
     cameraMode: appState.cameraMode,
+    showClearances: appState.showClearances,
+    wallsTransparent: appState.wallsTransparent,
+    showLabels: appState.showLabels,
+    simulationView: appState.simulationView,
+    panels: { ...appState.panels },
+    showReference: appState.showReference,
+    dialogsOpen: [...appState.dialogsOpen],
     activeVariantId: projectState.project.activeVariantId,
     activeScenarioId: projectState.project.activeScenarioId,
     selectedIds: [...projectState.selectedIds],
+    hasSimulationResult: selectSimulationRun(runStore.getState(), variantId, scenarioId) !== null,
     canUndo: projectState.past.length > 0,
     canRedo: projectState.future.length > 0,
   }
@@ -72,18 +112,39 @@ const setAppViewSchema: JsonSchemaObject = {
       enum: ['compare', 'auto-layout', null],
       description: 'Optional workspace overlay. Pass null to close the active overlay.',
     },
-    walkMode: { type: 'boolean', description: 'Enter or exit the first-person kitchen walk mode.' },
+    walkMode: { type: 'boolean', description: 'Enter or exit kitchen walk mode.' },
+    walkView: { type: 'string', enum: ['first-person', 'third-person'], description: 'Set the kitchen walk camera to first-person or third-person.' },
     cameraMode: { type: 'string', enum: ['perspective', 'top'], description: 'Set the 3D camera projection preset.' },
+    showClearances: { type: 'boolean', description: 'Show or hide equipment and opening clearance overlays in the 3D scene.' },
+    wallsTransparent: { type: 'boolean', description: 'Render the 3D room walls as transparent or opaque.' },
+    showLabels: { type: 'boolean', description: 'Show or hide labels in the 3D scene.' },
+    simulationView: {
+      type: 'string',
+      enum: ['operations-2d', 'overview-3d', 'walk'],
+      description: 'Set the simulation result view to 2D operations, 3D overview, or first-person walk mode.',
+    },
+    panels: {
+      type: 'object',
+      additionalProperties: false,
+      properties: {
+        catalog: { type: 'boolean', description: 'Show or hide the component catalog.' },
+        inspector: { type: 'boolean', description: 'Show or hide the inspector.' },
+        essentials: { type: 'boolean', description: 'Show or hide operational essentials in the inspector.' },
+        revisions: { type: 'boolean', description: 'Show or hide revision history in the inspector.' },
+      },
+      description: 'Patch one or more panel visibility flags. Omitted flags remain unchanged.',
+    },
+    showReference: { type: 'boolean', description: 'Show or hide the source reference overlay in the plan.' },
   },
   description: 'Provide at least one field. Omitted fields keep their current values.',
 }
 
-export function createAppTools(deps: ToolDependencies): WebMcpToolDefinition[] {
+export function createAppTools(deps: AppToolDependencies): WebMcpToolDefinition[] {
   const getAppState: WebMcpToolDefinition = {
     name: 'get_app_state',
     title: 'Get app state',
     description:
-      'Read the current visible workflow stage, plan/3D view, overlay, active layout and scenario, component selection, and undo/redo availability. This does not change the workspace.',
+      'Read the current visible workflow stage, plan/3D and simulation views, 3D scene controls, overlays, panels, open dialogs, source reference visibility, active layout and scenario, component selection, simulation-result availability, and undo/redo availability. This does not change the workspace.',
     inputSchema: {
       type: 'object',
       additionalProperties: false,
@@ -106,7 +167,7 @@ export function createAppTools(deps: ToolDependencies): WebMcpToolDefinition[] {
     name: 'set_app_view',
     title: 'Set app view',
     description:
-      'Navigate the visible app by setting its workflow stage, plan/3D view, or compare/auto-layout overlay. Omitted fields remain unchanged; pass overlay null to close an overlay. This does not change the document revision.',
+      'Navigate the visible app by setting its workflow stage, plan/3D or simulation view, 3D scene controls, overlay, panels, or source reference visibility. Omitted fields remain unchanged; pass overlay null to close an overlay. Open dialogs are reported but cannot be controlled by agents. This does not change the document revision.',
     inputSchema: setAppViewSchema,
     execute: (input) => {
       try {
@@ -117,7 +178,14 @@ export function createAppTools(deps: ToolDependencies): WebMcpToolDefinition[] {
         if (parsed.value.view !== undefined) appStateStore.getState().setView(parsed.value.view)
         if (parsed.value.overlay !== undefined) appStateStore.getState().setOverlay(parsed.value.overlay)
         if (parsed.value.walkMode !== undefined) appStateStore.getState().setWalkMode(parsed.value.walkMode)
+        if (parsed.value.walkView !== undefined) appStateStore.getState().setWalkView(parsed.value.walkView)
         if (parsed.value.cameraMode !== undefined) appStateStore.getState().setCameraMode(parsed.value.cameraMode)
+        if (parsed.value.showClearances !== undefined) appStateStore.getState().setShowClearances(parsed.value.showClearances)
+        if (parsed.value.wallsTransparent !== undefined) appStateStore.getState().setWallsTransparent(parsed.value.wallsTransparent)
+        if (parsed.value.showLabels !== undefined) appStateStore.getState().setShowLabels(parsed.value.showLabels)
+        if (parsed.value.simulationView !== undefined) appStateStore.getState().setSimulationView(parsed.value.simulationView)
+        if (parsed.value.panels !== undefined) appStateStore.getState().setPanels(parsed.value.panels)
+        if (parsed.value.showReference !== undefined) appStateStore.getState().setShowReference(parsed.value.showReference)
         return success(currentRevision(deps), appStatePayload(deps))
       } catch (error) {
         return failure(currentRevision(deps), 'internal-error', unknownErrorMessage(error))

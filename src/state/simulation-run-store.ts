@@ -14,11 +14,14 @@ export type StoredSimulationRun = {
 
 export type StoreSimulationRunInput = Omit<StoredSimulationRun, 'ranAt'> & {
   ranAt?: string
+  /** False retains the run for reads without replacing the visible playback result. */
+  active?: boolean
 }
 
 export interface SimulationRunState {
   runs: Record<string, StoredSimulationRun>
   leastRecentlyUsed: string[]
+  activeRunKey: string | null
   storeRun(input: StoreSimulationRunInput): StoredSimulationRun
   removeRun(variantId: string, scenarioId: string): void
   clear(): void
@@ -34,24 +37,45 @@ export const selectSimulationRun = (
   scenarioId: string,
 ): StoredSimulationRun | null => state.runs[simulationRunKey(variantId, scenarioId)] ?? null
 
+const withoutPlaybackFrames = (run: StoredSimulationRun): StoredSimulationRun => {
+  if (run.result.frames.length === 0) return run
+  return {
+    ...run,
+    result: {
+      ...run.result,
+      frames: [],
+    },
+  }
+}
+
 export function createSimulationRunStore(): SimulationRunStore {
   return createStore<SimulationRunState>((set) => ({
     runs: {},
     leastRecentlyUsed: [],
+    activeRunKey: null,
     storeRun: (input) => {
+      const { active = true, ...runInput } = input
       const stored: StoredSimulationRun = {
-        ...input,
+        ...runInput,
         ranAt: input.ranAt ?? new Date().toISOString(),
       }
       const key = simulationRunKey(input.variantId, input.scenarioId)
       set((state) => {
         const leastRecentlyUsed = [...state.leastRecentlyUsed.filter((candidate) => candidate !== key), key]
         const runs = { ...state.runs, [key]: stored }
+        const activeRunKey = active ? key : (state.activeRunKey ?? key)
+        // Only the active run needs its potentially large playback series.
+        // Historical entries retain their aggregates and evidence for WebMCP
+        // reads without keeping duplicate frame sets.
+        for (const candidate of leastRecentlyUsed) {
+          if (candidate !== activeRunKey && runs[candidate]) runs[candidate] = withoutPlaybackFrames(runs[candidate])
+        }
         while (leastRecentlyUsed.length > MAX_STORED_SIMULATION_RUNS) {
-          const evicted = leastRecentlyUsed.shift()
+          const evictionIndex = leastRecentlyUsed.findIndex((candidate) => candidate !== activeRunKey)
+          const [evicted] = leastRecentlyUsed.splice(evictionIndex < 0 ? 0 : evictionIndex, 1)
           if (evicted) delete runs[evicted]
         }
-        return { runs, leastRecentlyUsed }
+        return { runs, leastRecentlyUsed, activeRunKey }
       })
       return stored
     },
@@ -64,10 +88,11 @@ export function createSimulationRunStore(): SimulationRunStore {
         return {
           runs,
           leastRecentlyUsed: state.leastRecentlyUsed.filter((candidate) => candidate !== key),
+          activeRunKey: state.activeRunKey === key ? null : state.activeRunKey,
         }
       })
     },
-    clear: () => set({ runs: {}, leastRecentlyUsed: [] }),
+    clear: () => set({ runs: {}, leastRecentlyUsed: [], activeRunKey: null }),
   }))
 }
 

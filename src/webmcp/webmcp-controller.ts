@@ -26,6 +26,7 @@ export type WebMcpToolSummary = {
   name: string
   description: string
   readOnly: boolean
+  untrustedContentHint: boolean
 }
 
 export type WebMcpController = {
@@ -54,6 +55,7 @@ export const REGISTRATION_RETRY_DELAYS_MS = [0, 250, 750, 2_000, 5_000] as const
 const UNTRUSTED_CONTENT_TOOLS = new Set([
   'get_app_state',
   'select_components',
+  'get_component_catalog',
   'get_layout',
   'analyze_layout',
   'get_simulation_guide',
@@ -111,6 +113,7 @@ export function createWebMcpController(deps: WebMcpControllerDependencies): WebM
     name: tool.name,
     description: tool.description,
     readOnly: tool.annotations?.readOnlyHint === true,
+    untrustedContentHint: tool.annotations?.untrustedContentHint === true,
   }))
   const starterPrompt = starterPromptFor(baseTools.map((tool) => tool.name))
 

@@ -1,4 +1,6 @@
-export type SimulationView = 'operations-2d' | 'overview-3d' | 'walk'
+import type { AppSimulationView } from '../../state/app-state-store'
+
+export type SimulationView = AppSimulationView
 
 const VIEWS: readonly { id: SimulationView; label: string }[] = [
   { id: 'operations-2d', label: '2D Operations' },

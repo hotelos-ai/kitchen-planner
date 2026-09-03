@@ -46,4 +46,56 @@ describe('simulation run store', () => {
     expect(selectSimulationRun(store.getState(), 'layout-0', 'dinner')).toBeNull()
     expect(store.getState().leastRecentlyUsed).toEqual(['layout-1:dinner', 'layout-2:dinner', 'layout-3:dinner'])
   })
+
+  it('drops playback frames from non-active LRU entries while preserving the exact active result', () => {
+    const store = createSimulationRunStore()
+    const inactive = resultFor(21)
+    const active = resultFor(22)
+
+    store.getState().storeRun({
+      variantId: 'layout-a',
+      scenarioId: 'dinner',
+      result: inactive,
+      seed: 21,
+      ranAtRevision: 1,
+    })
+    store.getState().storeRun({
+      variantId: 'layout-b',
+      scenarioId: 'dinner',
+      result: active,
+      seed: 22,
+      ranAtRevision: 1,
+    })
+
+    const retainedInactive = selectSimulationRun(store.getState(), 'layout-a', 'dinner')
+    expect(inactive.frames.length).toBeGreaterThan(0)
+    expect(retainedInactive?.result).not.toBe(inactive)
+    expect(retainedInactive?.result.frames).toEqual([])
+    expect(retainedInactive?.result.metrics).toBe(inactive.metrics)
+    expect(selectSimulationRun(store.getState(), 'layout-b', 'dinner')?.result).toBe(active)
+    expect(active.frames.length).toBeGreaterThan(0)
+  })
+
+  it('keeps the active playback result exact when a background run is stored and evicts another history entry first', () => {
+    const store = createSimulationRunStore()
+    const active = resultFor(31)
+    store.getState().storeRun({ variantId: 'layout-active', scenarioId: 'dinner', result: active, seed: 31, ranAtRevision: 1 })
+
+    for (let index = 0; index < MAX_STORED_SIMULATION_RUNS; index += 1) {
+      store.getState().storeRun({
+        variantId: `layout-background-${index}`,
+        scenarioId: 'dinner',
+        result: resultFor(40 + index),
+        seed: 40 + index,
+        ranAtRevision: 1,
+        active: false,
+      })
+    }
+
+    expect(store.getState().activeRunKey).toBe('layout-active:dinner')
+    expect(selectSimulationRun(store.getState(), 'layout-active', 'dinner')?.result).toBe(active)
+    expect(selectSimulationRun(store.getState(), 'layout-active', 'dinner')?.result.frames.length).toBeGreaterThan(0)
+    expect(selectSimulationRun(store.getState(), 'layout-background-0', 'dinner')).toBeNull()
+    expect(selectSimulationRun(store.getState(), 'layout-background-2', 'dinner')?.result.frames).toEqual([])
+  })
 })

@@ -41,6 +41,15 @@ export function App() {
   const setView = useStore(appStateStore, (state) => state.setView)
   const setOverlay = useStore(appStateStore, (state) => state.setOverlay)
   const toggleOverlay = useStore(appStateStore, (state) => state.toggleOverlay)
+  const showReference = useStore(appStateStore, (state) => state.showReference)
+  const setShowReference = useStore(appStateStore, (state) => state.setShowReference)
+  const catalogOpen = useStore(appStateStore, (state) => state.panels.catalog)
+  const inspectorOpen = useStore(appStateStore, (state) => state.panels.inspector)
+  const essentialsOpen = useStore(appStateStore, (state) => state.panels.essentials)
+  const revisionsOpen = useStore(appStateStore, (state) => state.panels.revisions)
+  const setPanels = useStore(appStateStore, (state) => state.setPanels)
+  const dialogsOpen = useStore(appStateStore, (state) => state.dialogsOpen)
+  const setDialogOpen = useStore(appStateStore, (state) => state.setDialogOpen)
   const agentIntent = useStore(appStateStore, (state) => state.agentIntent)
   const lastAgentAction = useStore(appStateStore, (state) => state.lastAgentAction)
   const clearLastAgentAction = useStore(appStateStore, (state) => state.clearLastAgentAction)
@@ -51,13 +60,10 @@ export function App() {
   const canUndo = useStore(projectStore, (state) => state.past.length > 0)
   const canRedo = useStore(projectStore, (state) => state.future.length > 0)
 
-  const [showReference, setShowReference] = useState(false)
-  const [catalogOpen, setCatalogOpen] = useState(true)
-  const [inspectorOpen, setInspectorOpen] = useState(true)
-  const [wizardOpen, setWizardOpen] = useState(false)
+  const wizardOpen = dialogsOpen.includes('layout-wizard')
+  const helpOpen = dialogsOpen.includes('help')
+  const aiToolsOpen = dialogsOpen.includes('agent-tools')
   const [wizardStartsAtRoom, setWizardStartsAtRoom] = useState(false)
-  const [essentialsOpen, setEssentialsOpen] = useState(false)
-  const [revisionsOpen, setRevisionsOpen] = useState(false)
   const [sourceImageUrl, setSourceImageUrl] = useState('/reference/kitchen-sketch.png')
   const [closedLayout, setClosedLayout] = useState<{ name: string; revision: number; undo(): boolean } | null>(null)
   const [showStartScreen, setShowStartScreen] = useState(() => {
@@ -72,7 +78,6 @@ export function App() {
       ?? localStorage.getItem(LEGACY_LAST_GOOD_PROJECT_KEY)
     ) && !hasMatchingDeepLink
   })
-  const [helpOpen, setHelpOpen] = useState(false)
 
   useEffect(() => () => appStateStore.getState().reset(), [])
 
@@ -91,8 +96,6 @@ export function App() {
     localStorage.setItem(SESSION_FLAG_KEY, '1')
     setShowStartScreen(false)
   }
-  const [aiToolsOpen, setAiToolsOpen] = useState(false)
-
   const dragResizeEnabled = Boolean(selectedItem && !selectedItem.dimensionsLocked)
   const canCompare = project.variants.length >= 2 || project.scenarios.length >= 2
   const showAutoLayout = stage !== 'space'
@@ -125,7 +128,7 @@ export function App() {
     }
   }, [])
 
-  const openWizard = () => { setWizardStartsAtRoom(false); setWizardOpen(true) }
+  const openWizard = () => { setWizardStartsAtRoom(false); setDialogOpen('layout-wizard', true) }
 
   useEffect(() => {
     if (showStartScreen) return
@@ -157,7 +160,7 @@ export function App() {
           onOpenCompare={() => toggleOverlay('compare')}
           onOpenAutoLayout={() => toggleOverlay('auto-layout')}
           aiToolsOpen={aiToolsOpen}
-          onOpenAiTools={() => setAiToolsOpen((open) => !open)}
+          onOpenAiTools={() => setDialogOpen('agent-tools', !aiToolsOpen)}
           onTourFocus={focusTourStep}
           onCloseOverlay={() => setOverlay(null)}
         onNewProject={() => {
@@ -167,7 +170,7 @@ export function App() {
           setOverlay(null)
           setShowStartScreen(true)
         }}
-        onOpenSettings={() => { setInspectorOpen(true); setRevisionsOpen(false); setEssentialsOpen(false) }}
+        onOpenSettings={() => setPanels({ inspector: true, revisions: false, essentials: false })}
       />
       <ErrorBoundary>
         <Suspense fallback={<section className="workspace-placeholder">Loading workspace…</section>}>
@@ -180,7 +183,7 @@ export function App() {
               }}
               onScratch={() => { projectStore.getState().replaceProject(createBlankProject()); setStage('space'); setView('plan') }}
               onStarterKitchen={() => { projectStore.getState().replaceProject(createSeedProject()); beginSession(); setStage('space'); setView('plan') }}
-              onDrawManually={() => { beginSession(); setStage('space'); setWizardOpen(true); setWizardStartsAtRoom(true) }}
+              onDrawManually={() => { beginSession(); setStage('space'); setDialogOpen('layout-wizard', true); setWizardStartsAtRoom(true) }}
               onTraceImage={(url) => { beginSession(); setSourceImageUrl(url); setShowReference(true); setStage('space') }}
               onOpenProject={(opened) => { projectStore.getState().replaceProject(opened); beginSession(); setStage('space') }}
             />
@@ -202,13 +205,13 @@ export function App() {
                   canRedo={canRedo}
                   dragResizeEnabled={dragResizeEnabled}
                   hasSelection={selectedIds.length > 0}
-                  onToggleCatalog={() => setCatalogOpen((open) => !open)}
-                  onToggleInspector={() => setInspectorOpen((open) => !open)}
-                  onOpenEssentials={() => { setEssentialsOpen(true); setRevisionsOpen(false); setInspectorOpen(true) }}
-                  onOpenRevisions={() => { setInspectorOpen(true); setRevisionsOpen(true); setEssentialsOpen(false) }}
+                  onToggleCatalog={() => setPanels({ catalog: !catalogOpen })}
+                  onToggleInspector={() => setPanels({ inspector: !inspectorOpen })}
+                  onOpenEssentials={() => setPanels({ essentials: true, revisions: false, inspector: true })}
+                  onOpenRevisions={() => setPanels({ inspector: true, revisions: true, essentials: false })}
                   onUndo={() => projectStore.getState().undo()}
                   onRedo={() => projectStore.getState().redo()}
-                  onToggleReference={() => setShowReference((value) => !value)}
+                  onToggleReference={() => setShowReference(!showReference)}
                   onRotateLeft={() => projectStore.getState().rotateItems(selectedIds, -90)}
                   onRotateRight={() => projectStore.getState().rotateItems(selectedIds, 90)}
                   onToggleResize={() => selectedItem && projectStore.getState().setDimensionsLocked(selectedItem.id, !selectedItem.dimensionsLocked)}
@@ -240,12 +243,12 @@ export function App() {
                     closedLayout={closedLayout}
                     onInspectComponentIn3D={() => setView('scene')}
                     onStageChange={setStage}
-                    onCatalogOpenChange={setCatalogOpen}
-                    onInspectorOpenChange={setInspectorOpen}
-                    onEssentialsOpenChange={setEssentialsOpen}
-                    onRevisionsOpenChange={setRevisionsOpen}
+                    onCatalogOpenChange={(catalog) => setPanels({ catalog })}
+                    onInspectorOpenChange={(inspector) => setPanels({ inspector })}
+                    onEssentialsOpenChange={(essentials) => setPanels({ essentials })}
+                    onRevisionsOpenChange={(revisions) => setPanels({ revisions })}
                     onSourceImageUrlChange={setSourceImageUrl}
-                    onWizardOpenChange={setWizardOpen}
+                    onWizardOpenChange={(open) => setDialogOpen('layout-wizard', open)}
                     onWizardStartsAtRoomChange={setWizardStartsAtRoom}
                     onClosedLayoutChange={setClosedLayout}
                     onAddLayout={openWizard}
@@ -263,7 +266,7 @@ export function App() {
           </section>
           )}
         </Suspense>
-        {aiToolsOpen && <AgentToolsPanel onClose={() => setAiToolsOpen(false)} />}
+        {aiToolsOpen && <AgentToolsPanel onClose={() => setDialogOpen('agent-tools', false)} />}
       </ErrorBoundary>
       {agentIntent && <div className="agent-working-indicator" role="status">Agent is working · {agentIntent}</div>}
       {lastAgentAction && (
@@ -280,7 +283,7 @@ export function App() {
           >Undo</button>
         </div>
       )}
-      {helpOpen && <HelpDialog onClose={() => setHelpOpen(false)} />}
+      {helpOpen && <HelpDialog onClose={() => setDialogOpen('help', false)} />}
       <footer className="app-footer">
         <span className="footer-brand">
           <svg viewBox="0 0 214.2 214.2" aria-hidden="true"><path fill="#b1d15b" d="M190.1,0l-27.9,45.9c-3.5,5.7-9.8,9.4-16.6,9.4h-76.8c-6.8,0-13.3-3.7-16.8-9.4L24.4,0H0v214.2h24.4l27.7-45.6c3.5-5.9,10-9.4,16.8-9.4h76.8c6.8,0,13.1,3.5,16.6,9.4l27.9,45.6h24.2V0h-24.2ZM133,133.2h-51.9v-51.8h51.9v51.8Z"/></svg>
@@ -289,7 +292,7 @@ export function App() {
         <span className="footer-sep" aria-hidden="true"></span>
         <span className="footer-tag">Use your own agents and AI to help design your commercial kitchen</span>
         <span className="footer-right">
-          <button type="button" className="link-button" onClick={() => setHelpOpen(true)}>How to</button>
+          <button type="button" className="link-button" onClick={() => setDialogOpen('help', true)}>How to</button>
           <span className="footer-sep" aria-hidden="true"></span>
           <a href="https://hotelos.ai/kitchen" target="_blank" rel="noreferrer">hotelos.ai/kitchen</a>
           <span className="footer-sep" aria-hidden="true"></span>

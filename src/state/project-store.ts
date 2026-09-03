@@ -53,6 +53,7 @@ export interface ProjectState {
   selectedIds: string[]
   past: KitchenProject[]
   future: KitchenProject[]
+  revisionEntries: RevisionEntry[]
   applyWorkspaceOperations(operations: readonly unknown[], intent?: string): ReturnType<WorkspaceFacade['applyOperations']>
   adoptAutoLayoutCandidate(input: AdoptAutoLayoutCandidateInput): AdoptAutoLayoutCandidateResult
   selectItems(ids: string[]): void
@@ -80,7 +81,7 @@ export interface ProjectState {
   renameVariant(id: string, name: string): void
   deleteVariant(id: string): void
   updateScenario(id: string, patch: Partial<SimulationScenario>): void
-  commitProjectCandidate(project: unknown, expectedRevision: number, expectedDocumentId: string): ProjectCommitResult
+  commitProjectCandidate(project: unknown, expectedRevision: number, expectedDocumentId: string, entry?: Omit<RevisionEntry, 'revision'>): ProjectCommitResult
   replaceProject(project: KitchenProject): void
   patchProject(mutator: (project: KitchenProject) => void): ProjectCommitResult
   renameProject(name: string): void
@@ -99,6 +100,14 @@ const facadeByStore = new WeakMap<ProjectStore, WorkspaceFacade>()
 const autoLayoutServiceByStore = new WeakMap<ProjectStore, { run(input: unknown): unknown; cancel(input: { runId: string }): unknown }>()
 
 export type ProjectStore = StoreApi<ProjectState>
+
+export type RevisionEntry = {
+  revision: number
+  intent: string
+  author: 'agent' | 'human'
+  variantIds: string[]
+  changedIds: string[]
+}
 
 export type ProjectCommitResult =
   | { ok: true; revision: number }
@@ -139,6 +148,7 @@ export function createProjectStore(initialProject: KitchenProject): ProjectStore
       selectedIds: [],
       past: [],
       future: [],
+      revisionEntries: [],
       applyWorkspaceOperations: (operations, intent) => applyOperations(operations, intent ?? 'Update workspace'),
       adoptAutoLayoutCandidate: (input) => {
         const snapshot = get()
@@ -313,7 +323,7 @@ export function createProjectStore(initialProject: KitchenProject): ProjectStore
         void _ignoredId
         applyOperations([{ type: 'update_scenario', variantId: activeVariantId(), scenarioId: id, patch: scenarioPatch }], 'Update scenario')
       },
-      commitProjectCandidate: (project, expectedRevision, expectedDocumentId) => {
+      commitProjectCandidate: (project, expectedRevision, expectedDocumentId, entry) => {
         const state = get()
         if (state.documentId !== expectedDocumentId) return { ok: false, revision: state.revision, code: 'wrong-document', message: 'The open project was replaced after this candidate was prepared.' }
         if (state.revision !== expectedRevision) return { ok: false, revision: state.revision, code: 'stale-revision', message: `Expected revision ${expectedRevision}, received ${state.revision}.` }
@@ -324,11 +334,12 @@ export function createProjectStore(initialProject: KitchenProject): ProjectStore
           revision: state.revision + 1,
           past: appendHistory(state.past, state.project),
           future: [],
+          revisionEntries: entry ? appendHistory(state.revisionEntries, { ...entry, revision: state.revision + 1 }) : state.revisionEntries,
           selectedIds: state.selectedIds.filter((id) => parsed.data.variants.some((variant) => variant.equipment.some((item) => item.id === id))),
         })
         return { ok: true, revision: state.revision + 1 }
       },
-      replaceProject: (project) => set({ project: structuredClone(project), documentId: makeId('document'), revision: 0, selectedIds: [], past: [], future: [] }),
+      replaceProject: (project) => set({ project: structuredClone(project), documentId: makeId('document'), revision: 0, selectedIds: [], past: [], future: [], revisionEntries: [] }),
       patchProject: (mutator) => {
         const snapshot = get()
         const project = structuredClone(snapshot.project)

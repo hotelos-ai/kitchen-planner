@@ -31,7 +31,27 @@ describe('AgentToolsPanel', () => {
     render(<AgentToolsPanel onClose={() => undefined} controller={controller} />)
     expect(screen.getByRole('dialog', { name: 'AI agent tools' })).toBeInTheDocument()
     expect(screen.getByText('Agent tools unavailable in this browser')).toBeInTheDocument()
+    expect(screen.getByText('no modelContext')).toBeInTheDocument()
     expect(screen.getByText(/stays fully usable without it/i)).toBeInTheDocument()
+  })
+
+  it('retries registration and reacts to controller status updates', async () => {
+    const store = createProjectStore(createSeedProject())
+    let available = false
+    const controller = createWebMcpController({
+      store,
+      getFacade: () => getWorkspaceFacade(store),
+      detect: () => available
+        ? { available: true, surface: 'document', registerTool: () => Promise.resolve(undefined) }
+        : { available: false, reason: 'exact detection reason' },
+    })
+    await controller.register()
+    render(<AgentToolsPanel onClose={() => undefined} controller={controller} />)
+
+    expect(screen.getByText('exact detection reason')).toBeInTheDocument()
+    available = true
+    await userEvent.click(screen.getByRole('button', { name: 'Retry registration' }))
+    await waitFor(() => expect(screen.getByText('Agent tools active')).toBeInTheDocument())
   })
 
   it('lists the registered tools with read/write badges and the starter prompt', async () => {
@@ -45,6 +65,10 @@ describe('AgentToolsPanel', () => {
     const prompt = screen.getByText(/Inspect my attached reference image/)
     expect(prompt).toBeInTheDocument()
     expect(screen.getByText(/never receives, uploads, or interprets images/i)).toBeInTheDocument()
+    expect(screen.getByText(/only in this tab and this document/i)).toBeInTheDocument()
+    expect(screen.getAllByText('untrusted content').length).toBeGreaterThan(0)
+    expect(controller.getTools().find((tool) => tool.name === 'get_layout')).toMatchObject({ untrustedContentHint: true })
+    expect(controller.getTools().find((tool) => tool.name === 'get_component_catalog')).toMatchObject({ untrustedContentHint: true })
   })
 
   it('copies the starter prompt with a graceful fallback', async () => {

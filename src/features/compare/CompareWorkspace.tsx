@@ -51,7 +51,8 @@ export function CompareWorkspace({ store = projectStore }: { store?: ProjectStor
   const baselineResult = useMemo(() => simulate(baseline, kind === 'scenarios' ? scenarioA : scenario), [baseline, kind, scenario, scenarioA])
   const candidateResult = useMemo(() => simulate(kind === 'scenarios' ? baseline : candidate, kind === 'scenarios' ? scenarioB : scenario), [baseline, candidate, kind, scenario, scenarioB])
   const deltas = useMemo(() => compareResults(baselineResult, candidateResult), [baselineResult, candidateResult])
-  const findings = useMemo(() => buildFindings({ baseline: baselineResult, candidate: candidateResult, candidateEquipment: candidate.equipment, candidateArchitecture: candidate.architecture }), [baselineResult, candidateResult, candidate.architecture, candidate.equipment])
+  const resultVariant = kind === 'scenarios' ? baseline : candidate
+  const findings = useMemo(() => buildFindings({ baseline: baselineResult, candidate: candidateResult, candidateEquipment: resultVariant.equipment, candidateArchitecture: resultVariant.architecture }), [baselineResult, candidateResult, resultVariant.architecture, resultVariant.equipment])
   const affectedIds = selectedFinding?.affectedItemIds ?? []
   if (!kind) {
     return (
@@ -70,7 +71,7 @@ export function CompareWorkspace({ store = projectStore }: { store?: ProjectStor
       </section>
     )
   }
-  if (showReport) return <ReportView project={project} baseline={baseline} candidate={candidate} scenario={scenario} deltas={deltas} findings={findings} onClose={() => setShowReport(false)} />
+  if (showReport) return <ReportView project={project} baseline={baseline} candidate={resultVariant} baselineLabel={kind === 'scenarios' ? scenarioA.name : baseline.name} candidateLabel={kind === 'scenarios' ? scenarioB.name : candidate.name} scenario={kind === 'scenarios' ? scenarioB : scenario} candidateResult={candidateResult} deltas={deltas} findings={findings} onClose={() => setShowReport(false)} />
   const leftName = kind === 'scenarios' ? scenarioA.name : baseline.name
   const rightName = kind === 'scenarios' ? scenarioB.name : candidate.name
   return (

@@ -70,15 +70,27 @@ export function SceneWorkspace({ store = projectStore, renderer: Renderer, compa
   const variant = variantOverride ?? storeVariant
   const [previewSelectedIds, setPreviewSelectedIds] = useState<string[]>([])
   const selectedIds = readOnly ? previewSelectedIds : storeSelectedIds
-  const [showClearances, setShowClearances] = useState(false)
-  const [wallsTransparent, setWallsTransparent] = useState(false)
-  const [showLabels, setShowLabels] = useState(true)
+  const sharedShowClearances = useStore(appStateStore, (state) => state.showClearances)
+  const sharedWallsTransparent = useStore(appStateStore, (state) => state.wallsTransparent)
+  const sharedShowLabels = useStore(appStateStore, (state) => state.showLabels)
+  const [previewShowClearances, setPreviewShowClearances] = useState(false)
+  const [previewWallsTransparent, setPreviewWallsTransparent] = useState(false)
+  const [previewShowLabels, setPreviewShowLabels] = useState(true)
+  const showClearances = readOnly ? previewShowClearances : sharedShowClearances
+  const wallsTransparent = readOnly ? previewWallsTransparent : sharedWallsTransparent
+  const showLabels = readOnly ? previewShowLabels : sharedShowLabels
+  const setShowClearances = (value: boolean) => readOnly ? setPreviewShowClearances(value) : appStateStore.getState().setShowClearances(value)
+  const setWallsTransparent = (value: boolean) => readOnly ? setPreviewWallsTransparent(value) : appStateStore.getState().setWallsTransparent(value)
+  const setShowLabels = (value: boolean) => readOnly ? setPreviewShowLabels(value) : appStateStore.getState().setShowLabels(value)
   const sharedWalkMode = useStore(appStateStore, (state) => state.walkMode)
   const setSharedWalkMode = useStore(appStateStore, (state) => state.setWalkMode)
   const [previewWalkMode, setPreviewWalkMode] = useState(Boolean(walkModeProp))
   const walkMode = walkModeProp ?? (readOnly ? previewWalkMode : sharedWalkMode)
   const setWalkMode = (value: boolean) => readOnly ? setPreviewWalkMode(value) : setSharedWalkMode(value)
-  const [walkView, setWalkView] = useState<WalkViewMode>('first-person')
+  const sharedWalkView = useStore(appStateStore, (state) => state.walkView)
+  const [previewWalkView, setPreviewWalkView] = useState<WalkViewMode>('first-person')
+  const walkView = readOnly ? previewWalkView : sharedWalkView
+  const setWalkView = (value: WalkViewMode) => readOnly ? setPreviewWalkView(value) : appStateStore.getState().setWalkView(value)
   const [walkAvailability, setWalkAvailability] = useState<WalkAvailability>({ status: 'idle' })
   const [walkRetrySignal, setWalkRetrySignal] = useState(0)
   const [walkLocked, setWalkLocked] = useState(false)
@@ -137,9 +149,9 @@ export function SceneWorkspace({ store = projectStore, renderer: Renderer, compa
           <button type="button" aria-pressed={cameraMode === 'perspective'} onClick={() => activateCamera('perspective')}>Perspective</button>
           <button type="button" aria-pressed={cameraMode === 'top'} onClick={() => activateCamera('top')}>Top</button>
           <button type="button" onClick={() => setFitSignal((value) => value + 1)}>Fit room</button>
-          <button type="button" aria-pressed={showClearances} onClick={() => setShowClearances((value) => !value)}>Clearances</button>
-          <button type="button" aria-pressed={wallsTransparent} onClick={() => setWallsTransparent((value) => !value)}>Transparent walls</button>
-          <button type="button" aria-pressed={showLabels} onClick={() => setShowLabels((value) => !value)}>Labels</button>
+          <button type="button" aria-pressed={showClearances} onClick={() => setShowClearances(!showClearances)}>Clearances</button>
+          <button type="button" aria-pressed={wallsTransparent} onClick={() => setWallsTransparent(!wallsTransparent)}>Transparent walls</button>
+          <button type="button" aria-pressed={showLabels} onClick={() => setShowLabels(!showLabels)}>Labels</button>
           <button type="button" aria-pressed={walkMode} onClick={() => { setWalkAvailability({ status: 'idle' }); setWalkMode(true) }}>Walk kitchen</button>
         </div>
       </div>

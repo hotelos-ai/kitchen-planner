@@ -1,8 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import { createBlankProject } from '../domain/blank-project'
 import { createSeedProject } from '../domain/seed-project'
+import { emptyMetrics } from '../simulation/metrics'
+import type { SimulationResult } from '../simulation/types'
 import { exportProject } from '../state/persistence'
 import { createProjectStore } from '../state/project-store'
+import { createSimulationRunStore } from '../state/simulation-run-store'
 import type { WebMcpToolDefinition } from './model-context'
 import { createLifecycleTools } from './webmcp-lifecycle-tools'
 
@@ -10,13 +13,34 @@ type Envelope = { ok: boolean; revision: number; code?: string } & Record<string
 
 const setup = () => {
   const store = createProjectStore(createSeedProject())
-  const tools = createLifecycleTools({ store })
+  const runStore = createSimulationRunStore()
+  const tools = createLifecycleTools({ store, runStore })
   const call = (name: string, input: unknown) => {
     const tool = tools.find((candidate) => candidate.name === name) as WebMcpToolDefinition | undefined
     if (!tool) throw new Error(`Missing ${name}`)
     return tool.execute(input) as Envelope
   }
-  return { store, call }
+  return { store, runStore, call }
+}
+
+const simulationResult = (): SimulationResult => {
+  const metrics = emptyMetrics()
+  Object.assign(metrics, {
+    totalOrders: 12,
+    completedOrders: 10,
+    stationUtilization: { dishwasher: .82 },
+    queueSeconds: { dishwasher: 180 },
+  })
+  return {
+    seed: 42,
+    durationSeconds: 3600,
+    metrics,
+    warnings: ['Observed report warning'],
+    frames: [],
+    events: [],
+    taskTimeline: [],
+    orders: [],
+  }
 }
 
 describe('WebMCP project lifecycle tools', () => {
@@ -38,6 +62,46 @@ describe('WebMCP project lifecycle tools', () => {
     const svg = call('export_project', { format: 'plan-svg' })
     expect(svg.contents).toMatch(/^<svg/)
     expect(svg.contents).toContain('kitchen plan')
+  })
+
+  it('includes revision-matched retained simulation evidence in report HTML', () => {
+    const { store, runStore, call } = setup()
+    const project = store.getState().project
+    const result = simulationResult()
+    runStore.getState().storeRun({
+      variantId: project.activeVariantId,
+      scenarioId: project.activeScenarioId,
+      result,
+      seed: result.seed,
+      ranAtRevision: store.getState().revision,
+    })
+
+    const report = call('export_project', { format: 'report-html' })
+
+    expect(report.contents).toMatch(/Completed orders<\/th><td>10 of 12/)
+    expect(report.contents).toMatch(/Station utilization and queues[\s\S]*Dishwasher[\s\S]*82%[\s\S]*3\.0 min/)
+    expect(report.contents).toMatch(/Ranked findings[\s\S]*Reduce pressure at Dishwasher/)
+    expect(report.contents).toContain('Observed report warning')
+  })
+
+  it('excludes retained simulation evidence from an older revision', () => {
+    const { store, runStore, call } = setup()
+    const project = store.getState().project
+    const result = simulationResult()
+    runStore.getState().storeRun({
+      variantId: project.activeVariantId,
+      scenarioId: project.activeScenarioId,
+      result,
+      seed: result.seed,
+      ranAtRevision: store.getState().revision,
+    })
+    store.getState().nudgeItems(['tandoor'], { x: 100, y: 0 })
+
+    const report = call('export_project', { format: 'report-html' })
+
+    expect(report.contents).toContain('No current simulation result was included.')
+    expect(report.contents).toContain('No findings are available without a current simulation result.')
+    expect(report.contents).not.toContain('Observed report warning')
   })
 
   it('imports a replacement atomically with stale-revision protection', () => {

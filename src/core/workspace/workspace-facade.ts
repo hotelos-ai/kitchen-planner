@@ -20,6 +20,8 @@ type PreviewCandidate = {
   warnings: string[]
   diagnostics: ReturnType<typeof diagnosticsDelta>
   intent?: string
+  source?: 'agent' | 'human'
+  variantIds: string[]
 }
 
 type FacadeDependencies = {
@@ -61,7 +63,7 @@ const diagnosticsDelta = (before: KitchenProject, after: KitchenProject, variant
 export function createWorkspaceFacade(dependencies: FacadeDependencies) {
   const previews = createPreviewRegistry<'layout', WorkspaceOperation, PreviewCandidate>()
 
-  const previewLayoutChanges = (input: { expectedRevision: number; operations: readonly unknown[]; intent?: string }) => {
+  const previewLayoutChanges = (input: { expectedRevision: number; operations: readonly unknown[]; intent?: string; source?: 'agent' | 'human' }) => {
     const state = dependencies.store.getState()
     const result = executeWorkspaceBatch({
       project: state.project,
@@ -87,6 +89,8 @@ export function createWorkspaceFacade(dependencies: FacadeDependencies) {
       warnings: result.warnings,
       diagnostics,
       intent: input.intent,
+      source: input.source,
+      variantIds: targetedVariantIds,
     }
     const previewToken = previews.issue({
       kind: 'layout',
@@ -115,6 +119,12 @@ export function createWorkspaceFacade(dependencies: FacadeDependencies) {
       preview.preview.candidate.project,
       preview.preview.revision,
       preview.preview.documentId,
+      {
+        intent: preview.preview.candidate.intent ?? 'Update workspace',
+        author: preview.preview.candidate.source ?? 'human',
+        variantIds: [...preview.preview.candidate.variantIds],
+        changedIds: [...preview.preview.candidate.changedIds],
+      },
     )
     if (!committed.ok) return { ...committed, ok: false as const }
     const consumed = previews.consume(input.previewToken, expectation)

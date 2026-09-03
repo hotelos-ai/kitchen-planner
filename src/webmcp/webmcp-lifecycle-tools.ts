@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import { createCheckpoint, restoreCheckpointOnto } from '../domain/layout-checkpoints'
 import { importProject } from '../state/persistence'
+import { selectSimulationRun, simulationRunStore, type SimulationRunStore } from '../state/simulation-run-store'
 import type { JsonSchemaObject, WebMcpToolDefinition } from './model-context'
 import { downloadArtifact, projectArtifact } from './project-artifacts'
 import { currentRevision, failure, parseInput, resolveVariant, success, unknownErrorMessage, type ToolDependencies } from './webmcp-tool-utils'
@@ -49,7 +50,12 @@ const uniqueVariantId = (existingIds: Set<string>, preferred: string): string =>
   return `${base}-${suffix}`
 }
 
-export function createLifecycleTools(deps: ToolDependencies): WebMcpToolDefinition[] {
+export type LifecycleToolDependencies = ToolDependencies & {
+  runStore?: SimulationRunStore
+}
+
+export function createLifecycleTools(deps: LifecycleToolDependencies): WebMcpToolDefinition[] {
+  const runStore = deps.runStore ?? simulationRunStore
   const exportProjectTool: WebMcpToolDefinition = {
     name: 'export_project',
     title: 'Export project artifact',
@@ -63,7 +69,17 @@ export function createLifecycleTools(deps: ToolDependencies): WebMcpToolDefiniti
         const state = deps.store.getState()
         const variant = resolveVariant(state.project, parsed.value.variantId)
         if (!variant) return failure(state.revision, 'missing-variant', `Layout variant ${parsed.value.variantId ?? state.project.activeVariantId} does not exist.`)
-        const artifact = projectArtifact({ project: state.project, variant, revision: state.revision, format: parsed.value.format })
+        const scenario = state.project.scenarios.find((candidate) => candidate.id === state.project.activeScenarioId)
+        const storedRun = scenario ? selectSimulationRun(runStore.getState(), variant.id, scenario.id) : null
+        const simulation = storedRun?.ranAtRevision === state.revision ? storedRun.result : null
+        const artifact = projectArtifact({
+          project: state.project,
+          variant,
+          revision: state.revision,
+          format: parsed.value.format,
+          scenario,
+          simulation,
+        })
         const downloaded = parsed.value.download ? downloadArtifact(artifact) : false
         if (parsed.value.download && !downloaded) {
           return failure(state.revision, 'download-unavailable', 'The artifact was generated, but this environment cannot start a browser download.', { ...artifact, downloaded: false })

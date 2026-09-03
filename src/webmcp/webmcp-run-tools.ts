@@ -1,7 +1,8 @@
 import { z } from 'zod'
 import type { WorkspaceFacade } from '../core/workspace/workspace-facade'
 import { buildFindings } from '../simulation/recommendations'
-import type { SimulationResult } from '../simulation/types'
+import { runSimulationResponsive, SimulationRunCancelledError } from '../simulation/responsive-runner'
+import type { SimulationInput, SimulationResult } from '../simulation/types'
 import { appStateStore } from '../state/app-state-store'
 import {
   selectSimulationRun,
@@ -9,6 +10,7 @@ import {
   type SimulationRunStore,
 } from '../state/simulation-run-store'
 import type { WebMcpToolDefinition } from './model-context'
+import { recoveryForErrorCode } from './error-taxonomy'
 import {
   currentRevision,
   failure,
@@ -55,9 +57,31 @@ const isFullSimulationResult = (result: unknown): result is SimulationResult => 
     && Array.isArray(candidate.orders)
 }
 
+const simulationScopeFailure = (
+  deps: ToolDependencies,
+  expectedDocumentId: string,
+  expectedRevision: number,
+) => {
+  const current = deps.store.getState()
+  if (current.documentId !== expectedDocumentId) {
+    return {
+      ...failure(current.revision, 'wrong-document', 'The open project was replaced while the simulation was running. The obsolete result was discarded.'),
+      recovery: recoveryForErrorCode('wrong-document'),
+    }
+  }
+  if (current.revision !== expectedRevision) {
+    return {
+      ...failure(current.revision, 'stale-revision', `The workspace changed from revision ${expectedRevision} to ${current.revision} while the simulation was running. The obsolete result was discarded.`),
+      recovery: recoveryForErrorCode('stale-revision'),
+    }
+  }
+  return null
+}
+
 export type RunToolDependencies = ToolDependencies & {
   getFacade: () => WorkspaceFacade
   runStore?: SimulationRunStore
+  runSimulation?: (input: SimulationInput, signal?: AbortSignal) => Promise<SimulationResult>
 }
 
 export function createRunTools(deps: RunToolDependencies): WebMcpToolDefinition[] {
@@ -80,7 +104,7 @@ export function createRunTools(deps: RunToolDependencies): WebMcpToolDefinition[
         navigateTo: { type: 'boolean', description: 'Open the Simulate stage so the user sees the result. Defaults to true.' },
       },
     },
-    execute: (input, context) => {
+    execute: async (input, context) => {
       try {
         if (context?.signal?.aborted) return failure(currentRevision(deps), 'aborted', 'The simulation request was cancelled before it started.')
         const parsed = parseInput(deps, runSimulationInput, input)
@@ -93,18 +117,28 @@ export function createRunTools(deps: RunToolDependencies): WebMcpToolDefinition[
         const seed = parsed.value.seed ?? scenario.seed
         let result: unknown
         try {
-          // Presentation needs frames, events, and timelines. Compute that full
-          // result exactly once, retain it, then project the response if the
-          // caller only requested aggregate metrics.
-          result = deps.getFacade().runSimulation({
-            variantId: variant.id,
-            scenarioId: scenario.id,
-            seed,
+          // High-cover runs move to a cancellable Worker; small runs avoid its
+          // startup cost. Presentation still receives the exact full result.
+          const simulationInput: SimulationInput = {
+            architecture: structuredClone(variant.architecture),
+            equipment: structuredClone(variant.equipment),
+            scenario: { ...structuredClone(scenario), seed },
+            layoutConstraints: structuredClone(variant.layoutConstraints),
             outputMode: 'full',
-          })
+          }
+          result = deps.runSimulation
+            ? await deps.runSimulation(simulationInput, context?.signal)
+            : await runSimulationResponsive(simulationInput, { signal: context?.signal })
         } catch (error) {
+          const scopeFailure = simulationScopeFailure(deps, state.documentId, state.revision)
+          if (scopeFailure) return scopeFailure
+          if (error instanceof SimulationRunCancelledError || context?.signal?.aborted) {
+            return failure(state.revision, 'cancelled', 'The simulation request was cancelled.')
+          }
           return failure(state.revision, 'simulation-failed', unknownErrorMessage(error))
         }
+        const scopeFailure = simulationScopeFailure(deps, state.documentId, state.revision)
+        if (scopeFailure) return scopeFailure
         if (isFacadeFailure(result)) {
           return { ok: false as const, revision: result.revision, code: result.code, message: result.message }
         }
@@ -113,15 +147,16 @@ export function createRunTools(deps: RunToolDependencies): WebMcpToolDefinition[
         }
         if (context?.signal?.aborted) return failure(currentRevision(deps), 'aborted', 'The simulation request was cancelled before publishing its result.')
 
+        const playback = parsed.value.playback ?? 'play'
         runStore.getState().storeRun({
           variantId: variant.id,
           scenarioId: scenario.id,
           result,
           seed,
           ranAtRevision: state.revision,
+          active: playback !== 'none',
         })
 
-        const playback = parsed.value.playback ?? 'play'
         if (parsed.value.navigateTo ?? true) {
           appStateStore.getState().setOverlay(null)
           appStateStore.getState().setStage('simulate')
