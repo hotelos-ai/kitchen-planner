@@ -666,6 +666,15 @@ button { cursor: pointer; }
 /* dialogs + wizard */
 .layout-wizard-backdrop, .workspace-modal-backdrop { position: fixed; z-index: 100; inset: 0; display: grid; place-items: center; padding: 18px; background: rgba(12, 30, 3, 0.38); backdrop-filter: blur(3px); }
 .layout-wizard, .essentials-dialog { position: relative; width: min(760px, 100%); max-height: calc(100dvh - 36px); overflow: auto; border: 1px solid var(--rule); border-radius: var(--control-radius); padding: 18px; color: var(--ink); background: var(--paper-hi); box-shadow: var(--shadow-pop); }
+.auto-fix-strategy-dialog { position: relative; width: min(460px, 100%); border: 1px solid var(--rule); border-radius: 12px; padding: 18px; color: var(--ink); background: var(--paper-hi); box-shadow: var(--shadow-pop); }
+.auto-fix-strategy-dialog > h2 { margin: 3px 42px 15px 0; font-family: var(--font-display); font-size: 19px; letter-spacing: -0.015em; }
+.auto-fix-strategy-options { display: grid; gap: 9px; }
+.auto-fix-strategy-options > button { display: grid; gap: 4px; width: 100%; border: 1px solid rgba(202, 78, 142, 0.38); border-radius: 9px; padding: 12px 13px; color: var(--ink); background: var(--accent-soft); text-align: left; }
+.auto-fix-strategy-options > button:hover:not(:disabled) { border-color: var(--accent); background: rgba(202, 78, 142, 0.14); }
+.auto-fix-strategy-options > button:disabled { opacity: 0.65; cursor: wait; }
+.auto-fix-strategy-options strong { font-size: 13px; font-weight: 600; }
+.auto-fix-strategy-options span { color: var(--ink-3); font-size: 11.5px; line-height: 1.4; }
+.auto-fix-strategy-cancel { display: block; margin: 12px auto 0; border: 0; padding: 5px 10px; color: var(--ink-3); background: transparent; font-size: 11.5px; }
 .layout-wizard > header { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 3px 12px; border-bottom: 1px solid var(--rule); padding-bottom: 12px; }
 .layout-wizard > header p { grid-column: 1; margin: 0; color: var(--accent); font-size: 10.5px; font-weight: 600; letter-spacing: 0.07em; text-transform: uppercase; }
 .layout-wizard > header h2 { grid-column: 1; margin: 0; font-family: var(--font-display); font-size: 19px; font-weight: 600; letter-spacing: -0.015em; }

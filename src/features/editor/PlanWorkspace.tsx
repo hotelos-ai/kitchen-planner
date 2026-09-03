@@ -13,7 +13,7 @@ import { ProjectSettings } from './ProjectSettings'
 import { RevisionHistory } from './RevisionHistory'
 import { SpaceImpactDialog } from './SpaceImpactDialog'
 import { StageOverview } from './StageOverview'
-import { applyAutomaticPlanFixes } from './auto-fix-orchestrator'
+import { AutoFixStrategyDialog } from './AutoFixStrategyDialog'
 import { ValidationAutoFix } from './ValidationAutoFix'
 import { RoomEditorPanel } from './RoomEditorPanel'
 import type { PlacementSpec } from './room-outline'
@@ -125,6 +125,7 @@ export function PlanWorkspace({
   const [internalEssentialsOpen, setInternalEssentialsOpen] = useState(false)
   const [internalRevisionsOpen, setInternalRevisionsOpen] = useState(false)
   const [autoFixStatus, setAutoFixStatus] = useState('')
+  const [autoFixStrategyOpen, setAutoFixStrategyOpen] = useState(false)
   const [spaceImpactOpen, setSpaceImpactOpen] = useState(false)
   const [sourceOpacity, setSourceOpacity] = useState(35)
   const [sourceLocked, setSourceLocked] = useState(false)
@@ -226,11 +227,6 @@ export function PlanWorkspace({
     openLayoutWizard(true)
     onStageChange?.('space')
   }
-  const runAutomaticFix = () => {
-    setAutoFixStatus('Fixing the plan…')
-    window.setTimeout(() => setAutoFixStatus(applyAutomaticPlanFixes(store).message), 0)
-  }
-
   useWorkspaceShortcuts({
     enabled: shortcutEnabled,
     selectedIds,
@@ -248,6 +244,7 @@ export function PlanWorkspace({
     rotate: (ids, deltaDeg) => store.getState().rotateItems(ids, deltaDeg),
     clearSelection: () => store.getState().clearSelection(),
     onEscape: () => {
+      if (autoFixStrategyOpen) { setAutoFixStrategyOpen(false); return true }
       if (essentialsVisible) { setEssentialsVisible(false); return true }
       if (internalRevisionsOpen || revisionsOpen) { setRevisionsVisible(false); return true }
       if (spaceImpactOpen) { setSpaceImpactOpen(false); return true }
@@ -276,7 +273,7 @@ export function PlanWorkspace({
             hasSelection={selectedIds.length > 0}
             onToggleCatalog={() => setLocalCatalogOpen((open) => !open)}
             onToggleInspector={() => setLocalInspectorOpen((open) => !open)}
-            onAutoFix={runAutomaticFix}
+            onAutoFix={() => setAutoFixStrategyOpen(true)}
             onOpenEssentials={() => setEssentialsVisible(true)}
             onOpenRevisions={() => setRevisionsVisible(true)}
             onUndo={() => store.getState().undo()}
@@ -393,6 +390,13 @@ export function PlanWorkspace({
           <span>{autoFixStatus}</span>
           <button type="button" aria-label="Dismiss automatic fix result" onClick={() => setAutoFixStatus('')}>×</button>
         </div>
+      )}
+      {!compact && autoFixStrategyOpen && (
+        <AutoFixStrategyDialog
+          store={store}
+          onClose={() => setAutoFixStrategyOpen(false)}
+          onResult={(result) => setAutoFixStatus(result.message)}
+        />
       )}
       {!compact && wizardVisible && (
         <LayoutWizard

@@ -8,7 +8,7 @@ import { getActiveVariant, projectStore, type ProjectStore } from '../../state/p
 import { appStateStore } from '../../state/app-state-store'
 import { EssentialsChecker } from '../editor/EssentialsChecker'
 import { LayoutDiagnostics } from '../editor/LayoutDiagnostics'
-import { applyAutomaticPlanFixes } from '../editor/auto-fix-orchestrator'
+import { AutoFixStrategyDialog } from '../editor/AutoFixStrategyDialog'
 import { ValidationAutoFix } from '../editor/ValidationAutoFix'
 import {
   selectSimulationRun,
@@ -62,6 +62,7 @@ export function SimulationWorkspace({
   const [scenarioCollapsed, setScenarioCollapsed] = useState(false)
   const [autoFixOpen, setAutoFixOpen] = useState(false)
   const [autoFixStatus, setAutoFixStatus] = useState('')
+  const [autoFixStrategyOpen, setAutoFixStrategyOpen] = useState(false)
   const staffCount = scenario.staff.reduce((sum, entry) => sum + entry.count, 0)
   const validationErrors = useMemo(() => validateSimulationInput({
     architecture: variant.architecture,
@@ -127,14 +128,6 @@ export function SimulationWorkspace({
     appState.setView('plan')
     appState.setStage('space')
   }
-  const runAutomaticFix = () => {
-    setAutoFixStatus('Fixing the plan…')
-    window.setTimeout(() => {
-      const result = applyAutomaticPlanFixes(store)
-      setAutoFixStatus(result.message)
-      setAutoFixOpen(result.status !== 'success')
-    }, 0)
-  }
   const bottleneck = result ? Object.entries(result.metrics.stationUtilization).sort((left, right) => right[1] - left[1])[0]?.[0] : undefined
 
   return (
@@ -189,7 +182,7 @@ export function SimulationWorkspace({
           <div><span className="eyebrow">Active layout</span><strong>{variant.name}</strong></div>
           <div className="layer-toggles">{(Object.keys(layers) as (keyof Layers)[]).map((key) => <button type="button" key={key} aria-pressed={layers[key]} onClick={() => toggleLayer(key)}>{key[0].toUpperCase() + key.slice(1)}</button>)}</div>
           <label className="follow-control">Follow<select aria-label="Follow staff role" value={followRole} onChange={(event) => setFollowRole(event.target.value as StaffRole | 'overview')}><option value="overview">Overview</option><option value="head-chef">Head chef</option><option value="sous-chef">Sous chef</option><option value="cdp">CDP</option><option value="busser-washer">Busser / washer</option></select></label>
-          {hasValidationErrors && <button type="button" className="simulation-autofix-button" onClick={runAutomaticFix}>Auto-fix plan</button>}
+          {hasValidationErrors && <button type="button" className="simulation-autofix-button" onClick={() => setAutoFixStrategyOpen(true)}>Auto-fix plan</button>}
           <button type="button" className="run-simulation" disabled={hasValidationErrors} onClick={startRun}>Run {scenario.durationMinutes}-minute service</button>
         </div>
         {(validationErrors.length > 0 || autoFixStatus) && <div role={validationErrors.length > 0 ? 'alert' : 'status'} className="simulation-validation">
@@ -226,6 +219,13 @@ export function SimulationWorkspace({
         <p className="simulation-assumptions-line">{scenario.covers} covers over {scenario.durationMinutes} minutes · {staffCount} staff · seed {scenario.seed}</p>
       </div>
     </section>
+    {autoFixStrategyOpen && (
+      <AutoFixStrategyDialog
+        store={store}
+        onClose={() => setAutoFixStrategyOpen(false)}
+        onResult={(result) => setAutoFixStatus(result.message)}
+      />
+    )}
     {autoFixOpen && (
       <div className="workspace-modal-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) setAutoFixOpen(false) }}>
         <section

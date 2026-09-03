@@ -8,7 +8,7 @@ import { ProjectStartScreen } from './ProjectStartScreen'
 import { createBlankProject } from '../domain/blank-project'
 import { createSeedProject } from '../domain/seed-project'
 import { AgentToolsPanel } from '../features/webmcp/AgentToolsPanel'
-import { applyAutomaticPlanFixes } from '../features/editor/auto-fix-orchestrator'
+import { AutoFixStrategyDialog } from '../features/editor/AutoFixStrategyDialog'
 import { WebMcpProvider } from '../features/webmcp/WebMcpProvider'
 import { appStateStore } from '../state/app-state-store'
 import type { ViewMode } from './workflow'
@@ -62,10 +62,7 @@ export function App() {
   const [sourceImageUrl, setSourceImageUrl] = useState('/reference/kitchen-sketch.webp')
   const [closedLayout, setClosedLayout] = useState<{ name: string; revision: number; undo(): boolean } | null>(null)
   const [autoFixStatus, setAutoFixStatus] = useState('')
-  const runAutomaticFix = () => {
-    setAutoFixStatus('Fixing the plan…')
-    window.setTimeout(() => setAutoFixStatus(applyAutomaticPlanFixes(projectStore).message), 0)
-  }
+  const [autoFixStrategyOpen, setAutoFixStrategyOpen] = useState(false)
   const [showStartScreen, setShowStartScreen] = useState(() => {
     if (typeof localStorage === 'undefined') return false
     const hasMatchingDeepLink = typeof window !== 'undefined'
@@ -218,7 +215,7 @@ export function App() {
                   hasSelection={selectedIds.length > 0}
                   onToggleCatalog={() => setPanels({ catalog: !catalogOpen })}
                   onToggleInspector={() => setPanels({ inspector: !inspectorOpen })}
-                  onAutoFix={runAutomaticFix}
+                  onAutoFix={() => setAutoFixStrategyOpen(true)}
                   onOpenEssentials={() => setPanels({ essentials: true, revisions: false, inspector: true })}
                   onOpenRevisions={() => setPanels({ inspector: true, revisions: true, essentials: false })}
                   onUndo={() => projectStore.getState().undo()}
@@ -290,6 +287,13 @@ export function App() {
           <span>{autoFixStatus}</span>
           <button type="button" aria-label="Dismiss automatic fix result" onClick={() => setAutoFixStatus('')}>×</button>
         </div>
+      )}
+      {autoFixStrategyOpen && (
+        <AutoFixStrategyDialog
+          store={projectStore}
+          onClose={() => setAutoFixStrategyOpen(false)}
+          onResult={(result) => setAutoFixStatus(result.message)}
+        />
       )}
       {lastAgentAction && (
         <div className="workspace-toast agent-action-toast" role="status">
