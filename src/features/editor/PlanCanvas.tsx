@@ -31,12 +31,13 @@ type Props = {
   onWarningBadgeClick?(itemId: string): void
   placement?: PlacementSpec | null
   onPlacementDone?(): void
+  onSelectItem?(selection: { kind: 'pillar' | 'zone' | 'opening'; id: string } | null): void
 }
 
 type ContextRequest = { itemId: string; position: OverlayPosition }
 type QuickRequest = ContextRequest & { mode: QuickConfigurationMode }
 
-export function PlanCanvas({ store, showReference, sourceImageUrl = '/reference/kitchen-sketch.png', sourceOpacity = 22, mode = 'layout', variantOverride, readOnly = false, onInspectComponentIn3D, onComponentLockChange, onSkinChange, onWarningBadgeClick, placement = null, onPlacementDone }: Props) {
+export function PlanCanvas({ store, showReference, sourceImageUrl = '/reference/kitchen-sketch.png', sourceOpacity = 22, mode = 'layout', variantOverride, readOnly = false, onInspectComponentIn3D, onComponentLockChange, onSkinChange, onWarningBadgeClick, placement = null, onPlacementDone, onSelectItem }: Props) {
   const containerRef = useRef<HTMLDivElement>(null)
   const [size, setSize] = useState({ width: 740, height: 720 })
   const [contextRequest, setContextRequest] = useState<ContextRequest>()
@@ -68,14 +69,21 @@ export function PlanCanvas({ store, showReference, sourceImageUrl = '/reference/
   }, [])
 
   const margin = 44
-  const pixelsPerMm = Math.min(
-    (size.width - margin * 2) / variant.architecture.widthMm,
-    (size.height - margin * 2) / variant.architecture.depthMm,
-  )
+  const bounds = mode === 'space'
+    ? {
+        minX: Math.min(0, ...variant.equipment.map((item) => item.xMm - item.widthMm / 2)),
+        minY: Math.min(0, ...variant.equipment.map((item) => item.yMm - item.depthMm / 2)),
+        maxX: Math.max(variant.architecture.widthMm, ...variant.equipment.map((item) => item.xMm + item.widthMm / 2)),
+        maxY: Math.max(variant.architecture.depthMm, ...variant.equipment.map((item) => item.yMm + item.depthMm / 2)),
+      }
+    : { minX: 0, minY: 0, maxX: variant.architecture.widthMm, maxY: variant.architecture.depthMm }
+  const spanX = Math.max(1, bounds.maxX - bounds.minX)
+  const spanY = Math.max(1, bounds.maxY - bounds.minY)
+  const pixelsPerMm = Math.min((size.width - margin * 2) / spanX, (size.height - margin * 2) / spanY)
   const planWidth = variant.architecture.widthMm * pixelsPerMm
   const planHeight = variant.architecture.depthMm * pixelsPerMm
-  const originX = (size.width - planWidth) / 2
-  const originY = (size.height - planHeight) / 2
+  const originX = (size.width - (bounds.maxX - bounds.minX) * pixelsPerMm) / 2 - bounds.minX * pixelsPerMm
+  const originY = (size.height - (bounds.maxY - bounds.minY) * pixelsPerMm) / 2 - bounds.minY * pixelsPerMm
 
   const addDroppedCatalogItem = (event: DragEvent<HTMLDivElement>) => {
     event.preventDefault()
@@ -177,6 +185,7 @@ export function PlanCanvas({ store, showReference, sourceImageUrl = '/reference/
             placement={placement}
             onCommit={(next) => { store.getState().applySharedArchitecture(next) }}
             onPlacementDone={() => onPlacementDone?.()}
+            onSelectItem={onSelectItem}
           />
         )}
       </Stage>

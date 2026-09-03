@@ -104,6 +104,11 @@ export function App() {
 
   const openWizard = () => { setWizardStartsAtRoom(false); setWizardOpen(true) }
 
+  useEffect(() => {
+    if (showStartScreen) return
+    projectStore.getState().captureWorkingSnapshot()
+  }, [stage, showStartScreen])
+
   const focusTourStep = (step: number) => {
     setOverlay(null)
     if (step === 0) { setStage('space'); setView('plan') }

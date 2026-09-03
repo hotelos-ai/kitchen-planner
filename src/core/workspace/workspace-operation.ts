@@ -34,6 +34,7 @@ const rectSchema = z.object({
   widthMm: dimensionSchema,
   depthMm: dimensionSchema,
 }).strict()
+const pillarSchema = rectSchema.extend({ shape: z.literal('round').optional() })
 
 const openingSchema = z.object({
   id: idSchema,
@@ -60,7 +61,7 @@ const architecturePatchSchema = z.object({
   wallHeightMm: dimensionSchema.optional(),
   roomPolygon: z.array(pointSchema).min(3).max(1_000).optional(),
   openings: z.array(openingSchema).max(1_000).optional(),
-  pillars: z.array(rectSchema).max(1_000).optional(),
+  pillars: z.array(pillarSchema).max(1_000).optional(),
   storageZones: z.array(storageZoneSchema).max(1_000).optional(),
   locked: z.boolean().optional(),
 }).strict().refine((patch) => Object.keys(patch).length > 0, 'Architecture patch cannot be empty')

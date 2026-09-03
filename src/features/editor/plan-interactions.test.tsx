@@ -152,23 +152,23 @@ describe('plan workspace', () => {
     const user = userEvent.setup()
     render(workspace())
 
-    await user.click(screen.getByRole('button', { name: /Check essentials/i }))
-    expect(screen.getByRole('dialog', { name: 'Check essentials' })).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: /Validate/i }))
+    expect(screen.getByRole('dialog', { name: 'Validate plan' })).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Professional review' })).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Close essentials checker' }))
-    expect(screen.queryByRole('dialog', { name: 'Check essentials' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('dialog', { name: 'Validate plan' })).not.toBeInTheDocument()
   })
 
   it('uses Escape to close transient workspace UI before clearing selection', async () => {
     const user = userEvent.setup()
     render(workspace())
     await selectPlacedItem(user, /Select Tandoor/i)
-    await user.click(screen.getByRole('button', { name: /Check essentials/i }))
+    await user.click(screen.getByRole('button', { name: /Validate/i }))
     ;(document.activeElement as HTMLElement).blur()
 
     await user.keyboard('{Escape}')
 
-    expect(screen.queryByRole('dialog', { name: 'Check essentials' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('dialog', { name: 'Validate plan' })).not.toBeInTheDocument()
     expect(projectStore.getState().selectedIds).toEqual(['tandoor'])
   })
 
@@ -179,10 +179,10 @@ describe('plan workspace', () => {
     project.architecture = structuredClone(project.variants[0].architecture)
     render(workspace({ store: createProjectStore(project) }))
 
-    await user.click(screen.getByRole('button', { name: /Check essentials/i }))
+    await user.click(screen.getByRole('button', { name: /Validate/i }))
     await user.click(screen.getByRole('button', { name: /Edit room.*dedicated staff entry/i }))
 
-    expect(screen.queryByRole('dialog', { name: 'Check essentials' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('dialog', { name: 'Validate plan' })).not.toBeInTheDocument()
     expect(screen.getByRole('dialog', { name: 'Room' })).toBeInTheDocument()
     expect(screen.getByRole('group', { name: 'Advanced room geometry' })).toBeInTheDocument()
   })

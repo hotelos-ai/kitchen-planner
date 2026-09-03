@@ -119,8 +119,8 @@ test('creates an advanced room and recommended essentials through the novice wiz
 
   await expect(wizard).toHaveCount(0)
   await expect(page.getByRole('tab', { name: /Jagged service concept/ })).toHaveAttribute('aria-selected', 'true')
-  await page.getByRole('button', { name: 'Check essentials' }).first().click()
-  await expect(page.getByRole('dialog', { name: 'Check essentials' })).toContainText(/operational guidance, not regulatory certification/i)
+  await page.getByRole('button', { name: /Validate/ }).first().click()
+  await expect(page.getByRole('dialog', { name: 'Validate plan' })).toContainText(/operational guidance, not regulatory certification/i)
 })
 
 test('runs, inspects, compares, and atomically adopts an auto-layout finalist', async ({ page }) => {

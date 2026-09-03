@@ -184,6 +184,10 @@ export const projectSchema = z.object({
   scenarios: z.array(scenarioSchema).min(1),
   activeVariantId: z.string().min(1),
   activeScenarioId: z.string().min(1),
+  lastWorking: z.object({
+    architecture: architectureSchema,
+    equipmentByVariant: z.record(z.string(), z.array(equipmentSchema)),
+  }).optional(),
 }).strict().superRefine((project, context) => {
   const duplicateIndexes = (values: readonly string[]) => values.flatMap((value, index) => values.indexOf(value) === index ? [] : [index])
   duplicateIndexes(project.variants.map((variant) => variant.id)).forEach((index) => context.addIssue({ code: 'custom', path: ['variants', index, 'id'], message: 'Layout variant IDs must be unique' }))

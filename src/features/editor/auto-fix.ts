@@ -113,3 +113,17 @@ export function fixByBoundary(architecture: Architecture, equipment: readonly Eq
     depthMm: Math.max(100, ...roomPolygon.map((vertex) => vertex.y)),
   }
 }
+
+export function parkOutside(architecture: Architecture, equipment: readonly EquipmentItem[], existing: readonly EquipmentItem[], snapMm: number): EquipmentMove[] {
+  const snap = (value: number) => Math.round(value / snapMm) * snapMm
+  const rackX = snap(Math.max(...architecture.roomPolygon.map((vertex) => vertex.x)) + 900)
+  let cursorY = snap(Math.min(...architecture.roomPolygon.map((vertex) => vertex.y)))
+  const taken = existing.map((item) => ({ x: item.xMm - item.widthMm / 2, y: item.yMm - item.depthMm / 2, width: item.widthMm, depth: item.depthMm }))
+  return equipment.map((item) => {
+    const x = rackX
+    const y = cursorY
+    cursorY = snap(cursorY + item.depthMm + 400)
+    taken.push({ x: x - item.widthMm / 2, y: y - item.depthMm / 2, width: item.widthMm, depth: item.depthMm })
+    return { id: item.id, xMm: x, yMm: y }
+  })
+}

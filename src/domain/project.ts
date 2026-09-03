@@ -60,13 +60,17 @@ export interface StorageZone extends RectMm {
   adjacent: boolean
 }
 
+export interface Pillar extends RectMm {
+  shape?: 'round'
+}
+
 export interface Architecture {
   widthMm: Millimetres
   depthMm: Millimetres
   wallHeightMm: Millimetres
   roomPolygon: PointMm[]
   openings: Opening[]
-  pillars: RectMm[]
+  pillars: Pillar[]
   storageZones: StorageZone[]
   locked: boolean
 }
@@ -217,4 +221,9 @@ export interface KitchenProject {
   scenarios: SimulationScenario[]
   activeVariantId: string
   activeScenarioId: string
+  /** Last zero-issue snapshot used by Reset to working version. */
+  lastWorking?: {
+    architecture: Architecture
+    equipmentByVariant: Record<string, EquipmentItem[]>
+  }
 }

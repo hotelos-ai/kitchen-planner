@@ -1166,3 +1166,24 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px s
 .autofix-dialog > button:hover { border-color: rgba(17, 34, 28, 0.4); }
 .autofix-dialog > button strong { font-size: 12px; font-weight: 510; }
 .autofix-dialog > button span { color: var(--ink-3); font-size: 11px; line-height: 1.45; }
+
+.catalog-group { display: grid; gap: 7px; }
+.catalog-group-header { color: var(--ink-4); font-size: 10px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; margin-top: 6px; }
+.catalog-group:first-child .catalog-group-header { margin-top: 0; }
+
+.canvas-tooltip { position: absolute; z-index: 25; pointer-events: none; padding: 4px 9px; border: 1px solid var(--rule); border-radius: 6px; background: var(--ink); color: var(--paper-hi); font-size: 10.5px; font-weight: 510; white-space: nowrap; opacity: 0; transition: opacity 120ms ease; box-shadow: var(--shadow-pop); }
+
+.space-stack-section { border: 1px solid var(--rule); border-radius: var(--control-radius); margin-bottom: 7px; background: var(--paper); }
+.space-stack-section summary { display: flex; align-items: center; justify-content: space-between; padding: 9px 12px; cursor: pointer; font-size: 12.5px; font-weight: 510; color: var(--ink-2); list-style: none; }
+.space-stack-section summary::-webkit-details-marker { display: none; }
+.space-stack-section summary::before { content: '▸'; color: var(--ink-4); margin-right: 8px; transition: transform 150ms ease; }
+.space-stack-section[open] summary::before { transform: rotate(90deg); }
+.space-stack-count { color: var(--ink-4); font-family: var(--font-mono); font-size: 10.5px; }
+.space-stack-body { border-top: 1px solid var(--rule); padding: 10px 12px; display: grid; gap: 7px; }
+.space-stack-body .field-pair label input { min-height: 28px; }
+.space-item-inspector .field-pair { grid-template-columns: 1fr 1fr; }
+
+.autofix-reset { width: 100%; min-height: 28px; margin-top: 6px; border: 1px solid var(--rule-2); border-radius: var(--control-radius); background: var(--paper-hi); color: var(--ink-2); font-size: 11.5px; font-weight: 510; }
+.autofix-reset:hover { color: var(--ink); border-color: rgba(17, 34, 28, 0.4); }
+.autofix-notice { display: flex; align-items: start; gap: 8px; margin: 8px 0 0; border: 1px solid rgba(45, 124, 111, 0.4); border-radius: var(--control-radius); padding: 8px 10px; color: var(--ok); background: var(--ok-soft); font-size: 11.5px; line-height: 1.5; }
+.autofix-notice button { border: 0; background: transparent; color: inherit; padding: 0; }

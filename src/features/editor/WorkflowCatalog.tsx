@@ -16,18 +16,16 @@ import { EquipmentLibrary } from './EquipmentLibrary'
 
 type Props = { store: ProjectStore; stage: WorkflowStage; onBeginPlacement?(spec: import('./room-outline').PlacementSpec): void }
 
-type SpaceTab = 'openings' | 'structure' | 'zones'
-
 const titleCase = (value: string) => value
   .split('-')
   .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
   .join(' ')
 
-const SPACE_TAB_FILTERS: Record<SpaceTab, (entry: CatalogEntry) => boolean> = {
-  openings: (entry) => entry.category === 'architecture' && entry.tags.includes('opening'),
-  structure: (entry) => entry.category === 'architecture' && (entry.tags.includes('fixed') || entry.tags.includes('obstruction')),
-  zones: (entry) => entry.category === 'architecture' && entry.tags.includes('zone'),
-}
+const SPACE_GROUPS: { label: string; filter: (entry: CatalogEntry) => boolean }[] = [
+  { label: 'Openings', filter: (entry) => entry.category === 'architecture' && entry.tags.includes('opening') },
+  { label: 'Structure', filter: (entry) => entry.category === 'architecture' && (entry.tags.includes('fixed') || entry.tags.includes('obstruction')) },
+  { label: 'Zones', filter: (entry) => entry.category === 'architecture' && entry.tags.includes('zone') },
+]
 
 function CatalogCard({ entry, displayUnit, onAdd }: { entry: CatalogEntry; displayUnit: DisplayUnit; onAdd: () => void }) {
   const handleDragStart = (event: DragEvent<HTMLElement>) => {
@@ -56,13 +54,13 @@ function SpaceCatalog({ store, onBeginPlacement }: { store: ProjectStore; onBegi
   const project = useStore(store, (state) => state.project)
   const variant = useStore(store, getActiveVariant)
   const [query, setQuery] = useState('')
-  const [tab, setTab] = useState<SpaceTab>('openings')
   const [placementError, setPlacementError] = useState('')
 
-  const entries = useMemo(() => {
+  const groups = useMemo(() => {
     const searched = searchCatalog(query)
-    return filterCatalog(searched, {}).filter(SPACE_TAB_FILTERS[tab])
-  }, [query, tab])
+    const all = filterCatalog(searched, {}).filter((entry) => entry.category === 'architecture')
+    return SPACE_GROUPS.map((group) => ({ ...group, entries: all.filter(group.filter) })).filter((group) => group.entries.length > 0)
+  }, [query])
 
   const defaultPosition = (entry: CatalogEntry) => {
     const architecture = variant.architecture
@@ -84,10 +82,11 @@ function SpaceCatalog({ store, onBeginPlacement }: { store: ProjectStore; onBegi
         catalogId: entry.catalogId,
         label: entry.displayName,
         kind: entry.tags.includes('opening')
-          ? (entry.catalogId === 'architecture-service-window' ? 'service-window' : 'door')
+          ? (entry.tags.includes('service') ? 'service-window' : 'door')
           : entry.tags.includes('zone') ? 'zone' : 'pillar',
         widthMm: entry.typicalDimensions.widthMm,
         depthMm: entry.typicalDimensions.depthMm,
+        ...(entry.tags.includes('round') ? { round: true } : {}),
       })
       return
     }
@@ -110,19 +109,19 @@ function SpaceCatalog({ store, onBeginPlacement }: { store: ProjectStore; onBegi
     <aside className="equipment-library" aria-label="Space components catalog">
       <div className="panel-heading"><span className="eyebrow">Space</span><h2>Build the space</h2></div>
       <p className="stage-summary space-catalog-hint">Drag the outline on the plan to reshape the room, or add openings, structure, and zones here. Every change applies to all layouts.</p>
-      <div className="catalog-tabs" role="tablist" aria-label="Space catalog tabs">
-        {(['openings', 'structure', 'zones'] as SpaceTab[]).map((value) => (
-          <button key={value} type="button" role="tab" aria-selected={tab === value} onClick={() => setTab(value)}>{titleCase(value)}</button>
-        ))}
-      </div>
       <label>
         Search
         <input type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Door, window, pillar…" />
       </label>
       {placementError && <p role="alert">{placementError}</p>}
       <div className="catalog-grid">
-        {entries.map((entry) => <CatalogCard key={entry.catalogId} entry={entry} displayUnit={project.displayUnit} onAdd={() => addCatalogEntry(entry)} />)}
-        {entries.length === 0 && <p role="status">No components match this filter.</p>}
+        {groups.map((group) => (
+          <div key={group.label} className="catalog-group">
+            <span className="catalog-group-header">{group.label}</span>
+            {group.entries.map((entry) => <CatalogCard key={entry.catalogId} entry={entry} displayUnit={project.displayUnit} onAdd={() => addCatalogEntry(entry)} />)}
+          </div>
+        ))}
+        {groups.length === 0 && <p role="status">No components match this search.</p>}
       </div>
     </aside>
   )

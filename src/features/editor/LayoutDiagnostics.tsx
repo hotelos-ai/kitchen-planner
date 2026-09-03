@@ -8,6 +8,7 @@ export function LayoutDiagnostics({ store }: { store: ProjectStore }) {
   const variant = useStore(store, getActiveVariant)
   const project = useStore(store, (state) => state.project)
   const [fixOpen, setFixOpen] = useState(false)
+  const [resetNotice, setResetNotice] = useState<string | null>(null)
   const issues = analyzeLayout(variant.architecture, variant.equipment, { layoutConstraints: variant.layoutConstraints })
   const fixEquipment = () => {
     const moves = fixByRearranging(variant.architecture, variant.equipment, project.snapMm)
@@ -19,12 +20,25 @@ export function LayoutDiagnostics({ store }: { store: ProjectStore }) {
     store.getState().applySharedArchitecture(next)
     setFixOpen(false)
   }
+  const resetWorking = () => {
+    const result = store.getState().resetToWorkingSnapshot()
+    setFixOpen(false)
+    setResetNotice(result.restored
+      ? result.parked > 0
+        ? `Reset to the last working version. ${result.parked} item${result.parked === 1 ? '' : 's'} that did not fit were moved to the side of the plan.`
+        : 'Reset to the last working version.'
+      : 'No working version saved yet.')
+  }
   return (
     <section className="layout-diagnostics" aria-label="Layout checks">
       <div><span className="eyebrow">Checks</span><strong>{issues.length ? `${issues.length} items to inspect` : 'No geometry conflicts'}</strong></div>
       {issues.length > 0 && (
         <button type="button" className="autofix-button" onClick={() => setFixOpen((open) => !open)}>Auto-fix…</button>
       )}
+      {project.lastWorking && (
+        <button type="button" className="autofix-reset" onClick={resetWorking}>Reset to last working version</button>
+      )}
+      {resetNotice && <p className="autofix-notice" role="status">{resetNotice}<button type="button" aria-label="Dismiss notice" onClick={() => setResetNotice(null)}>×</button></p>}
       {issues.length > 0 && fixOpen && (
         <div className="autofix-dialog" role="dialog" aria-label="Choose an auto-fix">
           <p>This layout has {issues.length} geometric conflict{issues.length === 1 ? '' : 's'} (items outside the room, overlaps, or blocked clearances). How would you like to fix it?</p>

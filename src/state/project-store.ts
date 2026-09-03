@@ -1,6 +1,8 @@
 import { useStore } from 'zustand'
 import { createStore, type StoreApi } from 'zustand/vanilla'
 import { createWorkspaceFacade, type WorkspaceFacade } from '../core/workspace/workspace-facade'
+import { analyzeLayout } from '../domain/layout-diagnostics'
+import { parkOutside } from '../features/editor/auto-fix'
 import type {
   Architecture,
   DisplayUnit,
@@ -87,6 +89,8 @@ export interface ProjectState {
   restoreCheckpoint(checkpointId: string): boolean
   applySharedArchitecture(architecture: Architecture): ReturnType<WorkspaceFacade['applyOperations']>
   applyEquipmentMoves(moves: { id: string; xMm: number; yMm: number }[]): boolean
+  captureWorkingSnapshot(): void
+  resetToWorkingSnapshot(): { restored: boolean; parked: number }
   undo(): void
   redo(): void
 }
@@ -372,6 +376,49 @@ export function createProjectStore(initialProject: KitchenProject): ProjectStore
           if (project.activeVariantId === target.id) project.architecture = structuredClone(restored.architecture)
         })
         return result.ok
+      },
+      captureWorkingSnapshot: () => {
+        const project = get().project
+        const variant = getActiveVariant(get())
+        const clean = analyzeLayout(variant.architecture, variant.equipment, { layoutConstraints: variant.layoutConstraints }).length === 0
+        if (!clean) return
+        set((state) => ({
+          project: {
+            ...state.project,
+            lastWorking: {
+              architecture: structuredClone(state.project.architecture),
+              equipmentByVariant: Object.fromEntries(state.project.variants.map((entry) => [entry.id, structuredClone(entry.equipment)])),
+            },
+          },
+        }))
+      },
+      resetToWorkingSnapshot: () => {
+        const project = get().project
+        const snapshot = project.lastWorking
+        if (!snapshot) return { restored: false, parked: 0 }
+        const activeId = project.activeVariantId
+        const current = getActiveVariant(get())
+        const snapshotIds = new Set(snapshot.equipmentByVariant[activeId]?.map((item) => item.id) ?? [])
+        const newcomers = current.equipment.filter((item) => !snapshotIds.has(item.id))
+        const parkedMoves = parkOutside(snapshot.architecture, newcomers, snapshot.equipmentByVariant[activeId] ?? [], project.snapMm)
+        const operations = project.variants.flatMap((variant) => [
+          { type: 'update_architecture' as const, variantId: variant.id, patch: {
+            widthMm: snapshot.architecture.widthMm,
+            depthMm: snapshot.architecture.depthMm,
+            wallHeightMm: snapshot.architecture.wallHeightMm,
+            roomPolygon: snapshot.architecture.roomPolygon,
+            openings: snapshot.architecture.openings,
+            pillars: snapshot.architecture.pillars,
+            storageZones: snapshot.architecture.storageZones,
+            locked: false,
+          } },
+        ])
+        const equipmentOps = [
+          ...(snapshot.equipmentByVariant[activeId] ?? []).map((item) => ({ type: 'update_component' as const, variantId: activeId, componentId: item.id, patch: { xMm: item.xMm, yMm: item.yMm } })),
+          ...parkedMoves.map((move) => ({ type: 'update_component' as const, variantId: activeId, componentId: move.id, patch: { xMm: move.xMm, yMm: move.yMm } })),
+        ].filter((op) => current.equipment.some((item) => item.id === op.componentId))
+        const result = applyOperations([...operations, ...equipmentOps], 'Reset to last working version')
+        return { restored: result.ok, parked: parkedMoves.length }
       },
       applyEquipmentMoves: (moves) => {
         if (moves.length === 0) return true

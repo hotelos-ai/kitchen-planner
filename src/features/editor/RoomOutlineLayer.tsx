@@ -15,7 +15,10 @@ import {
   openingCenter,
   openingEnds,
   rectHandles,
+  removeOpening,
+  removePillar,
   removeVertex,
+  removeZone,
   resizeOpening,
   resizePillarRect,
   resizeZoneRect,
@@ -34,6 +37,7 @@ type Props = {
   placement: PlacementSpec | null
   onCommit(next: Architecture): void
   onPlacementDone(): void
+  onSelectItem?(selection: { kind: 'pillar' | 'zone' | 'opening'; id: string } | null): void
 }
 
 const HANDLE_RADIUS = 8
@@ -47,7 +51,7 @@ const isTypingTarget = (target: EventTarget | null) =>
 
 type SelectedItem = { kind: 'pillar' | 'zone' | 'opening'; id: string }
 
-export function RoomOutlineLayer({ architecture, pixelsPerMm, originX, originY, snapMm, placement, onCommit, onPlacementDone }: Props) {
+export function RoomOutlineLayer({ architecture, pixelsPerMm, originX, originY, snapMm, placement, onCommit, onPlacementDone, onSelectItem }: Props) {
   const [dragPolygon, setDragPolygon] = useState<PointMm[] | null>(null)
   const [draggingEdge, setDraggingEdge] = useState<number | null>(null)
   const [selectedVertex, setSelectedVertex] = useState<number | null>(null)
@@ -62,6 +66,8 @@ export function RoomOutlineLayer({ architecture, pixelsPerMm, originX, originY, 
     return () => { stage?.style.setProperty('cursor', 'default') }
   }, [placement])
 
+  useEffect(() => { onSelectItem?.(selectedItem) }, [selectedItem, onSelectItem])
+
   useEffect(() => {
     if (selectedVertex === null && selectedItem === null && !placement) return
     const onKeyDown = (event: KeyboardEvent) => {
@@ -74,11 +80,30 @@ export function RoomOutlineLayer({ architecture, pixelsPerMm, originX, originY, 
         return
       }
       if (event.key !== 'Delete' && event.key !== 'Backspace') return
-      if (selectedVertex === null) return
       event.preventDefault()
-      const index = selectedVertex
-      setSelectedVertex(null)
-      onCommit(removeVertex(architecture, index))
+      if (selectedVertex !== null) {
+        const index = selectedVertex
+        setSelectedVertex(null)
+        onCommit(removeVertex(architecture, index))
+        return
+      }
+      if (selectedItem?.kind === 'opening') {
+        const index = architecture.openings.findIndex((opening) => opening.id === selectedItem.id)
+        setSelectedItem(null)
+        if (index >= 0) onCommit(removeOpening(architecture, index))
+        return
+      }
+      if (selectedItem?.kind === 'pillar') {
+        const index = architecture.pillars.findIndex((pillar) => pillar.id === selectedItem.id)
+        setSelectedItem(null)
+        if (index >= 0) onCommit(removePillar(architecture, index))
+        return
+      }
+      if (selectedItem?.kind === 'zone') {
+        const index = architecture.storageZones.findIndex((zone) => zone.id === selectedItem.id)
+        setSelectedItem(null)
+        if (index >= 0) onCommit(removeZone(architecture, index))
+      }
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
@@ -120,6 +145,29 @@ export function RoomOutlineLayer({ architecture, pixelsPerMm, originX, originY, 
     if (pillarIndex >= 0) onCommit(resizePillarRect(architecture, pillarIndex, handle, point, snapMm))
     else if (zoneIndex >= 0) onCommit(resizeZoneRect(architecture, zoneIndex, handle, point, snapMm))
     node.position({ x: 0, y: 0 })
+  }
+
+  const showTooltip = (event: KonvaEventObject<MouseEvent>, text: string) => {
+    const stage = event.target.getStage()
+    const container = stage?.container()?.parentElement
+    if (!container) return
+    let tip = container.querySelector<HTMLElement>('.canvas-tooltip')
+    if (!tip) {
+      tip = document.createElement('div')
+      tip.className = 'canvas-tooltip'
+      container.appendChild(tip)
+    }
+    const pointer = stage?.getPointerPosition()
+    tip.textContent = text
+    tip.style.opacity = '1'
+    if (pointer) {
+      tip.style.left = `${pointer.x + 14}px`
+      tip.style.top = `${pointer.y - 30}px`
+    }
+  }
+  const hideTooltip = (event: KonvaEventObject<MouseEvent>) => {
+    const stage = event.target.getStage()
+    stage?.container()?.parentElement?.querySelector('.canvas-tooltip')?.remove()
   }
 
   return (
@@ -201,6 +249,9 @@ export function RoomOutlineLayer({ architecture, pixelsPerMm, originX, originY, 
               strokeWidth={2}
               dash={[5, 4]}
               hitStrokeWidth={20}
+              onMouseEnter={(event) => showTooltip(event, 'Add wall point')}
+              onMouseMove={(event) => showTooltip(event, 'Add wall point')}
+              onMouseLeave={hideTooltip}
               onClick={() => onCommit(insertVertexOnSegment(architecture, index, edgeMidpoint(architecture.roomPolygon, index), snapMm))}
             />
           </Group>
@@ -221,6 +272,8 @@ export function RoomOutlineLayer({ architecture, pixelsPerMm, originX, originY, 
             strokeWidth={2.5}
             draggable
             hitStrokeWidth={24}
+            onMouseEnter={(event) => showTooltip(event, 'Drag to move · Delete to remove')}
+            onMouseLeave={hideTooltip}
             onClick={() => setSelectedVertex((current) => current === index ? null : index)}
             onDragStart={() => setSelectedVertex(index)}
             onDragMove={(event) => {
@@ -256,6 +309,9 @@ export function RoomOutlineLayer({ architecture, pixelsPerMm, originX, originY, 
               }}
             >
               <Circle x={position.x} y={position.y} radius={OPENING_RADIUS} fill="#ca4e8e" opacity={isSelected ? 1 : 0.9} stroke="#fbfaf5" strokeWidth={2} hitStrokeWidth={22}
+                onMouseEnter={(event) => showTooltip(event, 'Drag along walls · click to select')}
+                onMouseMove={(event) => showTooltip(event, 'Drag along walls · click to select')}
+                onMouseLeave={hideTooltip}
                 onClick={() => setSelectedItem((current) => current?.id === opening.id ? null : { kind: 'opening', id: opening.id })} />
               <Circle x={position.x} y={position.y} radius={3} fill="#fbfaf5" listening={false} />
             </Group>
@@ -263,6 +319,8 @@ export function RoomOutlineLayer({ architecture, pixelsPerMm, originX, originY, 
               const at = end === 'start' ? startPx : endPx
               return (
                 <Circle key={end} x={at.x} y={at.y} radius={RESIZE_HALF} fill="#fbfaf5" stroke="#ca4e8e" strokeWidth={2.5} draggable hitStrokeWidth={22}
+                  onMouseEnter={(event) => showTooltip(event, 'Drag to resize')}
+                  onMouseLeave={hideTooltip}
                   onDragMove={(event) => {
                     const node = event.target
                     const snapped = snapPointLocal(toMm(node.x(), node.y()))
@@ -283,18 +341,27 @@ export function RoomOutlineLayer({ architecture, pixelsPerMm, originX, originY, 
       {architecture.pillars.map((pillar, index) => {
         const position = toPx({ x: pillar.xMm + pillar.widthMm / 2, y: pillar.yMm + pillar.depthMm / 2 })
         const isSelected = pillarIndex === index
-        return (
-          <Rect key={pillar.id} x={position.x - PILLAR_HALF} y={position.y - PILLAR_HALF}
-            width={PILLAR_HALF * 2} height={PILLAR_HALF * 2} cornerRadius={3}
-            fill={isSelected ? '#ca4e8e' : '#1b3a36'} stroke="#1b3a36" strokeWidth={2.5} draggable hitStrokeWidth={22}
-            onClick={() => setSelectedItem((current) => current?.id === pillar.id ? null : { kind: 'pillar', id: pillar.id })}
-            onDragEnd={(event) => {
-              const node = event.target
-              const point = toMm(node.x() + PILLAR_HALF, node.y() + PILLAR_HALF)
-              onCommit(movePillar(architecture, index, point, snapMm))
-            }}
-          />
-        )
+        const round = pillar.shape === 'round'
+        const handleProps = {
+          x: position.x - PILLAR_HALF,
+          y: position.y - PILLAR_HALF,
+          width: PILLAR_HALF * 2,
+          height: PILLAR_HALF * 2,
+          fill: isSelected ? '#ca4e8e' : '#1b3a36',
+          draggable: true,
+          hitStrokeWidth: 22,
+          onMouseEnter: (event: KonvaEventObject<MouseEvent>) => showTooltip(event, 'Drag to move · click to select'),
+          onMouseLeave: hideTooltip,
+          onClick: () => setSelectedItem((current) => current?.id === pillar.id ? null : { kind: 'pillar', id: pillar.id }),
+          onDragEnd: (event: KonvaEventObject<DragEvent>) => {
+            const node = event.target
+            const point = toMm(node.x() + PILLAR_HALF, node.y() + PILLAR_HALF)
+            onCommit(movePillar(architecture, index, point, snapMm))
+          },
+        }
+        return round
+          ? <Circle key={pillar.id} {...handleProps} radius={PILLAR_HALF} y={position.y} x={position.x} width={undefined} height={undefined} stroke="#1b3a36" strokeWidth={2.5} />
+          : <Rect key={pillar.id} {...handleProps} cornerRadius={3} stroke="#1b3a36" strokeWidth={2.5} />
       })}
 
       {architecture.storageZones.map((zone, index) => {
@@ -304,6 +371,8 @@ export function RoomOutlineLayer({ architecture, pixelsPerMm, originX, originY, 
         return (
           <Rect key={zone.id} x={a.x} y={a.y} width={size.x - a.x} height={size.y - a.y}
             fill={isSelected ? 'rgba(202,78,142,0.08)' : 'rgba(0,0,0,0)'} stroke={isSelected ? '#ca4e8e' : 'rgba(0,0,0,0)'} strokeWidth={2} dash={[8, 6]} draggable hitStrokeWidth={24}
+            onMouseEnter={(event) => showTooltip(event, 'Drag to move · click to select')}
+            onMouseLeave={hideTooltip}
             onClick={() => setSelectedItem((current) => current?.id === zone.id ? null : { kind: 'zone', id: zone.id })}
             onDragEnd={(event) => {
               const node = event.target
@@ -325,6 +394,8 @@ export function RoomOutlineLayer({ architecture, pixelsPerMm, originX, originY, 
               const snapped = snapPointLocal(toMm(node.x() + RESIZE_HALF, node.y() + RESIZE_HALF))
               node.position({ x: toPx(snapped).x - RESIZE_HALF, y: toPx(snapped).y - RESIZE_HALF })
             }}
+            onMouseEnter={(event) => showTooltip(event, 'Drag to resize · Shift = square')}
+            onMouseLeave={hideTooltip}
             onDragEnd={rectResizeCommit(handle)}
           />
         )

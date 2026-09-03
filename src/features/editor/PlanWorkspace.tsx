@@ -15,6 +15,7 @@ import { SpaceImpactDialog } from './SpaceImpactDialog'
 import { StageOverview } from './StageOverview'
 import { RoomEditorPanel } from './RoomEditorPanel'
 import type { PlacementSpec } from './room-outline'
+import type { SpaceSelection } from './SpaceItemInspector'
 import { useWorkspaceShortcuts } from './useWorkspaceShortcuts'
 import { WorkflowCatalog } from './WorkflowCatalog'
 
@@ -151,6 +152,7 @@ export function PlanWorkspace({
   const dragResizeEnabled = Boolean(selectedItem && !selectedItem.dimensionsLocked)
   const [localReference, setLocalReference] = useState(showReference)
   const [placement, setPlacement] = useState<PlacementSpec | null>(null)
+  const [spaceSelection, setSpaceSelection] = useState<SpaceSelection>(null)
   const [localCatalogOpen, setLocalCatalogOpen] = useState(includeToolbar ? drawersInitiallyOpen() : catalogOpen)
   const [localInspectorOpen, setLocalInspectorOpen] = useState(includeToolbar ? drawersInitiallyOpen() : inspectorOpen)
 
@@ -243,6 +245,7 @@ export function PlanWorkspace({
                 mode={stage === 'space' ? 'space' : 'layout'}
                 placement={stage === 'space' ? placement : null}
                 onPlacementDone={() => setPlacement(null)}
+                onSelectItem={setSpaceSelection}
                 showReference={compact ? false : referenceVisible}
                 sourceImageUrl={localSourceUrl}
                 sourceOpacity={sourceOpacity}
@@ -294,7 +297,7 @@ export function PlanWorkspace({
           {!compact && (
             <div className="editor-drawer right-panel inspector-drawer" data-editor-drawer="inspector" aria-hidden={!inspectorVisible}>
               {essentialsVisible && (
-                <section className="essentials-dialog in-panel" role="dialog" aria-modal="true" aria-label="Check essentials">
+                <section className="essentials-dialog in-panel" role="dialog" aria-modal="true" aria-label="Validate plan">
                   <button type="button" className="workspace-modal-close" aria-label="Close essentials checker" onClick={() => setEssentialsVisible(false)}>×</button>
                   <EssentialsChecker store={store} focusItemId={checksFocusId} onEditRoom={() => {
                     setEssentialsVisible(false)
@@ -307,7 +310,7 @@ export function PlanWorkspace({
               {!essentialsVisible && !revisionsVisible && (selectedIds.length > 0 ? (
                 <EquipmentInspector store={store} />
               ) : stage === 'space' ? (
-                <RoomEditorPanel store={store} onContinueToEquipment={continueToEquipment} />
+                <RoomEditorPanel store={store} selection={spaceSelection} onClearSelection={() => setSpaceSelection(null)} onContinueToEquipment={continueToEquipment} />
               ) : showInspectorContent ? (
                 <StageOverview
                   store={store}

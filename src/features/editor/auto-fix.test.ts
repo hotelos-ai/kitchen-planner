@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { Architecture, EquipmentItem } from '../../domain/project'
-import { fixByBoundary, fixByRearranging, itemInsideRoom } from './auto-fix'
+import { fixByBoundary, fixByRearranging, itemInsideRoom, parkOutside } from './auto-fix'
 
 const architecture: Architecture = {
   widthMm: 3000,
@@ -55,5 +55,16 @@ describe('auto-fix', () => {
 
   it('returns the architecture unchanged when everything already fits', () => {
     expect(fixByBoundary(architecture, [item('fine', 1000, 1000)], 100)).toBe(architecture)
+  })
+})
+
+describe('parking outside the room', () => {
+  it('stages newcomers to the right of the room in a racked column', () => {
+    const moves = parkOutside(architecture, [item('a', 0, 0), item('b', 0, 0, 800, 400)], [], 100)
+    expect(moves).toHaveLength(2)
+    expect(moves[0].xMm).toBeGreaterThanOrEqual(architecture.widthMm)
+    expect(moves[1].xMm).toBe(moves[0].xMm)
+    expect(moves[1].yMm).toBeGreaterThan(moves[0].yMm)
+    expect(moves[1].yMm - moves[0].yMm).toBeGreaterThanOrEqual(1000)
   })
 })

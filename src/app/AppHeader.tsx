@@ -147,7 +147,7 @@ export function StageToolbar({
         )}
         <button type="button" aria-label="Toggle inspector" aria-pressed={inspectorOpen} onClick={onToggleInspector}>Inspector</button>
         <button type="button" onClick={onOpenEssentials}>
-          Check essentials{essentialsCount > 0 ? ` · ${essentialsCount}` : ''}
+          {stage === 'space' ? 'Validate Plan' : 'Validate Fit-Out'}{essentialsCount > 0 ? ` · ${essentialsCount}` : ''}
         </button>
         <button type="button" aria-label="Undo" title="Undo (⌘Z)" disabled={!canUndo} onClick={onUndo}>↺</button>
         <button type="button" aria-label="Redo" title="Redo (⌘⇧Z)" disabled={!canRedo} onClick={onRedo}>↻</button>

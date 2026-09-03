@@ -80,7 +80,7 @@ export function StageOverview({ store, stage, hideToolbarActions = false, onCont
         </ul>
         <div className="stage-actions">
           {!hideToolbarActions && onCheckEssentials && (
-            <button type="button" onClick={onCheckEssentials}>Check essentials{attentionCount ? ` ${attentionCount}` : ''}</button>
+            <button type="button" onClick={onCheckEssentials}>Validate Fit-Out{attentionCount ? ` ${attentionCount}` : ''}</button>
           )}
           {onSetUpSimulation && (
             <button type="button" className="primary-button" onClick={onSetUpSimulation}>Set up simulation</button>

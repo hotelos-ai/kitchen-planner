@@ -303,7 +303,7 @@ export function createOpeningAt(architecture: Architecture, entry: { label: stri
   }
 }
 
-export function createRectItemAt(architecture: Architecture, entry: { id: string; label: string; kind: 'pillar' | 'zone'; widthMm: number; depthMm: number }, from: PointMm, to: PointMm | null, snapMm: number): Architecture {
+export function createRectItemAt(architecture: Architecture, entry: { id: string; label: string; kind: 'pillar' | 'zone'; widthMm: number; depthMm: number; round?: boolean }, from: PointMm, to: PointMm | null, snapMm: number): Architecture {
   const snap = (value: number) => Math.max(0, Math.round(value / snapMm) * snapMm)
   const x1 = snap(from.x)
   const y1 = snap(from.y)
@@ -323,14 +323,14 @@ export function createRectItemAt(architecture: Architecture, entry: { id: string
   return appendRectItem(architecture, entry, rect)
 }
 
-function appendRectItem(architecture: Architecture, entry: { id: string; label: string; kind: 'pillar' | 'zone' }, rect: RectMm): Architecture {
+function appendRectItem(architecture: Architecture, entry: { id: string; label: string; kind: 'pillar' | 'zone'; round?: boolean }, rect: RectMm): Architecture {
   if (entry.kind === 'pillar') {
-    return { ...architecture, pillars: [...architecture.pillars, { id: makeId('pillar'), xMm: rect.xMm, yMm: rect.yMm, widthMm: rect.widthMm, depthMm: rect.depthMm }] }
+    return { ...architecture, pillars: [...architecture.pillars, { id: makeId('pillar'), xMm: rect.xMm, yMm: rect.yMm, widthMm: rect.widthMm, depthMm: rect.depthMm, ...(entry.round ? { shape: 'round' as const } : {}) }] }
   }
   return { ...architecture, storageZones: [...architecture.storageZones, { id: makeId('storage-zone'), label: entry.label, xMm: rect.xMm, yMm: rect.yMm, widthMm: rect.widthMm, depthMm: rect.depthMm, adjacent: false }] }
 }
 
-export type PlacementSpec = { catalogId: string; label: string; kind: 'pillar' | 'partition' | 'zone' | 'door' | 'service-window'; widthMm: number; depthMm: number }
+export type PlacementSpec = { catalogId: string; label: string; kind: 'pillar' | 'partition' | 'zone' | 'door' | 'service-window'; widthMm: number; depthMm: number; round?: boolean }
 
 export function constrainToAxes(from: PointMm, to: PointMm): PointMm {
   const dx = to.x - from.x
@@ -348,4 +348,19 @@ export function squarePointAround(anchor: PointMm, point: PointMm): PointMm {
   const dy = point.y - anchor.y
   const size = Math.max(Math.abs(dx), Math.abs(dy))
   return { x: anchor.x + Math.sign(dx || 1) * size, y: anchor.y + Math.sign(dy || 1) * size }
+}
+
+export function removeOpening(architecture: Architecture, index: number): Architecture {
+  if (index < 0 || index >= architecture.openings.length) return architecture
+  return { ...architecture, openings: architecture.openings.filter((_, position) => position !== index) }
+}
+
+export function removePillar(architecture: Architecture, index: number): Architecture {
+  if (index < 0 || index >= architecture.pillars.length) return architecture
+  return { ...architecture, pillars: architecture.pillars.filter((_, position) => position !== index) }
+}
+
+export function removeZone(architecture: Architecture, index: number): Architecture {
+  if (index < 0 || index >= architecture.storageZones.length) return architecture
+  return { ...architecture, storageZones: architecture.storageZones.filter((_, position) => position !== index) }
 }

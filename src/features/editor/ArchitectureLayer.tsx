@@ -1,4 +1,4 @@
-import { Group, Layer, Line, Rect, Text } from 'react-konva'
+import { Circle, Group, Layer, Line, Rect, Text } from 'react-konva'
 import type { Architecture } from '../../domain/project'
 
 type Props = {
@@ -23,7 +23,9 @@ export function ArchitectureLayer({ architecture, pixelsPerMm: scale, originX, o
       ))}
       {architecture.pillars.map((pillar) => (
         <Group key={pillar.id} x={originX + px(pillar.xMm)} y={originY + px(pillar.yMm)}>
-          <Rect width={px(pillar.widthMm)} height={px(pillar.depthMm)} fill="#4b514e" stroke="#202623" strokeWidth={2} />
+          {pillar.shape === 'round'
+            ? <Circle x={px(pillar.widthMm) / 2} y={px(pillar.depthMm) / 2} radius={px(Math.min(pillar.widthMm, pillar.depthMm)) / 2} fill="#1b3a36" />
+            : <Rect width={px(pillar.widthMm)} height={px(pillar.depthMm)} fill="#1b3a36" stroke="#1b3a36" strokeWidth={2} />}
           <Text width={px(pillar.widthMm)} height={px(pillar.depthMm)} align="center" verticalAlign="middle" text="PILLAR" fill="white" fontSize={Math.max(6, Math.min(9, px(pillar.widthMm) / 5))} />
         </Group>
       ))}
