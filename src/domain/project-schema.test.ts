@@ -4,8 +4,8 @@ import { projectSchema } from './project-schema'
 
 const validProject = {
   schemaVersion: 3,
-  id: 'manta-raja',
-  name: 'Manta Raja Kitchen Lab',
+  id: 'schema-fixture',
+  name: 'Schema fixture kitchen',
   displayUnit: 'mm',
   snapMm: 100,
   architecture: {

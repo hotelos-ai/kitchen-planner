@@ -3,7 +3,7 @@ import { CONFIGURATION_BY_SEED_ID } from './equipment-configurations'
 import { projectSchema } from './project-schema'
 import { createSeedProject } from './seed-project'
 
-describe('Manta Raja seed project', () => {
+describe('seed project', () => {
   it('preserves the confirmed fixed relationships', () => {
     const project = createSeedProject()
     const items = project.variants[0].equipment

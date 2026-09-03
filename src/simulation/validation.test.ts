@@ -13,7 +13,7 @@ describe('simulation input validation', () => {
     expect(physicalStationCapacity(item)).toBe(Math.max(1, preset.capacity.workPositions))
   })
 
-  it('accepts the seeded Manta Raja scenario', () => {
+  it('accepts the seeded scenario', () => {
     const project = createSeedProject()
     expect(validateSimulationInput({ architecture: project.architecture, equipment: project.variants[0].equipment, scenario: project.scenarios[0] })).toEqual([])
   })

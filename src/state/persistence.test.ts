@@ -119,7 +119,7 @@ describe('project persistence', () => {
   })
 
   it('starts from the seed when nothing recoverable exists', () => {
-    expect(loadProject(memoryStorage()).id).toBe('manta-raja-kitchen-lab')
+    expect(loadProject(memoryStorage()).id).toBe('kitchen-1')
   })
 
   it('rejects malformed imports and saves only valid projects', () => {
@@ -188,7 +188,7 @@ describe('project persistence', () => {
     expect(() => importProject(JSON.stringify(nested))).toThrow(/not a valid kitchen project/i)
   })
 
-  it('reads legacy Manta storage keys only as fallback and saves generic product keys', () => {
+  it('reads legacy storage keys only as fallback and saves generic product keys', () => {
     const project = createSeedProject()
     const legacyStorage = memoryStorage({ [LEGACY_CURRENT_PROJECT_KEY]: JSON.stringify(project) })
     expect(loadProject(legacyStorage)).toEqual(project)

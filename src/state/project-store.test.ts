@@ -184,12 +184,12 @@ describe('project store', () => {
     candidate.variants[0].equipment.find((item) => item.id === 'tandoor')!.xMm = 2200
 
     expect(store.getState().commitProjectCandidate(candidate, 0, documentId)).toEqual({ ok: true, revision: 1 })
-    expect(store.getState()).toMatchObject({ revision: 1, past: [{ name: 'Manta Raja Kitchen Lab' }], future: [] })
+    expect(store.getState()).toMatchObject({ revision: 1, past: [{ name: 'Kitchen 1' }], future: [] })
     expect(store.getState().project).toMatchObject({ name: 'Atomic candidate' })
     expect(getActiveItem(store.getState(), 'tandoor').xMm).toBe(2200)
 
     store.getState().undo()
-    expect(store.getState().project.name).toBe('Manta Raja Kitchen Lab')
+    expect(store.getState().project.name).toBe('Kitchen 1')
     expect(getActiveItem(store.getState(), 'tandoor').xMm).toBe(2400)
   })
 

@@ -154,8 +154,8 @@ export function createSeedProject(): KitchenProject {
 
   return {
     schemaVersion: 3,
-    id: 'manta-raja-kitchen-lab',
-    name: 'Manta Raja Kitchen Lab',
+    id: 'kitchen-1',
+    name: 'Kitchen 1',
     displayUnit: 'mm',
     snapMm: 100,
     architecture: structuredClone(architecture),

@@ -12,10 +12,10 @@ describe('project exchange', () => {
   afterEach(() => { vi.restoreAllMocks(); vi.unstubAllGlobals() })
 
   it('imports a validated project without reloading the app', async () => {
-    const imported = { ...createSeedProject(), name: 'Imported Manta Raja option' }
+    const imported = { ...createSeedProject(), name: 'Imported kitchen option' }
     render(<ProjectExchange />)
     await userEvent.upload(screen.getByLabelText(/Open project JSON/i), new File([exportProject(imported)], 'kitchen.json', { type: 'application/json' }))
-    expect(projectStore.getState().project.name).toBe('Imported Manta Raja option')
+    expect(projectStore.getState().project.name).toBe('Imported kitchen option')
     expect(screen.getByText(/Opened kitchen.json/i)).toBeInTheDocument()
   })
 
@@ -50,7 +50,7 @@ describe('project exchange', () => {
     await userEvent.click(screen.getByRole('button', { name: /Save project/i }))
     expect(createObjectURL).toHaveBeenCalledOnce()
     expect(exportedBlob).toBeInstanceOf(Blob)
-    expect(clickedDownload).toBe('manta-raja-kitchen-lab.json')
+    expect(clickedDownload).toBe('kitchen-1.json')
     expect(screen.getByRole('status')).toHaveTextContent(/Project saved/i)
   })
 
