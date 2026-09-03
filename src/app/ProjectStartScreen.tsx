@@ -145,7 +145,8 @@ export function ProjectStartScreen({ onCreateRoom, onDrawManually, onOpenProject
             <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 11V2m0 0L4.5 5.5M8 2l3.5 3.5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" /><path d="M2.5 11v1.5a1.5 1.5 0 0 0 1.5 1.5h8a1.5 1.5 0 0 0 1.5-1.5V11" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" /></svg>
             Upload a file
           </button>
-          <button type="button" className="landing-quiet" onClick={() => { onScratch?.(); setChoice('scratch') }}>
+          <button type="button" className="landing-scratch" onClick={() => { onScratch?.(); setChoice('scratch') }}>
+            <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 13l.9-3.2L10.6 3.1a1.6 1.6 0 0 1 2.3 0 1.6 1.6 0 0 1 0 2.3L6.2 12.1 3 13Z" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" /></svg>
             Design from scratch
           </button>
         </div>
@@ -170,7 +171,7 @@ export function ProjectStartScreen({ onCreateRoom, onDrawManually, onOpenProject
 <span className="agent-user">you ›</span> move the fry line 300&nbsp;mm off the pass
 <span className="agent-user">you ›</span> run the dinner-peak simulation
 <span className="agent-model">designer ›</span> done — P90 wait 12:41, fry station clearing. want the diff?</code></pre>
-          <p>Agents drive the same atomic workspace ops you do — every edit lands in your undo history. Hit <em>Use your AI agent</em> in the top bar to connect.</p>
+          <p>Agents drive the same atomic workspace ops you do — every edit lands in your undo history. Start designing, then hit <em>Use your AI agent</em> in the top bar to connect.</p>
         </aside>
       </div>
       <input ref={fileRef} type="file" accept="application/json,.json" aria-label="Open saved project" hidden onChange={onOpenFile} />
