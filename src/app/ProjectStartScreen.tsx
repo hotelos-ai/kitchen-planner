@@ -4,6 +4,7 @@ import { RoomStartForm } from './RoomStartForm'
 import type { Architecture, KitchenProject } from '../domain/project'
 
 const SceneWorkspace = lazy(() => import('../features/scene/SceneWorkspace').then((module) => ({ default: module.SceneWorkspace })))
+const LANDING_PREVIEW_MEDIA_QUERY = '(min-width: 901px)'
 
 type StartChoice = 'home' | 'scratch' | 'dimensions' | 'trace' | 'draw'
 
@@ -29,6 +30,24 @@ function RotatingHeadline() {
   )
 }
 
+function useLandingPreviewEnabled() {
+  const [enabled, setEnabled] = useState(() => (
+    typeof window === 'undefined'
+    || typeof window.matchMedia !== 'function'
+    || window.matchMedia(LANDING_PREVIEW_MEDIA_QUERY).matches
+  ))
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return
+    const media = window.matchMedia(LANDING_PREVIEW_MEDIA_QUERY)
+    const onChange = (event: MediaQueryListEvent) => setEnabled(event.matches)
+    media.addEventListener('change', onChange)
+    return () => media.removeEventListener('change', onChange)
+  }, [])
+
+  return enabled
+}
+
 type Props = {
   onScratch?(): void
   onStarterKitchen?(): void
@@ -43,6 +62,7 @@ export function ProjectStartScreen({ onCreateRoom, onDrawManually, onOpenProject
   const [walkPreview, setWalkPreview] = useState(false)
   const [error, setError] = useState('')
   const fileRef = useRef<HTMLInputElement>(null)
+  const previewEnabled = useLandingPreviewEnabled()
 
   const onOpenFile = async (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
@@ -121,16 +141,18 @@ export function ProjectStartScreen({ onCreateRoom, onDrawManually, onOpenProject
 
   return (
     <section className="start-screen landing" aria-label="Create your kitchen space">
-      <div className="landing-3d" aria-label="Example kitchen in 3D">
-        <Suspense fallback={<div className="landing-3d-placeholder">Loading the example kitchen…</div>}>
-          <SceneWorkspace readOnly walkMode={walkPreview} />
-        </Suspense>
-        <div className="landing-3d-toggle" role="group" aria-label="Preview mode">
-          <button type="button" className={walkPreview ? '' : 'active'} onClick={() => setWalkPreview(false)}>3D view</button>
-          <button type="button" className={walkPreview ? 'active' : ''} onClick={() => setWalkPreview(true)}>Walk mode</button>
+      {previewEnabled && (
+        <div className="landing-3d" aria-label="Example kitchen in 3D">
+          <Suspense fallback={<div className="landing-3d-placeholder">Loading the example kitchen…</div>}>
+            <SceneWorkspace readOnly walkMode={walkPreview} />
+          </Suspense>
+          <div className="landing-3d-toggle" role="group" aria-label="Preview mode">
+            <button type="button" className={walkPreview ? '' : 'active'} onClick={() => setWalkPreview(false)}>3D view</button>
+            <button type="button" className={walkPreview ? 'active' : ''} onClick={() => setWalkPreview(true)}>Walk mode</button>
+          </div>
+          <p className="landing-3d-hint">{walkPreview ? 'W A S D to move · drag to look · Esc to release' : 'Drag to orbit · scroll to zoom'}</p>
         </div>
-        <p className="landing-3d-hint">{walkPreview ? 'W A S D to move · drag to look · Esc to release' : 'Drag to orbit · scroll to zoom'}</p>
-      </div>
+      )}
       <div className="landing-hero">
         <p className="eyebrow">CalmKitchen Designer · by HotelOS</p>
         <h1>Design commercial kitchens.</h1>

@@ -20,7 +20,7 @@ Hard submission gates — status at audit time:
 - [ ] Commit the 24 dirty files, push, `npm run deploy` — the judged URL must match the judged repo.
 - [ ] YouTube video, public, < 3 min, with audio.
 - [ ] Devpost description covering the four required points (drafted in the artifact).
-- [ ] Testing-instructions note: project began 31 Aug; WebMCP landed in `58c4861`.
+- [x] Testing-instructions note: project began 31 Aug; WebMCP landed in `ebd3758`.
 - [ ] Keep the site free/unrestricted through 21 Sep; no risky deploys during judging.
 
 Not needed for judging (cut): Chrome origin trial token — judges use the ChatGPT desktop browser (Site tools on by default) or Chrome 149+ with `chrome://flags/#enable-webmcp-testing`. Correction to P0.1 below: ChatGPT Site tools docs show `execute` returning plain objects, so bare-object results likely already work; **verify on the real ChatGPT browser first, wrap only if it fails.**
