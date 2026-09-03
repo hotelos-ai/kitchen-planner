@@ -24,7 +24,8 @@ const componentId = (catalogId: string) =>
 const recommendedCatalogIds = (results: readonly OperationalRequirementResult[]) => [
   ...new Set(results
     .filter((result) => result.scope === 'equipment')
-    .flatMap((result) => result.recommendedCatalogIds)),
+    .map((result) => result.recommendedCatalogIds.find((catalogId) => getCatalogEntry(catalogId)))
+    .filter((catalogId): catalogId is string => Boolean(catalogId))),
 ]
 
 function buildRecommendedOperations({
@@ -95,6 +96,8 @@ export function EssentialsChecker({ store, onEditRoom, focusItemId }: { store: P
     layoutConstraints: variant.layoutConstraints,
   }) : [], [scenario, variant])
   const equipmentRecommendations = recommendedCatalogIds(results)
+  const hasBlockingArchitectureFinding = results.some((result) =>
+    result.severity === 'blocker' && result.scope === 'architecture')
 
   const addRecommendations = (onlyCatalogId?: string) => {
     const operations = buildRecommendedOperations({ results, variant, snapMm: project.snapMm, onlyCatalogId })
@@ -102,7 +105,7 @@ export function EssentialsChecker({ store, onEditRoom, focusItemId }: { store: P
       setMessage('No safe automatic placement was found. Open the catalog to place this item manually.')
       return
     }
-    const intent = onlyCatalogId ? 'Add recommended essential' : 'Add all recommended essentials'
+    const intent = onlyCatalogId ? 'Add recommended essential' : 'Auto-fix missing essentials'
     const applied = store.getState().applyWorkspaceOperations(operations, intent)
     setMessage(applied.ok ? `${operations.length} recommended item${operations.length === 1 ? '' : 's'} added.` : applied.message)
   }
@@ -114,6 +117,13 @@ export function EssentialsChecker({ store, onEditRoom, focusItemId }: { store: P
         <strong>Check essentials</strong>
         <p>Scenario-based operational guidance, not regulatory certification.</p>
       </header>
+      {(equipmentRecommendations.length > 0 || (hasBlockingArchitectureFinding && onEditRoom)) &&
+        <section className="essentials-quick-fixes" aria-label="Quick fixes">
+          {equipmentRecommendations.length > 0 &&
+            <button type="button" className="primary-action" onClick={() => addRecommendations()}>Auto-fix missing essentials</button>}
+          {hasBlockingArchitectureFinding && onEditRoom &&
+            <button type="button" onClick={onEditRoom}>Fix room setup</button>}
+        </section>}
       {(['blocker', 'warning', 'professional-review'] as const).map((severity) => {
         const findings = results.filter((result) => result.severity === severity)
         return <section key={severity} className={`essentials-group ${severity}`}>
@@ -134,7 +144,6 @@ export function EssentialsChecker({ store, onEditRoom, focusItemId }: { store: P
             })}</ul>}
         </section>
       })}
-      {equipmentRecommendations.length > 1 && <button type="button" className="primary-action" onClick={() => addRecommendations()}>Add all recommended essentials</button>}
       {message && <p role="status">{message}</p>}
     </section>
   )
