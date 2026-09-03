@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { Architecture, PointMm } from '../../domain/project'
-import { edgeMidpoint, insertVertexOnSegment, moveVertex, nearestSegment, polygonCentroid, slideEdge } from './room-outline'
+import { edgeMidpoint, insertVertexOnSegment, moveOpening, moveVertex, nearestSegment, openingCenter, polygonCentroid, slideEdge } from './room-outline'
 
 const polygon: PointMm[] = [
   { x: 0, y: 0 },
@@ -70,5 +70,27 @@ describe('room outline editing', () => {
   it('computes midpoints and centroid', () => {
     expect(edgeMidpoint(polygon, 0)).toEqual({ x: 1500, y: 0 })
     expect(polygonCentroid(polygon)).toEqual({ x: 1500, y: 1000 })
+  })
+})
+
+describe('named-wall opening movement', () => {
+  it('slides a named-wall service window along its wall with snapping and clamping', () => {
+    const named: Architecture = {
+      ...architecture,
+      openings: [{ id: 'clean-window', label: 'Clean service window', kind: 'service-window', wall: 'right', offsetMm: 500, widthMm: 900, sillHeightMm: 900, heightMm: 900, flow: 'clean-out' as const }],
+    }
+    const next = moveOpening(named, 0, { x: 3000, y: 1550 }, 100)
+    expect(next.openings[0].offsetMm).toBe(1100)
+    expect(next.openings[0].wall).toBe('right')
+    const clamped = moveOpening(named, 0, { x: 3000, y: 2950 }, 100)
+    expect(clamped.openings[0].offsetMm).toBe(1100)
+    const floorZero = moveOpening(named, 0, { x: 3000, y: 0 }, 100)
+    expect(floorZero.openings[0].offsetMm).toBe(0)
+  })
+
+  it('places the named-wall handle at offset plus half width', () => {
+    const named: Architecture = { ...architecture, openings: [{ id: 'w', label: 'W', kind: 'service-window', wall: 'top', offsetMm: 600, widthMm: 900, sillHeightMm: 900, heightMm: 900, flow: 'clean-out' as const }] }
+    const center = openingCenter(named, named.openings[0])
+    expect(center).toEqual({ x: 1050, y: 0 })
   })
 })

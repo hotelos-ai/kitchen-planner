@@ -80,6 +80,11 @@ const segmentOf = (architecture: Architecture, opening: { segmentIndex?: number;
   if (opening.segmentIndex !== undefined && opening.segmentIndex >= 0 && opening.segmentIndex < polygon.length) {
     return { start: polygon[opening.segmentIndex], end: polygon[(opening.segmentIndex + 1) % polygon.length] }
   }
+  const wall = opening.wall
+  if (wall === 'top') return { start: { x: 0, y: 0 }, end: { x: architecture.widthMm, y: 0 } }
+  if (wall === 'right') return { start: { x: architecture.widthMm, y: 0 }, end: { x: architecture.widthMm, y: architecture.depthMm } }
+  if (wall === 'bottom') return { start: { x: 0, y: architecture.depthMm }, end: { x: architecture.widthMm, y: architecture.depthMm } }
+  if (wall === 'left') return { start: { x: 0, y: 0 }, end: { x: 0, y: architecture.depthMm } }
   return null
 }
 

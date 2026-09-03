@@ -223,11 +223,13 @@ export function AppHeader({
         <h1>CalmKitchen <em>Designer</em></h1>
       </a>
       {!minimal && <ProjectMenu store={store} onNewProject={onNewProject} onOpenSettings={onOpenSettings} />}
+      {minimal && (
       <nav className="topbar-nav" aria-label="HotelOS">
         <a href="https://hotelos.ai/#platform" target="_blank" rel="noreferrer">Platform</a>
         <a href="https://hotelos.ai/pricing" target="_blank" rel="noreferrer">Pricing</a>
         <a href="https://hotelos.ai/contact" target="_blank" rel="noreferrer">Contact</a>
       </nav>
+      )}
       {!
 minimal && <nav aria-label="Workflow stages" className="workflow-navigator">
         {WORKFLOW_STAGES.map((entry) => {
@@ -250,7 +252,7 @@ minimal && <nav aria-label="Workflow stages" className="workflow-navigator">
           )
         })}
       </nav>}
-      {stage !== 'simulate' && overlay === null && (
+      {!minimal && stage !== 'simulate' && overlay === null && (
         <nav aria-label="View mode" className="seg view-switcher">
           {VIEW_MODES.map((entry) => (
             <button
