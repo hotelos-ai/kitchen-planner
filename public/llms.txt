@@ -25,7 +25,7 @@ The live manifest and each tool's strict JSON input schema are authoritative. Ca
 
 ### Context and reads
 
-- `get_workspace_guide` — coordinate system, revision, room summary, supported operations, tool manifest, uncertainty guidance, and limitations.
+- `get_workspace_guide` — coordinate system, revision, room summary, complete discriminated operation JSON Schema, tool manifest, uncertainty guidance, and limitations.
 - `get_app_state` — current stage, view, overlay, active layout/scenario, selected component IDs, and undo/redo availability.
 - `get_component_catalog` — searchable catalog IDs, dimensions, capabilities, configurations, clearances, and tags.
 - `get_layout` — exact summary, architecture, component, or full project/variant state; returns the revision required by writes.
@@ -33,17 +33,24 @@ The live manifest and each tool's strict JSON input schema are authoritative. Ca
 - `analyze_layout` — boundary, equipment-overlap, pillar-overlap, and clearance findings with affected IDs and remediation.
 - `check_operational_essentials` — operational blockers, warnings, equipment recommendations, and professional-review items for a layout/scenario.
 - `get_simulation_guide` — scenarios, editable constraints, staff roles, and result definitions.
-- `export_project` — complete validated, round-trippable project JSON plus a suggested filename.
+- `get_simulation_result` — retained metrics, findings, station pressure, or orders without rerunning; identifies stale runs.
+- `compare_layouts` — same-seed spatial and service comparison between two layout variants.
+- `export_project` — JSON, CSV equipment schedule, self-contained HTML report, or SVG plan, optionally downloaded.
+- `import_project` — validated project replacement or active-layout import as a variant.
+- `manage_checkpoints` — list, create, or restore named layout checkpoints.
+- `share_results` — scoped workspace deep link plus a current-evidence self-contained report.
 
 ### Visible workspace controls
 
 - `set_app_view` — set the visible workflow stage, Plan/3D/split view, or compare/auto-layout overlay. This changes presentation, not project data.
 - `select_components` — replace, add, toggle, or clear selection and optionally reveal it in plan, scene, or both. This changes presentation, not project data.
+- `focus_camera` — frame the room, a stable component ID, or an exact millimetre point in 3D.
 
 ### Transactional document tools
 
 - `preview_layout_changes` — validate 1–200 ordered operations against `expectedRevision` without mutation; returns normalized operations, warnings, diagnostics delta, changed IDs, and a short-lived single-use `previewToken`.
-- `apply_layout_changes` — commit that token atomically as one revision and one undo step. The live plan and scene update immediately.
+- `apply_layout_changes` — commit a preview token, or directly commit a guarded batch using an idempotency key, exactly once and as one undo step.
+- `edit_architecture` — granular room, opening, pillar, and storage-zone edits compiled into one validated architecture transaction.
 - `step_workspace_history` — undo or redo one human or agent document edit.
 
 Supported batch operations include layout create/activate/rename/remove; component add/customize/configure/skin/update/move/nudge/rotate/resize/lock/duplicate/remove; architecture and operational-profile updates; workspace settings; scenario updates; and adoption of an auto-layout result. Read the live guide and tool schema for exact fields.
@@ -51,6 +58,10 @@ Supported batch operations include layout create/activate/rename/remove; compone
 ### Simulation
 
 - `run_simulation` — run a deterministic layout/scenario/seed, make the result visible in the Simulate workspace, and return assumptions, metrics, warnings, and recommendations. It does not change the document revision.
+- `run_auto_layout` — start a deterministic revision-bound layout optimization experiment.
+- `get_auto_layout_run` — poll experiment progress and retrieve ranked candidates or confirmed finalists.
+- `cancel_auto_layout_run` — cancel an in-flight experiment.
+- `adopt_auto_layout_candidate` — atomically adopt a confirmed finalist with experiment provenance.
 
 ## Canonical short workflow
 
@@ -58,8 +69,8 @@ Supported batch operations include layout create/activate/rename/remove; compone
 2. Build one minimal ordered batch. Call `preview_layout_changes` with the revision just read; inspect its warnings and diagnostics.
 3. Commit only with `apply_layout_changes(previewToken)`. On a stale revision, re-read and recompute the delta; never blindly retry.
 4. Reveal the result with `select_components` and `set_app_view`, then verify with `analyze_layout`, `get_layout`, and `check_operational_essentials`.
-5. For service questions, read `get_simulation_guide`, update the scenario through preview/apply if needed, then call `run_simulation`. Keep modeled assumptions separate from facts.
-6. Use `export_project` for a portable checkpoint; use `step_workspace_history` if the user asks to undo.
+5. For service questions, read `get_simulation_guide`, update the scenario through preview/apply if needed, then call `run_simulation` and `get_simulation_result`. Keep modeled assumptions separate from facts.
+6. Use `export_project` or `share_results` for a portable handoff; use `step_workspace_history` if the user asks to undo.
 
 Example sequence to add and reveal one catalog item (IDs and revision are examples; read real values first):
 
@@ -73,7 +84,7 @@ Example sequence to add and reveal one catalog item (IDs and revision are exampl
 ## Protocol and trust
 
 - Tools register through `document.modelContext` (or the legacy `navigator.modelContext` alias) in a top-level HTTPS or localhost page.
-- Every call returns a JSON-serializable result with `ok` and the current `revision`; failures add a stable `code` and message, plus details or recovery guidance where available.
+- All 26 tools return parseable JSON text plus matching `structuredContent` and `isError`; responses are capped at 256 KiB. Failures add a stable code, message, revision, and recovery detail where available.
 - The application is a static browser client. Project state, tool execution, and simulation stay in the browser; there is no CalmKitchen application server or agent proxy.
 - Reference images and natural-language instructions stay with the external agent. CalmKitchen receives only explicit structured tool arguments.
 - Persistent writes are revision-guarded, previewed, schema-validated, atomic, visible, and undoable. View/selection actions, checks, and simulations do not alter the project revision.

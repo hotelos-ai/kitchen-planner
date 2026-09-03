@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
-import { DEFAULT_GENERATED_MENU, parseMenuText, type EstimatedMenuItem } from '../../domain/menu-templates'
-import type { SimulationScenario } from '../../domain/project'
+import { DEFAULT_GENERATED_MENU, parseMenuText } from '../../domain/menu-templates'
+import type { SimulationMenuItem, SimulationScenario, StationCapability } from '../../domain/project'
 import type { ProjectStore } from '../../state/project-store'
 
 type SetupPath = 'quick' | 'menu' | 'detailed' | null
@@ -12,11 +12,18 @@ type Props = {
   onChange(patch: Partial<SimulationScenario>): void
 }
 
-export function SimulationSetup({ scenario, store: _store, onRun, onChange }: Props) {
+const CAPABILITIES: readonly StationCapability[] = [
+  'flat-top-cook', 'fryer-cook', 'range-cook', 'tandoor-cook', 'cold-retrieval', 'food-prep',
+  'finish-plate', 'clean-window', 'dirty-window', 'dirty-landing', 'dish-pre-rinse', 'dish-wash',
+  'clean-landing', 'hand-wash', 'mix',
+]
+
+export function SimulationSetup({ scenario, onRun, onChange }: Props) {
   const [path, setPath] = useState<SetupPath>(null)
-  const [menu, setMenu] = useState<EstimatedMenuItem[]>(DEFAULT_GENERATED_MENU)
   const [menuText, setMenuText] = useState('')
-  const [reviewItem, setReviewItem] = useState<EstimatedMenuItem | null>(null)
+  const [reviewItemId, setReviewItemId] = useState<string | null>(null)
+  const menu = scenario.menuItems ?? []
+  const reviewItem = menu.find((item) => item.id === reviewItemId) ?? null
   const staffCount = scenario.staff.reduce((sum, entry) => sum + entry.count, 0)
   const estimatedCount = menu.filter((item) => item.source !== 'user-provided').length
 
@@ -27,15 +34,32 @@ export function SimulationSetup({ scenario, store: _store, onRun, onChange }: Pr
       durationMinutes: scenario.durationMinutes || 60,
       variability: scenario.variability ?? 'typical',
       serviceStyle: scenario.serviceStyle ?? 'À la carte',
+      menuItems: structuredClone(DEFAULT_GENERATED_MENU),
     })
-    setMenu(DEFAULT_GENERATED_MENU)
     setPath('quick')
   }
 
   const importMenu = () => {
     const parsed = parseMenuText(menuText)
-    if (parsed.length) setMenu(parsed)
+    if (parsed.length) onChange({ menuItems: parsed })
     setPath('menu')
+  }
+
+  const changeMenuItem = (updated: SimulationMenuItem) => onChange({
+    menuItems: menu.map((item) => item.id === updated.id ? updated : item),
+  })
+
+  const addMenuItem = () => {
+    const id = `menu-${globalThis.crypto?.randomUUID?.() ?? Math.random().toString(36).slice(2)}`
+    const item: SimulationMenuItem = {
+      id,
+      name: 'New menu item',
+      sharePct: 0,
+      source: 'user-provided',
+      steps: [{ label: 'Prepare', capability: 'food-prep', activeSeconds: 60 }],
+    }
+    onChange({ menuItems: [...menu, item] })
+    setReviewItemId(id)
   }
 
   const summary = useMemo(() => (
@@ -94,7 +118,7 @@ export function SimulationSetup({ scenario, store: _store, onRun, onChange }: Pr
           {summary}
           <p>We will generate representative menu items, order popularity, station routes, and a realistic peak-hour arrival pattern.</p>
           <div className="stage-actions">
-            <button type="button" onClick={() => setReviewItem(menu[0])}>Review assumptions</button>
+            <button type="button" onClick={() => setReviewItemId(menu[0]?.id ?? null)}>Review assumptions</button>
             <button type="button" className="primary-button" onClick={onRun}>Run quick simulation</button>
           </div>
         </>
@@ -121,15 +145,15 @@ export function SimulationSetup({ scenario, store: _store, onRun, onChange }: Pr
           {menu.length > 0 && <p>{menu.length} menu items found. Station routes are suggested and editable.</p>}
         </>
       )}
-      {path === 'detailed' && <p>Use the scenario fields below to refine demand, staffing, timings and capacity.</p>}
-      <MenuTable menu={menu} onSelect={setReviewItem} />
-      {reviewItem && <MenuItemDetail item={reviewItem} onClose={() => setReviewItem(null)} />}
+      {path === 'detailed' && <><p>Use the scenario fields below to refine demand, staffing, timings and capacity.</p><button type="button" onClick={addMenuItem}>Add menu item</button></>}
+      {menu.length ? <MenuTable menu={menu} onSelect={(item) => setReviewItemId(item.id)} onChange={changeMenuItem} /> : <p>No modeled menu items yet. Add or import a menu to replace the compatibility demand model.</p>}
+      {reviewItem && <MenuItemDetail item={reviewItem} onChange={changeMenuItem} onClose={() => setReviewItemId(null)} />}
       <button type="button" className="link-button" onClick={() => setPath(null)}>Change setup method</button>
     </section>
   )
 }
 
-function MenuTable({ menu, onSelect }: { menu: EstimatedMenuItem[]; onSelect(item: EstimatedMenuItem): void }) {
+function MenuTable({ menu, onSelect, onChange }: { menu: SimulationMenuItem[]; onSelect(item: SimulationMenuItem): void; onChange(item: SimulationMenuItem): void }) {
   return (
     <table className="menu-table" aria-label={`Menu · ${menu.length} items`}>
       <thead><tr><th>Item</th><th>Share</th><th>Route</th><th>Time</th><th>Source</th></tr></thead>
@@ -137,9 +161,9 @@ function MenuTable({ menu, onSelect }: { menu: EstimatedMenuItem[]; onSelect(ite
         {menu.map((item) => (
           <tr key={item.id}>
             <td><button type="button" className="link-button" onClick={() => onSelect(item)}>{item.name}</button></td>
-            <td>{item.sharePct}%</td>
-            <td>{item.route}</td>
-            <td>{item.timeRangeMinutes[0]}–{item.timeRangeMinutes[1]}m</td>
+            <td><input aria-label={`${item.name} share percent`} type="number" min="0" max="100" value={item.sharePct} onChange={(event) => onChange({ ...item, sharePct: Math.min(100, Math.max(0, Number(event.target.value) || 0)) })} /></td>
+            <td>{item.steps.map((step) => step.capability.replaceAll('-', ' ')).join(' → ')}</td>
+            <td>{menuItemTimeRange(item)}</td>
             <td>{item.source === 'template-estimate' ? 'Estimated' : item.source}</td>
           </tr>
         ))}
@@ -148,17 +172,32 @@ function MenuTable({ menu, onSelect }: { menu: EstimatedMenuItem[]; onSelect(ite
   )
 }
 
-function MenuItemDetail({ item, onClose }: { item: EstimatedMenuItem; onClose(): void }) {
+function menuItemTimeRange(item: SimulationMenuItem) {
+  const active = item.steps.reduce((total, step) => total + step.activeSeconds, 0)
+  const minimum = active + item.steps.reduce((total, step) => total + (step.passiveSeconds?.minSeconds ?? 0), 0)
+  const maximum = active + item.steps.reduce((total, step) => total + (step.passiveSeconds?.maxSeconds ?? 0), 0)
+  return `${Math.max(1, Math.round(minimum / 60))}–${Math.max(1, Math.round(maximum / 60))}m`
+}
+
+function MenuItemDetail({ item, onChange, onClose }: { item: SimulationMenuItem; onChange(item: SimulationMenuItem): void; onClose(): void }) {
+  const updateStep = (index: number, patch: Partial<SimulationMenuItem['steps'][number]>) => onChange({
+    ...item,
+    steps: item.steps.map((step, stepIndex) => stepIndex === index ? { ...step, ...patch } : step),
+  })
   return (
     <article className="menu-item-detail" aria-label={item.name}>
       <header><h3>{item.name}</h3><button type="button" aria-label="Close menu item" onClick={onClose}>×</button></header>
       <ol>
-        {item.steps.map((step) => (
-          <li key={step.label}>
+        {item.steps.map((step, index) => (
+          <li key={`${index}-${step.label}`}>
             <strong>{step.label}</strong>
-            <span>Station: {step.station}</span>
-            <span>Active time: {step.activeSeconds} sec</span>
-            {step.cookingSeconds && <span>Cooking time: {Math.round(step.cookingSeconds.min / 60)}–{Math.round(step.cookingSeconds.max / 60)} min</span>}
+            <label>Station capability<select aria-label={`${item.name} ${step.label} capability`} value={step.capability} onChange={(event) => updateStep(index, { capability: event.target.value as StationCapability })}>{CAPABILITIES.map((capability) => <option key={capability} value={capability}>{capability.replaceAll('-', ' ')}</option>)}</select></label>
+            <label>Active seconds<input aria-label={`${item.name} ${step.label} active seconds`} type="number" min="1" max="86400" value={step.activeSeconds} onChange={(event) => updateStep(index, { activeSeconds: Math.min(86_400, Math.max(1, Number(event.target.value) || 1)) })} /></label>
+            {step.passiveSeconds ? <>
+              <label>Passive minimum<input aria-label={`${item.name} ${step.label} passive minimum seconds`} type="number" min="1" max="86400" value={step.passiveSeconds.minSeconds} onChange={(event) => { const minSeconds = Math.min(86_400, Math.max(1, Number(event.target.value) || 1)); updateStep(index, { passiveSeconds: { minSeconds, maxSeconds: Math.max(minSeconds, step.passiveSeconds!.maxSeconds) } }) }} /></label>
+              <label>Passive maximum<input aria-label={`${item.name} ${step.label} passive maximum seconds`} type="number" min="1" max="86400" value={step.passiveSeconds.maxSeconds} onChange={(event) => { const maxSeconds = Math.min(86_400, Math.max(step.passiveSeconds!.minSeconds, Number(event.target.value) || 1)); updateStep(index, { passiveSeconds: { minSeconds: step.passiveSeconds!.minSeconds, maxSeconds } }) }} /></label>
+              <button type="button" onClick={() => updateStep(index, { passiveSeconds: undefined })}>Remove passive time</button>
+            </> : <button type="button" onClick={() => updateStep(index, { passiveSeconds: { minSeconds: 60, maxSeconds: 120 } })}>Add passive time</button>}
           </li>
         ))}
       </ol>

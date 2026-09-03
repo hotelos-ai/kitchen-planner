@@ -124,7 +124,7 @@ export function createBlankProject(name = 'Kitchen 1'): KitchenProject {
     updatedAt: CREATED_AT,
   }
   return {
-    schemaVersion: 3,
+    schemaVersion: 4,
     id: `kitchen-${globalThis.crypto?.randomUUID?.() ?? Math.random().toString(36).slice(2)}`,
     name,
     displayUnit: 'mm',

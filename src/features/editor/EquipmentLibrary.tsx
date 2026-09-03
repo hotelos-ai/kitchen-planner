@@ -55,7 +55,7 @@ function CatalogCard({ entry, displayUnit, onAdd }: { entry: CatalogEntry; displ
   )
 }
 
-export function EquipmentLibrary({ store, stage = 'equipment' }: Props) {
+export function EquipmentLibrary({ store }: Props) {
   const project = useStore(store, (state) => state.project)
   const variant = useStore(store, getActiveVariant)
   const selectedIds = useStore(store, (state) => state.selectedIds)

@@ -62,7 +62,12 @@ test('agents discover tools, edit the plan, run simulations, and export — with
     page.evaluate(([toolName, toolInput]: [string, unknown]) => {
       const entry = (window as unknown as ShimWindow).__webmcpTools[toolName]
       if (!entry) throw new Error(`Tool ${toolName} was not registered`)
-      return entry.execute(toolInput) as Promise<Envelope>
+      return Promise.resolve(entry.execute(toolInput)).then((result) => {
+        if (result && typeof result === 'object' && 'structuredContent' in result) {
+          return (result as { structuredContent: Envelope }).structuredContent
+        }
+        return result as Envelope
+      })
     }, [name, input])
 
   await page.getByRole('button', { name: 'Use your AI agent' }).click()
@@ -109,7 +114,7 @@ test('agents discover tools, edit the plan, run simulations, and export — with
 
   const exported = await call('export_project', {})
   expect(exported.ok).toBe(true)
-  expect(JSON.parse(exported.projectJson ?? '{}')).toMatchObject({ schemaVersion: 3 })
+  expect(JSON.parse(exported.projectJson ?? '{}')).toMatchObject({ schemaVersion: 4 })
 
   const undone = await call('step_workspace_history', { direction: 'undo' })
   expect(undone.stepped).toBe(true)

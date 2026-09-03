@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { createSeedProject } from '../domain/seed-project'
+import { createRng } from '../simulation/rng'
+import { generateServiceTaskDemand } from '../simulation/tasks'
 import {
   CURRENT_PROJECT_KEY,
   LAST_GOOD_PROJECT_KEY,
@@ -64,7 +66,7 @@ describe('project persistence', () => {
     const exported = exportProject(project)
     const decoded = JSON.parse(exported)
     expect(decoded).toMatchObject({
-      schemaVersion: 3,
+      schemaVersion: 4,
       activeVariantId: 'courtyard-option',
       activeScenarioId: 'lunch-steady',
       displayUnit: 'cm',
@@ -137,7 +139,7 @@ describe('project persistence', () => {
     delete architecture.wallHeightMm
     variants.forEach((variant) => { delete variant.architecture })
     const migrated = importProject(JSON.stringify(legacy))
-    expect(migrated.schemaVersion).toBe(3)
+    expect(migrated.schemaVersion).toBe(4)
     expect(migrated.architecture.wallHeightMm).toBe(2800)
     expect(migrated.variants[0].architecture).toEqual(migrated.architecture)
     expect(() => importProject('{"schemaVersion":99}')).toThrow(/unsupported future schema version 99/i)
@@ -153,10 +155,45 @@ describe('project persistence', () => {
 
     const migrated = importProject(JSON.stringify(legacy))
 
-    expect(migrated.schemaVersion).toBe(3)
+    expect(migrated.schemaVersion).toBe(4)
     migrated.variants.forEach((variant) => {
       variant.equipment.forEach((item) => expect(item.dimensionsLocked).toBe(false))
     })
+  })
+
+  it('migrates v3 by changing only schemaVersion and preserves its exact seeded demand', () => {
+    const current = createSeedProject()
+    const legacy = structuredClone(current) as unknown as Record<string, unknown>
+    legacy.schemaVersion = 3
+    const legacyScenario = structuredClone(current.scenarios[0])
+    const before = generateServiceTaskDemand(legacyScenario, createRng(legacyScenario.seed))
+
+    const migrated = importProject(JSON.stringify(legacy))
+    const migratedAsLegacy = structuredClone(migrated) as unknown as Record<string, unknown>
+    migratedAsLegacy.schemaVersion = 3
+
+    expect(migratedAsLegacy).toEqual(legacy)
+    expect(migrated.scenarios[0].menuItems).toBeUndefined()
+    expect(migrated.scenarios[0].seed).toBe(legacyScenario.seed)
+    expect(generateServiceTaskDemand(migrated.scenarios[0], createRng(migrated.scenarios[0].seed))).toEqual(before)
+  })
+
+  it('does not repair or otherwise reshape malformed v3 data during the v4 migration', () => {
+    const legacy = structuredClone(createSeedProject()) as unknown as Record<string, unknown>
+    legacy.schemaVersion = 3
+    delete (legacy.variants as Array<Record<string, unknown>>)[0].architecture
+
+    expect(() => importProject(JSON.stringify(legacy))).toThrow(/not a valid kitchen project/i)
+  })
+
+  it('round-trips scenario menu demand as schema v4 data', () => {
+    const project = createSeedProject()
+    project.scenarios[0].menuItems = [{
+      id: 'nightly-special', name: 'Nightly special', sharePct: 100, source: 'user-provided',
+      steps: [{ label: 'Cook', capability: 'tandoor-cook', activeSeconds: 45, passiveSeconds: { minSeconds: 300, maxSeconds: 480 } }],
+    }]
+
+    expect(importProject(exportProject(project)).scenarios[0].menuItems).toEqual(project.scenarios[0].menuItems)
   })
 
   it('migrates v1 global architecture into independent variant-owned copies', () => {
@@ -169,7 +206,7 @@ describe('project persistence', () => {
 
     const migrated = importProject(JSON.stringify(legacy))
 
-    expect(migrated.schemaVersion).toBe(3)
+    expect(migrated.schemaVersion).toBe(4)
     expect(migrated.variants).toHaveLength(2)
     expect(migrated.variants[0].architecture).toEqual(migrated.architecture)
     expect(migrated.variants[1].architecture).toEqual(migrated.architecture)

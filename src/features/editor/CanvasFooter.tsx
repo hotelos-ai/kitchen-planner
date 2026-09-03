@@ -1,6 +1,6 @@
 import { useStore } from 'zustand'
 import type { WorkflowStage } from '../../app/workflow'
-import { getActiveVariant, type ProjectStore } from '../../state/project-store'
+import type { ProjectStore } from '../../state/project-store'
 
 type Props = {
   store: ProjectStore
@@ -11,7 +11,6 @@ type Props = {
 
 export function CanvasFooter({ store, stage, selectedCount, onEditSpace }: Props) {
   const project = useStore(store, (state) => state.project)
-  const variant = useStore(store, getActiveVariant)
   const unitLabel = project.displayUnit === 'mm' ? 'mm' : project.displayUnit
 
   return (

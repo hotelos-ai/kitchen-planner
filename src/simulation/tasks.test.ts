@@ -43,4 +43,58 @@ describe('service task generation', () => {
     project.scenarios[0].taskDurations = { 'food-prep': { minSeconds: 90, maxSeconds: 30 } }
     expect(() => generateServiceTaskDemand(project.scenarios[0], createRng(1))).toThrow(/duration range/i)
   })
+
+  it('keeps the legacy demand and RNG stream unchanged when menuItems is absent or empty', () => {
+    const project = createSeedProject()
+    const absent = generateServiceTaskDemand(project.scenarios[0], createRng(20260831))
+    const empty = generateServiceTaskDemand({ ...project.scenarios[0], menuItems: [] }, createRng(20260831))
+
+    expect(empty).toEqual(absent)
+    expect(absent.slice(0, 5).map((task) => ({ id: task.id, capability: task.capability, durationSeconds: task.durationSeconds }))).toEqual([
+      { id: 'order-1-0-retrieve', capability: 'cold-retrieval', durationSeconds: 21 },
+      { id: 'order-1-1-prep', capability: 'food-prep', durationSeconds: 116 },
+      { id: 'order-1-2-cook', capability: 'flat-top-cook', durationSeconds: 292 },
+      { id: 'order-1-3-finish', capability: 'finish-plate', durationSeconds: 45 },
+      { id: 'order-1-4-pass', capability: 'clean-window', durationSeconds: 13 },
+    ])
+  })
+
+  it('uses a deterministic share-weighted menu choice and each selected item task chain', () => {
+    const project = createSeedProject()
+    const scenario = {
+      ...project.scenarios[0],
+      covers: 12,
+      menuItems: [
+        {
+          id: 'salad', name: 'Salad', sharePct: 75, source: 'user-provided' as const,
+          steps: [{ label: 'Assemble', capability: 'food-prep' as const, activeSeconds: 30 }],
+        },
+        {
+          id: 'curry', name: 'Curry', sharePct: 25, source: 'imported' as const,
+          steps: [
+            { label: 'Prepare', capability: 'food-prep' as const, activeSeconds: 45 },
+            { label: 'Simmer', capability: 'range-cook' as const, activeSeconds: 15, passiveSeconds: { minSeconds: 120, maxSeconds: 120 } },
+          ],
+        },
+      ],
+    }
+
+    const first = generateServiceTaskDemand(scenario, createRng(77))
+    const second = generateServiceTaskDemand(scenario, createRng(77))
+    const orderTasks = first.filter((task) => task.orderId)
+
+    expect(second).toEqual(first)
+    expect(orderTasks.map((task) => task.id)).toEqual([
+      'order-1-salad-0-assemble',
+      'order-2-salad-0-assemble',
+      'order-3-curry-0-prepare',
+      'order-3-curry-1-simmer',
+      'order-4-salad-0-assemble',
+      'order-5-curry-0-prepare',
+      'order-5-curry-1-simmer',
+      'order-6-salad-0-assemble',
+    ])
+    expect(orderTasks.find((task) => task.id.endsWith('simmer'))?.durationSeconds).toBe(135)
+    expect(orderTasks.find((task) => task.id === 'order-3-curry-1-simmer')?.predecessorId).toBe('order-3-curry-0-prepare')
+  })
 })

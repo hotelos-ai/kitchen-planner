@@ -2,6 +2,9 @@ import { useEffect, useState, type ChangeEvent } from 'react'
 import { useStore } from 'zustand'
 import { exportProject, importProject } from '../state/persistence'
 import { projectStore, type ProjectStore } from '../state/project-store'
+import { buildReportHtml } from '../webmcp/project-artifacts'
+import { appStateStore } from '../state/app-state-store'
+import { buildWorkspaceDeepLink } from './workspace-deep-link'
 
 const TOUR_STEPS = [
   { title: 'Define the space', body: 'Drag the room outline to reshape it, or add doors, service windows, and pillars. The floor plan is shared by every layout.' },
@@ -56,10 +59,29 @@ export function ProjectExchange({ store = projectStore, onTourFocus }: { store?:
     setMessage({ kind: 'status', text: 'Equipment schedule exported.' })
   }
   const exportReport = () => {
-    const html = `<!doctype html><html><head><title>${project.name}</title></head><body><h1>${project.name}</h1><p>${project.variants.length} layouts · ${project.scenarios.length} scenarios</p></body></html>`
+    const variant = project.variants.find((entry) => entry.id === project.activeVariantId) ?? project.variants[0]
+    const html = buildReportHtml({ project, variant })
     downloadText(`${slug}-report.html`, html, 'text/html')
     setShowExport(false)
     setMessage({ kind: 'status', text: 'Report exported.' })
+  }
+  const copyWorkspaceLink = async () => {
+    try {
+      if (!navigator.clipboard?.writeText) throw new Error('Clipboard access is unavailable in this browser.')
+      const appState = appStateStore.getState()
+      await navigator.clipboard.writeText(buildWorkspaceDeepLink({
+        projectId: project.id,
+        variantId: project.activeVariantId,
+        scenarioId: project.activeScenarioId,
+        stage: appState.stage,
+        view: appState.view,
+        overlay: appState.overlay,
+      }))
+      setShowExport(false)
+      setMessage({ kind: 'status', text: 'Workspace link copied. It reopens this saved project in this browser.' })
+    } catch (error) {
+      setMessage({ kind: 'error', text: error instanceof Error ? error.message : 'Could not copy workspace link.' })
+    }
   }
   return (
     <div className="project-exchange">
@@ -74,7 +96,7 @@ export function ProjectExchange({ store = projectStore, onTourFocus }: { store?:
             <button type="button" role="menuitem" onClick={() => { window.print(); setShowExport(false) }}>Export all layouts as PDF</button>
             <button type="button" role="menuitem" onClick={exportSchedule}>Export equipment schedule</button>
             <button type="button" role="menuitem" onClick={exportReport}>Export simulation report</button>
-            <button type="button" role="menuitem" onClick={() => { window.print(); setShowExport(false) }}>Export current view as image</button>
+            <button type="button" role="menuitem" onClick={() => void copyWorkspaceLink()}>Copy workspace link</button>
           </div>
         )}
       </div>

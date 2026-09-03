@@ -2,12 +2,14 @@ import { beforeEach, describe, expect, it } from 'vitest'
 import { createSeedProject } from '../domain/seed-project'
 import { appStateStore } from '../state/app-state-store'
 import { createProjectStore, getWorkspaceFacade } from '../state/project-store'
+import { createSimulationRunStore } from '../state/simulation-run-store'
 import type { WebMcpToolDefinition } from './model-context'
 import { createWebMcpTools } from './webmcp-tools'
 
 const setup = () => {
   const store = createProjectStore(createSeedProject())
-  const tools = createWebMcpTools({ store, getFacade: () => getWorkspaceFacade(store) })
+  const runStore = createSimulationRunStore()
+  const tools = createWebMcpTools({ store, getFacade: () => getWorkspaceFacade(store), runStore })
   const tool = (name: string): WebMcpToolDefinition => {
     const found = tools.find((candidate) => candidate.name === name)
     if (!found) throw new Error(`Missing tool ${name}`)
@@ -34,6 +36,21 @@ describe('visible WebMCP actions', () => {
         playback: true,
       },
     })
+  })
+
+  it('honors paused and store-only presentation options independently from navigation', async () => {
+    const { tool } = setup()
+    appStateStore.getState().setStage('space')
+
+    expect(await tool('run_simulation').execute({ seed: 9, playback: 'pause', navigateTo: false })).toMatchObject({ ok: true })
+    expect(appStateStore.getState()).toMatchObject({
+      stage: 'space',
+      requestedSimulationRun: { seed: 9, playback: false },
+    })
+
+    appStateStore.getState().clearSimulationRun()
+    expect(await tool('run_simulation').execute({ seed: 10, playback: 'none' })).toMatchObject({ ok: true })
+    expect(appStateStore.getState()).toMatchObject({ stage: 'simulate', requestedSimulationRun: null })
   })
 
   it('surfaces the committed agent intent as one undoable action', async () => {

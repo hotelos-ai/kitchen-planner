@@ -266,7 +266,6 @@ export function resizeOpening(architecture: Architecture, index: number, end: 's
 
 export function createOpeningAt(architecture: Architecture, entry: { label: string; kind: 'door' | 'service-window'; widthMm: number }, point: PointMm, dragTo: PointMm | null, snapMm: number): Architecture {
   const from = dragTo ?? point
-  const segment = segmentOf(architecture, { segmentIndex: nearestSegment(architecture.roomPolygon, from).segmentIndex })
   const polygon = architecture.roomPolygon
   const nearest = nearestSegment(polygon, from)
   const start = polygon[nearest.segmentIndex]

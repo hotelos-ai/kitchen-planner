@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { operationalProfileSchema } from '../../domain/project-schema'
+import { menuItemSchema, operationalProfileSchema } from '../../domain/project-schema'
 
 const idSchema = z.string()
   .min(1)
@@ -129,6 +129,7 @@ const scenarioPatchSchema = z.object({
   stationCapacities: z.record(idSchema, z.number().int().positive().max(100)).optional(),
   serviceStyle: nameSchema.optional(),
   variability: z.enum(['low', 'typical', 'high']).optional(),
+  menuItems: z.array(menuItemSchema).max(200).optional(),
 }).strict().refine((patch) => Object.keys(patch).length > 0, 'Scenario patch cannot be empty')
 
 const operationalProfilePatchSchema = operationalProfileSchema.partial()

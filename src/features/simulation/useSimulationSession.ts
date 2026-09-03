@@ -1,6 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { useStore } from 'zustand'
 import { deriveLiveServiceState } from '../../simulation/live-state'
 import type { SimulationInput, SimulationResult } from '../../simulation/types'
+import {
+  selectSimulationRun,
+  simulationRunStore,
+  type SimulationRunStore,
+} from '../../state/simulation-run-store'
 import { advancePlaybackTime } from './playback-timing'
 
 export type SimulationSession = {
@@ -9,20 +15,59 @@ export type SimulationSession = {
   elapsedSeconds: number
   playing: boolean
   speed: number
-  startRun(inputOverride?: SimulationInput, autoplay?: boolean): void
+  startRun(inputOverride?: SimulationInput, autoplay?: boolean, targetOverride?: SimulationSessionTarget): void
+  presentRun(autoplay?: boolean): void
   clearRun(): void
   setPlaying(value: boolean): void
   setSpeed(value: number): void
   setElapsedSeconds(value: number): void
 }
 
-export function useSimulationSession({ input, run }: { input: SimulationInput; run: (input: SimulationInput) => SimulationResult }): SimulationSession {
-  const [result, setResult] = useState<SimulationResult | null>(null)
+export type SimulationSessionTarget = {
+  variantId: string
+  scenarioId: string
+  revision: number
+}
+
+type UseSimulationSessionInput = {
+  input: SimulationInput
+  run: (input: SimulationInput) => SimulationResult
+  variantId?: string
+  scenarioId?: string
+  revision?: number
+  runStore?: SimulationRunStore
+}
+
+export function useSimulationSession({
+  input,
+  run,
+  variantId = 'active-layout',
+  scenarioId = input.scenario.id,
+  revision = 0,
+  runStore = simulationRunStore,
+}: UseSimulationSessionInput): SimulationSession {
+  const storedRun = useStore(runStore, (state) => selectSimulationRun(state, variantId, scenarioId))
+  // Retain stale runs for agent inspection, but never visualize old routes on
+  // top of geometry or assumptions from a newer document revision.
+  const result = storedRun?.ranAtRevision === revision ? storedRun.result : null
   const [elapsedSeconds, setElapsedSeconds] = useState(0)
   const [playing, setPlaying] = useState(false)
   const [speed, setSpeed] = useState(25)
   const lastTick = useRef(0)
+  const lastResult = useRef(result)
+  const locallyStartedResult = useRef<SimulationResult | null>(null)
   const liveState = useMemo(() => result ? deriveLiveServiceState(result, elapsedSeconds) : null, [elapsedSeconds, result])
+
+  useEffect(() => {
+    if (lastResult.current === result) return
+    lastResult.current = result
+    setElapsedSeconds(0)
+    if (locallyStartedResult.current === result) {
+      locallyStartedResult.current = null
+      return
+    }
+    setPlaying(false)
+  }, [result])
 
   useEffect(() => {
     if (!playing || !result) return
@@ -44,12 +89,31 @@ export function useSimulationSession({ input, run }: { input: SimulationInput; r
 
   return {
     result, liveState, elapsedSeconds, playing, speed,
-    startRun: (inputOverride, autoplay = true) => {
-      setResult(run(inputOverride ?? input))
+    startRun: (inputOverride, autoplay = true, targetOverride) => {
+      const simulationInput = inputOverride ?? input
+      const nextResult = run(simulationInput)
+      locallyStartedResult.current = nextResult
+      const target = targetOverride ?? { variantId, scenarioId, revision }
+      runStore.getState().storeRun({
+        variantId: target.variantId,
+        scenarioId: target.scenarioId,
+        result: nextResult,
+        seed: simulationInput.scenario.seed,
+        ranAtRevision: target.revision,
+      })
       setElapsedSeconds(0)
       setPlaying(autoplay)
     },
-    clearRun: () => { setResult(null); setElapsedSeconds(0); setPlaying(false) },
+    presentRun: (autoplay = true) => {
+      setElapsedSeconds(0)
+      setPlaying(autoplay)
+    },
+    clearRun: () => {
+      locallyStartedResult.current = null
+      runStore.getState().removeRun(variantId, scenarioId)
+      setElapsedSeconds(0)
+      setPlaying(false)
+    },
     setPlaying, setSpeed, setElapsedSeconds,
   }
 }

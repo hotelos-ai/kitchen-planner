@@ -11,14 +11,14 @@ export const LEGACY_LAST_GOOD_PROJECT_KEY = 'manta-raja:project:last-good:v1'
 function migrate(value: unknown): unknown {
   if (!value || typeof value !== 'object') return value
   const source = value as Record<string, unknown>
-  if (source.schemaVersion !== 0 && source.schemaVersion !== 1 && source.schemaVersion !== 2) return value
+  if (source.schemaVersion !== 0 && source.schemaVersion !== 1 && source.schemaVersion !== 2 && source.schemaVersion !== 3) return value
   const migrated = structuredClone(source)
   if (migrated.schemaVersion === 0 && migrated.architecture && typeof migrated.architecture === 'object') {
     const architecture = migrated.architecture as Record<string, unknown>
     architecture.wallHeightMm ??= 2800
     architecture.locked ??= true
   }
-  if (migrated.architecture && typeof migrated.architecture === 'object' && Array.isArray(migrated.variants)) {
+  if (migrated.schemaVersion !== 3 && migrated.architecture && typeof migrated.architecture === 'object' && Array.isArray(migrated.variants)) {
     migrated.variants = migrated.variants.map((value) => {
       if (!value || typeof value !== 'object') return value
       const variant = structuredClone(value as Record<string, unknown>)
@@ -26,20 +26,25 @@ function migrate(value: unknown): unknown {
       return variant
     })
   }
-  migrated.schemaVersion = 2
-  // v2 → v3: drag-resize became the default editing affordance, so dimensions persisted
-  // under the old lock-by-default seed are unlocked once during this one-time migration.
-  if (Array.isArray(migrated.variants)) {
-    migrated.variants = migrated.variants.map((value) => {
-      if (!value || typeof value !== 'object') return value
-      const variant = structuredClone(value as Record<string, unknown>)
-      if (Array.isArray(variant.equipment)) {
-        variant.equipment = variant.equipment.map((item) => (item && typeof item === 'object' ? { ...item, dimensionsLocked: false } : item))
-      }
-      return variant
-    })
+  if (migrated.schemaVersion !== 3) {
+    migrated.schemaVersion = 2
+    // v2 → v3: drag-resize became the default editing affordance, so dimensions persisted
+    // under the old lock-by-default seed are unlocked once during this one-time migration.
+    if (Array.isArray(migrated.variants)) {
+      migrated.variants = migrated.variants.map((value) => {
+        if (!value || typeof value !== 'object') return value
+        const variant = structuredClone(value as Record<string, unknown>)
+        if (Array.isArray(variant.equipment)) {
+          variant.equipment = variant.equipment.map((item) => (item && typeof item === 'object' ? { ...item, dimensionsLocked: false } : item))
+        }
+        return variant
+      })
+    }
+    migrated.schemaVersion = 3
   }
-  migrated.schemaVersion = 3
+  // v3 → v4 only introduces optional scenario menu data. Leaving it absent is
+  // meaningful: legacy scenarios continue through the exact original task model.
+  migrated.schemaVersion = 4
   return migrated
 }
 
@@ -107,7 +112,7 @@ export function importProject(json: string): KitchenProject {
   }
   if (candidate && typeof candidate === 'object') {
     const version = (candidate as Record<string, unknown>).schemaVersion
-    if (typeof version === 'number' && version > 3) throw new Error(`Unsupported future schema version ${version}`)
+    if (typeof version === 'number' && version > 4) throw new Error(`Unsupported future schema version ${version}`)
   }
   const project = validated(candidate)
   if (!project) throw new Error('Import is not a valid kitchen project')

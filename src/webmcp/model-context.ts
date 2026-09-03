@@ -20,8 +20,11 @@ export type JsonSchemaObject = {
 
 export type WebMcpToolAnnotations = {
   readOnlyHint?: boolean
-  destructiveHint?: boolean
-  openWorldHint?: boolean
+  untrustedContentHint?: boolean
+}
+
+export type WebMcpToolExecutionContext = {
+  signal?: AbortSignal
 }
 
 export type WebMcpToolDefinition = {
@@ -30,13 +33,22 @@ export type WebMcpToolDefinition = {
   description: string
   inputSchema: JsonSchemaObject
   annotations?: WebMcpToolAnnotations
-  execute: (input: unknown) => unknown
+  execute: (input: unknown, context?: WebMcpToolExecutionContext) => unknown
 }
 
 export type RegisterModelTool = (tool: WebMcpToolDefinition, options?: { signal?: AbortSignal }) => Promise<unknown>
+export type RegisteredModelTool = { name: string }
+export type GetModelTools = () => Promise<readonly RegisteredModelTool[]>
+export type SubscribeModelToolChanges = (listener: () => void) => () => void
 
 export type ModelContextDetection =
-  | { available: true; surface: 'document' | 'navigator'; registerTool: RegisterModelTool }
+  | {
+    available: true
+    surface: 'document' | 'navigator'
+    registerTool: RegisterModelTool
+    getTools?: GetModelTools
+    subscribeToolChanges?: SubscribeModelToolChanges
+  }
   | { available: false; reason: string }
 
 export type ModelContextEnvironment = {
@@ -47,16 +59,53 @@ export type ModelContextEnvironment = {
 }
 
 type RawRegisterTool = (tool: WebMcpToolDefinition, options?: { signal?: AbortSignal }) => unknown
+type RawGetTools = () => unknown
 
-const asRegisterTool = (value: unknown): RegisterModelTool | null => {
+const asRegisterTool = (modelContext: object, value: unknown): RegisterModelTool | null => {
   if (typeof value !== 'function') return null
   const raw = value as RawRegisterTool
-  return (tool, options) => Promise.resolve().then(() => raw(tool, options))
+  return (tool, options) => Promise.resolve().then(() => raw.call(modelContext, tool, options))
 }
 
-const registerToolOf = (modelContext: unknown): RegisterModelTool | null => {
+const getToolsOf = (modelContext: object): GetModelTools | undefined => {
+  const value = (modelContext as { getTools?: unknown }).getTools
+  if (typeof value !== 'function') return undefined
+  const raw = value as RawGetTools
+  return async () => {
+    const result = await raw.call(modelContext)
+    if (!Array.isArray(result)) return []
+    return result.filter((tool): tool is RegisteredModelTool => (
+      tool !== null && typeof tool === 'object' && typeof (tool as { name?: unknown }).name === 'string'
+    ))
+  }
+}
+
+const toolChangesOf = (modelContext: object): SubscribeModelToolChanges | undefined => {
+  const target = modelContext as {
+    addEventListener?: unknown
+    removeEventListener?: unknown
+  }
+  if (typeof target.addEventListener !== 'function' || typeof target.removeEventListener !== 'function') return undefined
+  const addEventListener = target.addEventListener as (type: string, listener: () => void) => void
+  const removeEventListener = target.removeEventListener as (type: string, listener: () => void) => void
+  return (listener) => {
+    const eventListener = () => listener()
+    addEventListener.call(modelContext, 'toolchange', eventListener)
+    return () => removeEventListener.call(modelContext, 'toolchange', eventListener)
+  }
+}
+
+const surfaceOf = (modelContext: unknown): Omit<Extract<ModelContextDetection, { available: true }>, 'available' | 'surface'> | null => {
   if (modelContext === null || typeof modelContext !== 'object') return null
-  return asRegisterTool((modelContext as { registerTool?: unknown }).registerTool)
+  const registerTool = asRegisterTool(modelContext, (modelContext as { registerTool?: unknown }).registerTool)
+  if (!registerTool) return null
+  const getTools = getToolsOf(modelContext)
+  const subscribeToolChanges = toolChangesOf(modelContext)
+  return {
+    registerTool,
+    ...(getTools ? { getTools } : {}),
+    ...(subscribeToolChanges ? { subscribeToolChanges } : {}),
+  }
 }
 
 const readGlobalDocument = (): { modelContext?: unknown } | undefined =>
@@ -74,10 +123,10 @@ export function detectModelContext(environment: ModelContextEnvironment = {}): M
   if (!isSecureContext) {
     return { available: false, reason: 'Agent tools require a secure (HTTPS or localhost) browser context.' }
   }
-  const documentTool = registerToolOf((environment.document ?? readGlobalDocument())?.modelContext)
-  if (documentTool) return { available: true, surface: 'document', registerTool: documentTool }
-  const navigatorTool = registerToolOf((environment.navigator ?? readGlobalNavigator())?.modelContext)
-  if (navigatorTool) return { available: true, surface: 'navigator', registerTool: navigatorTool }
+  const documentSurface = surfaceOf((environment.document ?? readGlobalDocument())?.modelContext)
+  if (documentSurface) return { available: true, surface: 'document', ...documentSurface }
+  const navigatorSurface = surfaceOf((environment.navigator ?? readGlobalNavigator())?.modelContext)
+  if (navigatorSurface) return { available: true, surface: 'navigator', ...navigatorSurface }
   return {
     available: false,
     reason: 'This browser does not expose document.modelContext or navigator.modelContext (WebMCP) yet.',

@@ -153,7 +153,7 @@ export function createSeedProject(): KitchenProject {
   }
 
   return {
-    schemaVersion: 3,
+    schemaVersion: 4,
     id: 'kitchen-1',
     name: 'Kitchen 1',
     displayUnit: 'mm',

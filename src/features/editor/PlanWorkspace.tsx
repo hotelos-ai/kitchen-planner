@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { useStore } from 'zustand'
 import type { WorkflowStage } from '../../app/workflow'
 import { StageToolbar } from '../../app/AppHeader'
@@ -52,6 +52,44 @@ const drawersInitiallyOpen = () => typeof globalThis.matchMedia !== 'function' |
 
 const duplicateId = (sourceId: string, index: number) => `${sourceId}-copy-${globalThis.crypto?.randomUUID?.() ?? Math.random().toString(36).slice(2)}-${index + 1}`
 
+const DEFAULT_SOURCE_IMAGE_URL = '/reference/kitchen-sketch.png'
+
+type SourceReferencePopoverProps = {
+  sourceOpacity: number
+  sourceLocked: boolean
+  onDisable(): void
+  onOpacityChange(opacity: number): void
+  onLockedChange(locked: boolean): void
+  onSourceImageUrlChange(url: string): void
+}
+
+function SourceReferencePopover({ sourceOpacity, sourceLocked, onDisable, onOpacityChange, onLockedChange, onSourceImageUrlChange }: SourceReferencePopoverProps) {
+  const [open, setOpen] = useState(true)
+  if (!open) return null
+
+  return (
+    <div className="source-reference-popover" role="dialog" aria-label="Source reference">
+      <strong>Source reference</strong>
+      <label>On <input type="checkbox" checked onChange={() => { onDisable(); setOpen(false) }} /></label>
+      <label>Opacity {sourceOpacity}% <input aria-label="Source opacity" type="range" min="10" max="80" value={sourceOpacity} onChange={(event) => onOpacityChange(Number(event.target.value))} /></label>
+      <label>Lock reference <input type="checkbox" checked={sourceLocked} onChange={(event) => onLockedChange(event.target.checked)} /></label>
+      <label>Replace
+        <input
+          type="file"
+          accept="image/*,application/pdf"
+          aria-label="Replace source drawing"
+          onChange={(event) => {
+            const file = event.target.files?.[0]
+            if (file) onSourceImageUrlChange(URL.createObjectURL(file))
+          }}
+        />
+      </label>
+      <button type="button" onClick={() => onSourceImageUrlChange(DEFAULT_SOURCE_IMAGE_URL)}>Remove</button>
+      <button type="button" onClick={() => setOpen(false)}>Close</button>
+    </div>
+  )
+}
+
 export function PlanWorkspace({
   store = projectStore,
   stage = 'equipment',
@@ -68,7 +106,6 @@ export function PlanWorkspace({
   closedLayout = null,
   onInspectComponentIn3D,
   onStageChange,
-  onCatalogOpenChange,
   onInspectorOpenChange,
   onEssentialsOpenChange,
   onRevisionsOpenChange,
@@ -86,10 +123,9 @@ export function PlanWorkspace({
   const [internalEssentialsOpen, setInternalEssentialsOpen] = useState(false)
   const [internalRevisionsOpen, setInternalRevisionsOpen] = useState(false)
   const [spaceImpactOpen, setSpaceImpactOpen] = useState(false)
-  const [sourcePopover, setSourcePopover] = useState(false)
   const [sourceOpacity, setSourceOpacity] = useState(35)
   const [sourceLocked, setSourceLocked] = useState(false)
-  const [localSourceUrl, setLocalSourceUrl] = useState(sourceImageUrl ?? '/reference/kitchen-sketch.png')
+  const [sourceImage, setSourceImage] = useState(() => ({ prop: sourceImageUrl, url: sourceImageUrl ?? DEFAULT_SOURCE_IMAGE_URL }))
   const [equipmentPromptOpen, setEquipmentPromptOpen] = useState(true)
   const [checksFocusId, setChecksFocusId] = useState<string | undefined>()
   const activeClosedLayout = closedLayout ?? internalClosedLayout
@@ -97,6 +133,15 @@ export function PlanWorkspace({
   const wizardRoomStep = wizardStartsAtRoom || internalWizardStartsAtRoom
   const essentialsVisible = essentialsOpen || internalEssentialsOpen
   const revisionsVisible = revisionsOpen || internalRevisionsOpen
+
+  if (sourceImage.prop !== sourceImageUrl) {
+    setSourceImage({ prop: sourceImageUrl, url: sourceImageUrl || sourceImage.url })
+  }
+
+  const setLocalSourceUrl = (url: string) => {
+    setSourceImage({ prop: sourceImageUrl, url })
+    onSourceImageUrlChange?.(url)
+  }
 
   const setEssentialsVisible = (open: boolean) => {
     setInternalEssentialsOpen(open)
@@ -117,10 +162,6 @@ export function PlanWorkspace({
       onEssentialsOpenChange?.(false)
     }
   }
-
-  useEffect(() => {
-    if (sourceImageUrl) setLocalSourceUrl(sourceImageUrl)
-  }, [sourceImageUrl])
 
   const openChecksForItem = (itemId: string) => {
     setChecksFocusId(itemId)
@@ -168,9 +209,6 @@ export function PlanWorkspace({
   const catalogVisible = includeToolbar ? localCatalogOpen : catalogOpen
   const inspectorVisible = (includeToolbar ? localInspectorOpen : inspectorOpen) || essentialsVisible || revisionsVisible
 
-  useEffect(() => {
-    if (referenceVisible) setSourcePopover(true)
-  }, [referenceVisible])
   const continueToEquipment = () => {
     const layouts = store.getState().project.variants.length
     if (stage === 'space' && layouts > 1) {
@@ -256,7 +294,7 @@ export function PlanWorkspace({
                 selectedSpaceItem={spaceSelection}
                 onSelectItem={selectSpaceItem}
                 showReference={compact ? false : referenceVisible}
-                sourceImageUrl={localSourceUrl}
+                sourceImageUrl={sourceImage.url}
                 sourceOpacity={sourceOpacity}
                 onInspectComponentIn3D={onInspectComponentIn3D}
                 onWarningBadgeClick={openChecksForItem}
@@ -264,29 +302,15 @@ export function PlanWorkspace({
             ) : (
               <div className="test-canvas-placeholder" />
             )}
-            {referenceVisible && sourcePopover && (
-              <div className="source-reference-popover" role="dialog" aria-label="Source reference">
-                <strong>Source reference</strong>
-                <label>On <input type="checkbox" checked={referenceVisible} onChange={() => { setLocalReference(false); setSourcePopover(false) }} /></label>
-                <label>Opacity {sourceOpacity}% <input aria-label="Source opacity" type="range" min="10" max="80" value={sourceOpacity} onChange={(event) => setSourceOpacity(Number(event.target.value))} /></label>
-                <label>Lock reference <input type="checkbox" checked={sourceLocked} onChange={(event) => setSourceLocked(event.target.checked)} /></label>
-                <label>Replace
-                  <input
-                    type="file"
-                    accept="image/*,application/pdf"
-                    aria-label="Replace source drawing"
-                    onChange={(event) => {
-                      const file = event.target.files?.[0]
-                      if (!file) return
-                      const url = URL.createObjectURL(file)
-                      setLocalSourceUrl(url)
-                      onSourceImageUrlChange?.(url)
-                    }}
-                  />
-                </label>
-                <button type="button" onClick={() => { setLocalSourceUrl('/reference/kitchen-sketch.png'); onSourceImageUrlChange?.('/reference/kitchen-sketch.png') }}>Remove</button>
-                <button type="button" onClick={() => setSourcePopover(false)}>Close</button>
-              </div>
+            {referenceVisible && (
+              <SourceReferencePopover
+                sourceOpacity={sourceOpacity}
+                sourceLocked={sourceLocked}
+                onDisable={() => setLocalReference(false)}
+                onOpacityChange={setSourceOpacity}
+                onLockedChange={setSourceLocked}
+                onSourceImageUrlChange={setLocalSourceUrl}
+              />
             )}
             {stage === 'equipment' && equipmentPromptOpen && !compact && (
               <div className="equipment-start-prompt" role="note">

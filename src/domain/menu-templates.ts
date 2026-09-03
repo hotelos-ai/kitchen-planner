@@ -1,75 +1,64 @@
-export type MenuItemSource = 'user-provided' | 'imported' | 'template-estimate' | 'system-inferred'
+import type { SimulationMenuItem } from './project'
 
-export type MenuRouteStep = {
-  label: string
-  station: string
-  activeSeconds: number
-  cookingSeconds?: { min: number; max: number }
-}
+/** @deprecated Use SimulationMenuItem. Kept as a source-compatible UI alias. */
+export type EstimatedMenuItem = SimulationMenuItem
 
-export type EstimatedMenuItem = {
-  id: string
-  name: string
-  sharePct: number
-  route: string
-  timeRangeMinutes: [number, number]
-  source: MenuItemSource
-  steps: MenuRouteStep[]
-}
-
-export const DEFAULT_GENERATED_MENU: EstimatedMenuItem[] = [
+export const DEFAULT_GENERATED_MENU: SimulationMenuItem[] = [
   {
-    id: 'grilled-fish', name: 'Grilled fish', sharePct: 16, route: 'Cold prep → Grill → Pass', timeRangeMinutes: [10, 14], source: 'template-estimate',
+    id: 'grilled-fish', name: 'Grilled fish', sharePct: 16, source: 'template-estimate',
     steps: [
-      { label: 'Retrieve', station: 'Upright fridge', activeSeconds: 15 },
-      { label: 'Prepare', station: 'Cold preparation', activeSeconds: 90 },
-      { label: 'Cook', station: 'Grill', activeSeconds: 25, cookingSeconds: { min: 480, max: 720 } },
-      { label: 'Plate', station: 'Pass', activeSeconds: 45 },
+      { label: 'Retrieve', capability: 'cold-retrieval', activeSeconds: 15 },
+      { label: 'Prepare', capability: 'food-prep', activeSeconds: 90 },
+      { label: 'Cook', capability: 'flat-top-cook', activeSeconds: 25, passiveSeconds: { minSeconds: 480, maxSeconds: 720 } },
+      { label: 'Plate', capability: 'finish-plate', activeSeconds: 45 },
+      { label: 'Pass', capability: 'clean-window', activeSeconds: 10 },
     ],
   },
   {
-    id: 'chicken-curry', name: 'Chicken curry', sharePct: 13, route: 'Prep → Range → Pass', timeRangeMinutes: [12, 18], source: 'template-estimate',
+    id: 'chicken-curry', name: 'Chicken curry', sharePct: 13, source: 'template-estimate',
     steps: [
-      { label: 'Retrieve', station: 'Cold storage', activeSeconds: 20 },
-      { label: 'Prepare', station: 'Prep', activeSeconds: 120 },
-      { label: 'Cook', station: 'Range', activeSeconds: 40, cookingSeconds: { min: 540, max: 900 } },
-      { label: 'Plate', station: 'Pass', activeSeconds: 40 },
+      { label: 'Retrieve', capability: 'cold-retrieval', activeSeconds: 20 },
+      { label: 'Prepare', capability: 'food-prep', activeSeconds: 120 },
+      { label: 'Cook', capability: 'range-cook', activeSeconds: 40, passiveSeconds: { minSeconds: 540, maxSeconds: 900 } },
+      { label: 'Plate', capability: 'finish-plate', activeSeconds: 40 },
+      { label: 'Pass', capability: 'clean-window', activeSeconds: 10 },
     ],
   },
   {
-    id: 'fried-rice', name: 'Fried rice', sharePct: 11, route: 'Prep → Range → Pass', timeRangeMinutes: [7, 11], source: 'template-estimate',
+    id: 'fried-rice', name: 'Fried rice', sharePct: 11, source: 'template-estimate',
     steps: [
-      { label: 'Retrieve', station: 'Fridge', activeSeconds: 12 },
-      { label: 'Prepare', station: 'Prep', activeSeconds: 60 },
-      { label: 'Cook', station: 'Range', activeSeconds: 30, cookingSeconds: { min: 300, max: 480 } },
-      { label: 'Plate', station: 'Pass', activeSeconds: 30 },
+      { label: 'Retrieve', capability: 'cold-retrieval', activeSeconds: 12 },
+      { label: 'Prepare', capability: 'food-prep', activeSeconds: 60 },
+      { label: 'Cook', capability: 'range-cook', activeSeconds: 30, passiveSeconds: { minSeconds: 300, maxSeconds: 480 } },
+      { label: 'Plate', capability: 'finish-plate', activeSeconds: 30 },
+      { label: 'Pass', capability: 'clean-window', activeSeconds: 10 },
     ],
   },
   {
-    id: 'green-salad', name: 'Green salad', sharePct: 9, route: 'Cold prep → Pass', timeRangeMinutes: [4, 7], source: 'template-estimate',
+    id: 'green-salad', name: 'Green salad', sharePct: 9, source: 'template-estimate',
     steps: [
-      { label: 'Retrieve', station: 'Cold prep', activeSeconds: 20 },
-      { label: 'Prepare', station: 'Cold preparation', activeSeconds: 90 },
-      { label: 'Plate', station: 'Pass', activeSeconds: 35 },
+      { label: 'Retrieve', capability: 'cold-retrieval', activeSeconds: 20 },
+      { label: 'Prepare', capability: 'food-prep', activeSeconds: 90 },
+      { label: 'Plate', capability: 'finish-plate', activeSeconds: 35 },
+      { label: 'Pass', capability: 'clean-window', activeSeconds: 10 },
     ],
   },
 ]
 
-export function parseMenuText(text: string): EstimatedMenuItem[] {
-  const lines = text.split(/\r?\n/).map((line) => line.trim()).filter(Boolean)
+export function parseMenuText(text: string): SimulationMenuItem[] {
+  const lines = text.split(/\r?\n/).map((line) => line.trim()).filter(Boolean).slice(0, 200)
   if (!lines.length) return []
-  const share = Math.max(4, Math.round(100 / lines.length))
+  const share = Math.min(100, Math.max(0, Math.round(100 / lines.length)))
   return lines.map((name, index) => ({
     id: `imported-${index + 1}`,
-    name: name.replace(/^[\d.)\-\s]+/, '').slice(0, 80) || `Item ${index + 1}`,
+    name: name.replace(/^[\d.)\-\s]+/, '').slice(0, 160) || `Item ${index + 1}`,
     sharePct: share,
-    route: 'Prep → Cook → Pass',
-    timeRangeMinutes: [8, 14] as [number, number],
     source: 'imported' as const,
     steps: [
-      { label: 'Prepare', station: 'Prep', activeSeconds: 90 },
-      { label: 'Cook', station: 'Hot line', activeSeconds: 30, cookingSeconds: { min: 360, max: 600 } },
-      { label: 'Plate', station: 'Pass', activeSeconds: 40 },
+      { label: 'Prepare', capability: 'food-prep' as const, activeSeconds: 90 },
+      { label: 'Cook', capability: 'range-cook' as const, activeSeconds: 30, passiveSeconds: { minSeconds: 360, maxSeconds: 600 } },
+      { label: 'Plate', capability: 'finish-plate' as const, activeSeconds: 40 },
+      { label: 'Pass', capability: 'clean-window' as const, activeSeconds: 10 },
     ],
   }))
 }

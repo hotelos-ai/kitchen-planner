@@ -54,6 +54,43 @@ describe('project exchange', () => {
     expect(screen.getByRole('status')).toHaveTextContent(/Project saved/i)
   })
 
+  it('exports a self-contained planning report instead of a placeholder', async () => {
+    let exportedBlob: Blob | undefined
+    vi.stubGlobal('URL', {
+      ...URL,
+      createObjectURL: vi.fn((blob: Blob) => { exportedBlob = blob; return 'blob:kitchen-report' }),
+      revokeObjectURL: vi.fn(),
+    })
+    let clickedDownload = ''
+    vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function (this: HTMLAnchorElement) {
+      clickedDownload = this.download
+    })
+    render(<ProjectExchange />)
+    await userEvent.click(screen.getByRole('button', { name: 'Export' }))
+    await userEvent.click(screen.getByRole('menuitem', { name: 'Export simulation report' }))
+
+    expect(clickedDownload).toBe('kitchen-1-report.html')
+    expect(await exportedBlob!.text()).toMatch(/<svg[\s\S]*Equipment schedule[\s\S]*Professional review required/)
+    expect(screen.queryByRole('menuitem', { name: /current view as image/i })).not.toBeInTheDocument()
+  })
+
+  it('copies a scoped deep link for the active project and workspace view', async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined)
+    const clipboardNavigator = Object.create(navigator) as Navigator
+    Object.defineProperty(clipboardNavigator, 'clipboard', { value: { writeText }, configurable: true })
+    vi.stubGlobal('navigator', clipboardNavigator)
+
+    render(<ProjectExchange />)
+    await userEvent.click(screen.getByRole('button', { name: 'Export' }))
+    await userEvent.click(screen.getByRole('menuitem', { name: 'Copy workspace link' }))
+
+    expect(writeText).toHaveBeenCalledOnce()
+    const sharedUrl = new URL(writeText.mock.calls[0][0])
+    expect(sharedUrl.hash).toContain('workspace=v1')
+    expect(sharedUrl.hash).toContain(`project=${encodeURIComponent(projectStore.getState().project.id)}`)
+    expect(screen.getByRole('status')).toHaveTextContent(/reopens this saved project in this browser/i)
+  })
+
   it('atomically replaces the document and invalidates previews from the previous document', async () => {
     const store = createProjectStore(createSeedProject())
     store.getState().nudgeItems(['tandoor'], { x: 100, y: 0 })

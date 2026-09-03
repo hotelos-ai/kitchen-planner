@@ -193,6 +193,23 @@ export interface ScenarioChecks {
 
 export type ServiceVariability = 'low' | 'typical' | 'high'
 
+export type MenuItemSource = 'user-provided' | 'imported' | 'template-estimate' | 'system-inferred'
+
+export interface MenuItemStep {
+  label: string
+  capability: StationCapability
+  activeSeconds: number
+  passiveSeconds?: { minSeconds: number; maxSeconds: number }
+}
+
+export interface SimulationMenuItem {
+  id: string
+  name: string
+  sharePct: number
+  source: MenuItemSource
+  steps: MenuItemStep[]
+}
+
 export interface SimulationScenario {
   id: string
   name: string
@@ -207,10 +224,11 @@ export interface SimulationScenario {
   stationCapacities?: Record<string, number>
   serviceStyle?: string
   variability?: ServiceVariability
+  menuItems?: SimulationMenuItem[]
 }
 
 export interface KitchenProject {
-  schemaVersion: 3
+  schemaVersion: 4
   id: string
   name: string
   displayUnit: DisplayUnit

@@ -7,9 +7,7 @@ import {
   currentRevision,
   diagnosticsSummary,
   failure,
-  jsonSafeSize,
   parseInput,
-  resolveVariant,
   success,
   unknownErrorMessage,
   type ToolDependencies,
@@ -19,8 +17,6 @@ export type WriteToolDependencies = ToolDependencies & {
   getFacade: () => WorkspaceFacade
 }
 
-const MAX_SIMULATION_RESULT_BYTES = 262_144
-
 const previewInput = z.object({
   expectedRevision: z.number().int().nonnegative(),
   operations: z.array(workspaceOperationSchema).min(1).max(200),
@@ -28,21 +24,29 @@ const previewInput = z.object({
 }).strict()
 
 const applyInput = z.object({
-  previewToken: z.string().min(1).max(200),
-}).strict()
-
-const runSimulationInput = z.object({
-  scenarioId: z.string().min(1).max(128).optional(),
-  variantId: z.string().min(1).max(128).optional(),
-  seed: z.number().int().min(-2_147_483_648).max(2_147_483_647).optional(),
-  outputMode: z.enum(['metrics-only', 'full']).optional(),
-  playback: z.enum(['play', 'pause', 'none']).optional(),
-  navigateTo: z.boolean().optional(),
-}).strict()
+  previewToken: z.string().min(1).max(200).optional(),
+  expectedRevision: z.number().int().nonnegative().optional(),
+  operations: z.array(workspaceOperationSchema).min(1).max(200).optional(),
+  intent: z.string().max(2_000).optional(),
+  idempotencyKey: z.string().min(1).max(200).optional(),
+}).strict().superRefine((input, context) => {
+  const directFields = input.expectedRevision !== undefined || input.operations !== undefined || input.idempotencyKey !== undefined
+  if (input.previewToken && directFields) context.addIssue({ code: 'custom', message: 'Use either previewToken or direct batch fields, not both.' })
+  if (!input.previewToken) {
+    if (input.expectedRevision === undefined) context.addIssue({ code: 'custom', path: ['expectedRevision'], message: 'expectedRevision is required for direct apply.' })
+    if (!input.operations) context.addIssue({ code: 'custom', path: ['operations'], message: 'operations are required for direct apply.' })
+    if (!input.idempotencyKey) context.addIssue({ code: 'custom', path: ['idempotencyKey'], message: 'idempotencyKey is required for direct apply.' })
+  }
+})
 
 const historyInput = z.object({
   direction: z.enum(['undo', 'redo']),
 }).strict()
+
+export const workspaceOperationJsonSchema = z.toJSONSchema(workspaceOperationSchema, {
+  target: 'draft-7',
+}) as Record<string, unknown>
+delete workspaceOperationJsonSchema.$schema
 
 const operationSchemaDescription: JsonSchemaObject = {
   type: 'object',
@@ -53,7 +57,7 @@ const operationSchemaDescription: JsonSchemaObject = {
     operations: {
       type: 'array',
       description: 'Ordered batch of spatial operations executed atomically: add_component, add_custom_component, move_components, nudge_components, rotate_components, resize_component, update_component, duplicate_components, remove_components, update_architecture, update_scenario, create_layout, activate_layout, rename_layout, remove_layout, update_workspace_settings, and related kinds. Each is validated strictly; one failure rejects the whole batch.',
-      items: { type: 'object', description: 'One workspace operation object; see get_workspace_guide supportedOperations and get_component_catalog for IDs.' },
+      items: { type: 'object', description: 'One strict workspace operation. Call get_workspace_guide for the complete discriminated JSON Schema before constructing a batch.' },
     },
     intent: { type: 'string', description: 'Optional human-readable description of the change, recorded in history.' },
   },
@@ -76,6 +80,7 @@ const applyRecoveryHint = (code: string): string => {
 }
 
 export function createWriteTools(deps: WriteToolDependencies): WebMcpToolDefinition[] {
+  const directResults = new Map<string, { signature: string; result: ApplyResult }>()
   const previewLayoutChanges: WebMcpToolDefinition = {
     name: 'preview_layout_changes',
     title: 'Preview layout changes',
@@ -119,20 +124,57 @@ export function createWriteTools(deps: WriteToolDependencies): WebMcpToolDefinit
     name: 'apply_layout_changes',
     title: 'Apply layout changes',
     description:
-      'Commit a previewed batch: pass the previewToken from preview_layout_changes. Commits the whole batch as one transaction, one undo step, and one revision increment; returns the new revision, changed IDs, warnings, and diagnostics delta.',
+      'Commit a preview token, or atomically preview and commit a direct operation batch with expectedRevision and an idempotencyKey. A repeated identical key never applies twice. Each new batch is one undo step and revision.',
     inputSchema: {
       type: 'object',
       additionalProperties: false,
-      required: ['previewToken'],
       properties: {
-        previewToken: { type: 'string', description: 'The single-use token returned by a successful preview_layout_changes call.' },
+        previewToken: { type: 'string', description: 'Single-use token from preview_layout_changes. Do not combine with direct batch fields.' },
+        expectedRevision: { type: 'number', description: 'For direct apply, the latest revision read by the agent.' },
+        operations: { type: 'array', items: { type: 'object', description: 'One strict operation; exact discriminated schema is returned by get_workspace_guide.' }, description: 'For direct apply, 1–200 strict workspace operations committed atomically.' },
+        intent: { type: 'string', description: 'Optional human-readable intent recorded with a direct batch.' },
+        idempotencyKey: { type: 'string', description: 'Required for direct apply. Reusing it with the same batch returns the original result; different content is rejected.' },
       },
     },
-    execute: (input) => {
+    execute: (input, context) => {
       try {
         const parsed = parseInput(deps, applyInput, input)
         if (!parsed.ok) return failure(currentRevision(deps), 'invalid-input', 'Invalid apply request.', parsed.issues)
-        const result = deps.getFacade().applyLayoutChanges({ previewToken: parsed.value.previewToken }) as ApplyResult | FacadeFailure
+        if (context?.signal?.aborted) return failure(currentRevision(deps), 'aborted', 'The apply request was cancelled before it started.')
+        let previewToken = parsed.value.previewToken
+        let signature: string | undefined
+        let scopedIdempotencyKey: string | undefined
+        if (!previewToken) {
+          const scope = `${deps.store.getState().documentId}:${deps.store.getState().project.id}`
+          scopedIdempotencyKey = `${scope}:${parsed.value.idempotencyKey!}`
+          signature = JSON.stringify({
+            scope,
+            expectedRevision: parsed.value.expectedRevision,
+            operations: parsed.value.operations,
+            intent: parsed.value.intent,
+          })
+          const cached = directResults.get(scopedIdempotencyKey)
+          if (cached) {
+            if (cached.signature !== signature) return failure(currentRevision(deps), 'idempotency-conflict', 'This idempotencyKey was already used for a different batch.')
+            return success(currentRevision(deps), {
+              originalRevision: cached.result.revision,
+              changedIds: cached.result.changedIds,
+              warnings: cached.result.warnings,
+              diagnostics: diagnosticsSummary(cached.result.diagnostics),
+              ...(cached.result.intent === undefined ? {} : { intent: cached.result.intent }),
+              replayed: true,
+            })
+          }
+          const preview = deps.getFacade().previewLayoutChanges({
+            expectedRevision: parsed.value.expectedRevision!,
+            operations: parsed.value.operations!,
+            ...(parsed.value.intent === undefined ? {} : { intent: parsed.value.intent }),
+          }) as PreviewResult | FacadeFailure
+          if (isFacadeFailure(preview)) return { ...preview, recovery: applyRecoveryHint(preview.code) }
+          previewToken = preview.previewToken
+        }
+        if (context?.signal?.aborted) return failure(currentRevision(deps), 'aborted', 'The apply request was cancelled before commit.')
+        const result = deps.getFacade().applyLayoutChanges({ previewToken }) as ApplyResult | FacadeFailure
         if (isFacadeFailure(result)) {
           return {
             ok: false as const,
@@ -142,6 +184,14 @@ export function createWriteTools(deps: WriteToolDependencies): WebMcpToolDefinit
             recovery: applyRecoveryHint(result.code),
           }
         }
+        const committedState = deps.store.getState()
+        const activeEquipmentIds = new Set(
+          committedState.project.variants
+            .find((variant) => variant.id === committedState.project.activeVariantId)
+            ?.equipment.map((item) => item.id) ?? [],
+        )
+        const visibleChangedIds = result.changedIds.filter((id) => activeEquipmentIds.has(id))
+        if (visibleChangedIds.length > 0) committedState.selectItems(visibleChangedIds)
         if (result.intent) {
           appStateStore.getState().setLastAgentAction({
             id: `agent-action-${result.revision}`,
@@ -150,95 +200,17 @@ export function createWriteTools(deps: WriteToolDependencies): WebMcpToolDefinit
             revision: result.revision,
           })
         }
+        if (signature) {
+          directResults.set(scopedIdempotencyKey!, { signature, result })
+          if (directResults.size > 100) directResults.delete(directResults.keys().next().value!)
+        }
         return success(result.revision, {
           changedIds: result.changedIds,
           warnings: result.warnings,
           diagnostics: diagnosticsSummary(result.diagnostics),
           ...(result.intent === undefined ? {} : { intent: result.intent }),
+          ...(signature === undefined ? {} : { replayed: false }),
         })
-      } catch (error) {
-        return failure(currentRevision(deps), 'internal-error', unknownErrorMessage(error))
-      }
-    },
-  }
-
-  const runSimulationTool: WebMcpToolDefinition = {
-    name: 'run_simulation',
-    title: 'Run service simulation',
-    description:
-      'Run the deterministic service simulation for a scenario against a layout revision, show the run in the app, and return assumptions, metrics, warnings, and recommendations. playback controls visible playback; navigateTo opens Simulate by default. outputMode "metrics-only" (default) returns aggregates; "full" adds time series and is size-capped. Does not change the document revision.',
-    inputSchema: {
-      type: 'object',
-      additionalProperties: false,
-      properties: {
-        scenarioId: { type: 'string', description: 'Optional scenario ID; defaults to the active scenario.' },
-        variantId: { type: 'string', description: 'Optional layout variant ID; defaults to the active variant.' },
-        seed: { type: 'number', description: 'Optional deterministic seed; defaults to the scenario seed.' },
-        outputMode: { type: 'string', enum: ['metrics-only', 'full'], description: 'Detail level; defaults to metrics-only.' },
-        playback: { type: 'string', enum: ['play', 'pause', 'none'], description: 'Whether the visible run should play, start paused, or not be requested. Defaults to play.' },
-        navigateTo: { type: 'boolean', description: 'Open the Simulate stage so the user sees the run. Defaults to true.' },
-      },
-    },
-    annotations: { readOnlyHint: true },
-    execute: (input) => {
-      try {
-        const parsed = parseInput(deps, runSimulationInput, input)
-        if (!parsed.ok) return failure(currentRevision(deps), 'invalid-input', 'Invalid simulation request.', parsed.issues)
-        const state = deps.store.getState()
-        const variant = resolveVariant(state.project, parsed.value.variantId)
-        if (!variant) return failure(state.revision, 'missing-variant', `Layout variant ${parsed.value.variantId ?? state.project.activeVariantId} does not exist.`)
-        const scenario = state.project.scenarios.find((candidate) => candidate.id === (parsed.value.scenarioId ?? state.project.activeScenarioId))
-        if (!scenario) return failure(state.revision, 'missing-scenario', `Scenario ${parsed.value.scenarioId ?? state.project.activeScenarioId} does not exist.`)
-        const outputMode = parsed.value.outputMode ?? 'metrics-only'
-        let result: unknown
-        try {
-          result = deps.getFacade().runSimulation({
-            variantId: variant.id,
-            scenarioId: scenario.id,
-            seed: parsed.value.seed ?? scenario.seed,
-            outputMode,
-          })
-        } catch (error) {
-          return failure(state.revision, 'simulation-failed', unknownErrorMessage(error))
-        }
-        if (isFacadeFailure(result)) {
-          return { ok: false as const, revision: result.revision, code: result.code, message: result.message }
-        }
-        const payload = {
-          scenario: { id: scenario.id, name: scenario.name, seed: parsed.value.seed ?? scenario.seed, covers: scenario.covers, durationMinutes: scenario.durationMinutes },
-          layoutRevision: state.revision,
-          outputMode,
-          result: structuredClone(result),
-          assumptions: 'Simulated values are scenario assumptions, not observed service data.',
-        }
-        const playback = parsed.value.playback ?? 'play'
-        if (parsed.value.navigateTo ?? true) {
-          appStateStore.getState().setOverlay(null)
-          appStateStore.getState().setStage('simulate')
-        }
-        if (playback !== 'none') {
-          appStateStore.getState().requestSimulationRun({
-            scenarioId: scenario.id,
-            variantId: variant.id,
-            seed: parsed.value.seed ?? scenario.seed,
-            playback: playback === 'play',
-          })
-        }
-        if (jsonSafeSize(payload) > MAX_SIMULATION_RESULT_BYTES) {
-          const record = result as { seed?: unknown; durationSeconds?: unknown; metrics?: unknown; warnings?: unknown }
-          return success(state.revision, {
-            ...payload,
-            result: {
-              seed: record.seed,
-              durationSeconds: record.durationSeconds,
-              metrics: record.metrics,
-              warnings: record.warnings,
-            },
-            truncated: true,
-            truncationNote: 'The full result exceeded the size limit; detailed series were dropped and aggregates kept.',
-          })
-        }
-        return success(state.revision, payload)
       } catch (error) {
         return failure(currentRevision(deps), 'internal-error', unknownErrorMessage(error))
       }
@@ -277,5 +249,5 @@ export function createWriteTools(deps: WriteToolDependencies): WebMcpToolDefinit
     },
   }
 
-  return [previewLayoutChanges, applyLayoutChanges, runSimulationTool, stepWorkspaceHistory]
+  return [previewLayoutChanges, applyLayoutChanges, stepWorkspaceHistory]
 }

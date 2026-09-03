@@ -6,6 +6,11 @@ import type { SimulationInput, SimulationResult } from '../../simulation/types'
 import { validateSimulationInput } from '../../simulation/validation'
 import { getActiveVariant, projectStore, type ProjectStore } from '../../state/project-store'
 import { appStateStore } from '../../state/app-state-store'
+import {
+  selectSimulationRun,
+  simulationRunStore,
+  type SimulationRunStore,
+} from '../../state/simulation-run-store'
 import { FindingsPanel } from './FindingsPanel'
 import { LayoutVerdict } from './LayoutVerdict'
 import { LiveServiceHUD } from './LiveServiceHUD'
@@ -19,7 +24,12 @@ import { WaitTimeDistribution } from './WaitTimeDistribution'
 import { useSimulationSession } from './useSimulationSession'
 import { ConfidenceLedger, SimulationSetup, StressTestPresets } from './SimulationSetup'
 
-type Props = { store?: ProjectStore; run?: (input: SimulationInput) => SimulationResult; threeRenderer?: ComponentType<SimulationThreeSceneProps> }
+type Props = {
+  store?: ProjectStore
+  run?: (input: SimulationInput) => SimulationResult
+  runStore?: SimulationRunStore
+  threeRenderer?: ComponentType<SimulationThreeSceneProps>
+}
 type Layers = { heatmap: boolean; trails: boolean; queues: boolean; clearances: boolean; flows: boolean; labels: boolean }
 
 const minutes = (seconds: number) => {
@@ -27,10 +37,19 @@ const minutes = (seconds: number) => {
   return `${Math.floor(whole / 60)} min ${String(whole % 60).padStart(2, '0')} sec`
 }
 
-export function SimulationWorkspace({ store = projectStore, run = runSimulation, threeRenderer: ThreeRenderer = SimulationThreeScene }: Props) {
+export function SimulationWorkspace({
+  store = projectStore,
+  run = runSimulation,
+  runStore = simulationRunStore,
+  threeRenderer: ThreeRenderer = SimulationThreeScene,
+}: Props) {
   const project = useStore(store, (state) => state.project)
-  const variant = useStore(store, getActiveVariant)
-  const scenario = project.scenarios.find((value) => value.id === project.activeScenarioId) ?? project.scenarios[0]
+  const activeVariant = useStore(store, getActiveVariant)
+  const simulationViewTarget = useStore(appStateStore, (state) => state.simulationViewTarget)
+  const variant = project.variants.find((value) => value.id === simulationViewTarget?.variantId) ?? activeVariant
+  const scenario = project.scenarios.find((value) => value.id === simulationViewTarget?.scenarioId)
+    ?? project.scenarios.find((value) => value.id === project.activeScenarioId)
+    ?? project.scenarios[0]
   const requestedRun = useStore(appStateStore, (state) => state.requestedSimulationRun)
   const [layers, setLayers] = useState<Layers>({ heatmap: true, trails: true, queues: true, clearances: false, flows: true, labels: true })
   const [followRole, setFollowRole] = useState<StaffRole | 'overview'>('overview')
@@ -62,7 +81,14 @@ export function SimulationWorkspace({ store = projectStore, run = runSimulation,
       layoutConstraints: requestedVariant.layoutConstraints,
     }
   }, [project.scenarios, project.variants, requestedRun])
-  const session = useSimulationSession({ input: simulationInput, run })
+  const session = useSimulationSession({
+    input: simulationInput,
+    run,
+    variantId: variant.id,
+    scenarioId: scenario.id,
+    revision: store.getState().revision,
+    runStore,
+  })
   const { result, liveState, elapsedSeconds, playing, speed } = session
 
   const startRun = () => {
@@ -75,11 +101,18 @@ export function SimulationWorkspace({ store = projectStore, run = runSimulation,
     if (!requestedRun) return
     appStateStore.getState().consumeSimulationRun(requestedRun.id)
     if (!requestedSimulationInput || validateSimulationInput(requestedSimulationInput).length > 0) return
-    session.startRun(requestedSimulationInput, requestedRun.playback)
+    const stored = selectSimulationRun(runStore.getState(), requestedRun.variantId, requestedRun.scenarioId)
+    if (stored && stored.seed === requestedRun.seed && stored.ranAtRevision === store.getState().revision) {
+      session.presentRun(requestedRun.playback)
+    } else session.startRun(requestedSimulationInput, requestedRun.playback, {
+      variantId: requestedRun.variantId,
+      scenarioId: requestedRun.scenarioId,
+      revision: store.getState().revision,
+    })
     // The request id is a one-shot command. Session methods intentionally stay
     // out of the dependency list so ordinary playback renders cannot replay it.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [requestedRun?.id, requestedSimulationInput])
+  }, [requestedRun?.id, requestedSimulationInput, runStore, store])
   const toggleLayer = (key: keyof Layers) => setLayers((current) => ({ ...current, [key]: !current[key] }))
   const bottleneck = result ? Object.entries(result.metrics.stationUtilization).sort((left, right) => right[1] - left[1])[0]?.[0] : undefined
 
@@ -90,7 +123,10 @@ export function SimulationWorkspace({ store = projectStore, run = runSimulation,
           <span className="eyebrow">Scenario</span>
           <h2>{scenario.name}</h2>
           <label>Scenario
-            <select aria-label="Active scenario" value={scenario.id} onChange={(event) => store.getState().patchProject((project) => { project.activeScenarioId = event.target.value })}>
+            <select aria-label="Active scenario" value={scenario.id} onChange={(event) => {
+              appStateStore.getState().clearSimulationRun()
+              store.getState().patchProject((project) => { project.activeScenarioId = event.target.value })
+            }}>
               {project.scenarios.map((entry) => <option key={entry.id} value={entry.id}>{entry.name}</option>)}
             </select>
           </label>

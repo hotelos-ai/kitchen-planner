@@ -3,6 +3,7 @@ import { createSeedProject } from '../domain/seed-project'
 import { projectSchema } from '../domain/project-schema'
 import { appStateStore } from '../state/app-state-store'
 import { createProjectStore, getActiveItem, getActiveVariant, getWorkspaceFacade } from '../state/project-store'
+import { createSimulationRunStore, selectSimulationRun } from '../state/simulation-run-store'
 import { kitchenCapabilityManifest } from './capability-manifest'
 import type { WebMcpToolDefinition } from './model-context'
 import { createWebMcpTools } from './webmcp-tools'
@@ -11,10 +12,12 @@ type Envelope = { ok: boolean; revision?: number; code?: string; message?: strin
 
 const setup = () => {
   const store = createProjectStore(createSeedProject())
+  const runStore = createSimulationRunStore()
   const tools = createWebMcpTools({
     store,
     getFacade: () => getWorkspaceFacade(store),
     manifest: kitchenCapabilityManifest,
+    runStore,
   })
   const byName = (name: string): WebMcpToolDefinition => {
     const tool = tools.find((candidate) => candidate.name === name)
@@ -22,7 +25,7 @@ const setup = () => {
     return tool
   }
   const call = async (name: string, input: unknown): Promise<Envelope> => byName(name).execute(input) as Promise<Envelope>
-  return { store, tools, byName, call }
+  return { store, runStore, tools, byName, call }
 }
 
 const collectObjectSchemas = (schema: unknown, found: unknown[] = []): unknown[] => {
@@ -53,7 +56,7 @@ describe('webmcp tools', () => {
       'get_workspace_guide', 'get_component_catalog', 'get_layout', 'analyze_layout',
       'suggest_component_placement', 'get_simulation_guide', 'export_project',
       'get_app_state', 'set_app_view', 'select_components', 'check_operational_essentials',
-      'preview_layout_changes', 'apply_layout_changes', 'run_simulation', 'step_workspace_history',
+      'preview_layout_changes', 'apply_layout_changes', 'run_simulation', 'get_simulation_result', 'step_workspace_history',
     ]))
   })
 
@@ -252,6 +255,41 @@ describe('webmcp tools', () => {
     expect(getActiveItem(store.getState(), 'tandoor')).toMatchObject({ xMm: item.xMm + 200, notes: 'agent-adjusted' })
   })
 
+  it('directly applies an idempotent batch exactly once', async () => {
+    const { store, call } = setup()
+    const before = store.getState()
+    const input = {
+      expectedRevision: before.revision,
+      operations: [{
+        type: 'nudge_components',
+        variantId: before.project.activeVariantId,
+        componentIds: ['tandoor'],
+        delta: { xMm: 50, yMm: 0 },
+      }],
+      intent: 'Make room beside the tandoor',
+      idempotencyKey: 'direct-tandoor-nudge-1',
+    }
+    const first = await call('apply_layout_changes', input)
+    expect(first).toMatchObject({ ok: true, revision: before.revision + 1, replayed: false })
+    const xAfterFirst = getActiveItem(store.getState(), 'tandoor').xMm
+
+    const replay = await call('apply_layout_changes', input)
+    expect(replay).toMatchObject({ ok: true, revision: before.revision + 1, originalRevision: before.revision + 1, replayed: true })
+    expect(getActiveItem(store.getState(), 'tandoor').xMm).toBe(xAfterFirst)
+    expect(store.getState().past).toHaveLength(1)
+
+    const conflict = await call('apply_layout_changes', {
+      ...input,
+      operations: [{
+        type: 'nudge_components',
+        variantId: before.project.activeVariantId,
+        componentIds: ['tandoor'],
+        delta: { xMm: 100, yMm: 0 },
+      }],
+    })
+    expect(conflict).toMatchObject({ ok: false, code: 'idempotency-conflict' })
+  })
+
   it('rejects invalid operations and stale revisions with structured errors', async () => {
     const { store, call } = setup()
     const state = store.getState()
@@ -286,16 +324,55 @@ describe('webmcp tools', () => {
   })
 
   it('runs the simulation without changing the document revision', async () => {
-    const { store, call } = setup()
+    const { store, runStore, call } = setup()
     const before = store.getState().revision
     const result = await call('run_simulation', {})
     expect(result).toMatchObject({ ok: true, revision: before, outputMode: 'metrics-only' })
     expect(result.assumptions).toEqual(expect.any(String))
     const scenario = result.scenario as { seed: number }
     expect(scenario.seed).toEqual(expect.any(Number))
+    const retained = selectSimulationRun(
+      runStore.getState(),
+      store.getState().project.activeVariantId,
+      store.getState().project.activeScenarioId,
+    )
+    expect(retained).not.toBeNull()
+    expect(retained?.result.frames.length).toBeGreaterThan(0)
+    expect((result.result as Record<string, unknown>).frames).toBeUndefined()
     expect(store.getState().revision).toBe(before)
     const missing = await call('run_simulation', { scenarioId: 'nope' })
     expect(missing).toMatchObject({ ok: false, code: 'missing-scenario' })
+  })
+
+  it('reads retained metrics, findings, stations, and orders without rerunning and reports staleness', async () => {
+    const { store, runStore, call } = setup()
+    const missing = await call('get_simulation_result', {})
+    expect(missing).toMatchObject({ ok: false, code: 'missing-simulation-result' })
+
+    await call('run_simulation', { seed: 8080, playback: 'none', navigateTo: false })
+    const key = {
+      variantId: store.getState().project.activeVariantId,
+      scenarioId: store.getState().project.activeScenarioId,
+    }
+    const retained = selectSimulationRun(runStore.getState(), key.variantId, key.scenarioId)!
+    const metrics = await call('get_simulation_result', { include: 'metrics' })
+    const findings = await call('get_simulation_result', { include: 'findings' })
+    const stations = await call('get_simulation_result', { include: 'stations' })
+    const orders = await call('get_simulation_result', { include: 'orders' })
+
+    expect(metrics).toMatchObject({ ok: true, seed: 8080, ranAtRevision: 0, metrics: retained.result.metrics })
+    expect(findings).toMatchObject({ ok: true, findings: expect.any(Array) })
+    expect(stations).toMatchObject({ ok: true, stations: expect.any(Array) })
+    expect((stations.stations as unknown[]).length).toBeGreaterThan(0)
+    expect(orders).toMatchObject({ ok: true, orders: retained.result.orders })
+    expect(selectSimulationRun(runStore.getState(), key.variantId, key.scenarioId)?.result).toBe(retained.result)
+
+    store.getState().nudgeItems(['tandoor'], { x: 50, y: 0 })
+    expect(await call('get_simulation_result', {})).toMatchObject({
+      ok: true,
+      ranAtRevision: 0,
+      staleAtRevision: 1,
+    })
   })
 
   it('exports a project JSON that round-trips through the project schema', async () => {

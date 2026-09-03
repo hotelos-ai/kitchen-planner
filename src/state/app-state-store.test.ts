@@ -20,6 +20,16 @@ describe('app state store', () => {
     expect(store.getState().overlay).toBe('auto-layout')
   })
 
+  it('coordinates shared walk, camera, and one-shot focus state', () => {
+    store.getState().setWalkMode(true)
+    store.getState().setCameraMode('top')
+    const request = store.getState().requestCameraFocus({ target: 'point', point: { x: 1200, y: 800 } })
+
+    expect(store.getState()).toMatchObject({ walkMode: true, cameraMode: 'top', cameraFocusRequest: request })
+    expect(store.getState().consumeCameraFocus(request.id)).toEqual(request)
+    expect(store.getState().cameraFocusRequest).toBeNull()
+  })
+
   it('publishes and consumes deterministic simulation run requests', () => {
     const observed: Array<string | null> = []
     const unsubscribe = store.subscribe((state) => observed.push(state.requestedSimulationRun?.id ?? null))

@@ -1,4 +1,4 @@
-import type { EquipmentItem, SimulationScenario, StaffRole, StationCapability } from '../domain/project'
+import type { EquipmentItem, SimulationMenuItem, SimulationScenario, StaffRole, StationCapability } from '../domain/project'
 import type { Rng } from './rng'
 import type { SimTask, SimTaskDemand } from './types'
 
@@ -15,6 +15,32 @@ const duration = (scenario: SimulationScenario, capability: StationCapability, r
   }
   return rng.between(min, max)
 }
+
+const menuStepDuration = (step: SimulationMenuItem['steps'][number], rng: Rng) => {
+  const active = step.activeSeconds
+  const min = step.passiveSeconds?.minSeconds ?? 0
+  const max = step.passiveSeconds?.maxSeconds ?? 0
+  const invalidPassive = step.passiveSeconds
+    && (!Number.isFinite(min) || !Number.isFinite(max) || min <= 0 || max <= 0 || min > max || max > 86_400)
+  if (!Number.isFinite(active) || active <= 0 || active > 86_400 || invalidPassive) {
+    throw new Error(`Invalid duration range for menu step ${step.label}.`)
+  }
+  return active + (step.passiveSeconds ? rng.between(min, max) : 0)
+}
+
+const weightedMenuItem = (items: readonly SimulationMenuItem[], rng: Rng) => {
+  const totalShare = items.reduce((total, item) => total + item.sharePct, 0)
+  if (totalShare <= 0) return rng.pick(items)
+  const target = rng.next() * totalShare
+  let cumulative = 0
+  for (const item of items) {
+    cumulative += item.sharePct
+    if (target < cumulative) return item
+  }
+  return items[items.length - 1]
+}
+
+const taskStageId = (label: string) => label.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'step'
 
 const arrivalTime = (index: number, count: number, scenario: SimulationScenario, rng: Rng) => {
   const durationSeconds = scenario.durationMinutes * 60
@@ -61,17 +87,32 @@ function addDemandChain(
 export function generateServiceTaskDemand(scenario: SimulationScenario, rng: Rng): SimTaskDemand[] {
   const tasks: SimTaskDemand[] = []
   const orderCount = Math.max(1, Math.ceil(scenario.covers / 2))
-  for (let index = 0; index < orderCount; index += 1) {
-    const orderId = `order-${index + 1}`
-    const cook = COOKING[index % COOKING.length]
-    const cookedToOrder = index < Math.round(orderCount * scenario.cookToOrderRatio)
-    addDemandChain(tasks, orderId, arrivalTime(index, orderCount, scenario, rng), 'clean', COOK_ROLES, [
-      { stage: 'retrieve', capability: 'cold-retrieval', duration: duration(scenario, 'cold-retrieval', rng, 20, 45) },
-      { stage: 'prep', capability: 'food-prep', duration: duration(scenario, 'food-prep', rng, 45, 120) },
-      { stage: 'cook', capability: cook, compatibleCapabilities: COOKING, duration: cookedToOrder ? duration(scenario, cook, rng, 180, 540) : rng.between(60, 150) },
-      { stage: 'finish', capability: 'finish-plate', duration: duration(scenario, 'finish-plate', rng, 25, 60) },
-      { stage: 'pass', capability: 'clean-window', duration: duration(scenario, 'clean-window', rng, 5, 15) },
-    ], orderId)
+  if (scenario.menuItems?.length) {
+    for (let index = 0; index < orderCount; index += 1) {
+      const orderId = `order-${index + 1}`
+      const readyAtSeconds = arrivalTime(index, orderCount, scenario, rng)
+      const menuItem = weightedMenuItem(scenario.menuItems, rng)
+      addDemandChain(tasks, `${orderId}-${menuItem.id}`, readyAtSeconds, 'clean', COOK_ROLES, menuItem.steps.map((step) => ({
+        stage: taskStageId(step.label),
+        capability: step.capability,
+        duration: menuStepDuration(step, rng),
+      })), orderId)
+    }
+  } else {
+    // Compatibility model: keep this branch and its RNG call order unchanged for
+    // every project that predates persisted menu data.
+    for (let index = 0; index < orderCount; index += 1) {
+      const orderId = `order-${index + 1}`
+      const cook = COOKING[index % COOKING.length]
+      const cookedToOrder = index < Math.round(orderCount * scenario.cookToOrderRatio)
+      addDemandChain(tasks, orderId, arrivalTime(index, orderCount, scenario, rng), 'clean', COOK_ROLES, [
+        { stage: 'retrieve', capability: 'cold-retrieval', duration: duration(scenario, 'cold-retrieval', rng, 20, 45) },
+        { stage: 'prep', capability: 'food-prep', duration: duration(scenario, 'food-prep', rng, 45, 120) },
+        { stage: 'cook', capability: cook, compatibleCapabilities: COOKING, duration: cookedToOrder ? duration(scenario, cook, rng, 180, 540) : rng.between(60, 150) },
+        { stage: 'finish', capability: 'finish-plate', duration: duration(scenario, 'finish-plate', rng, 25, 60) },
+        { stage: 'pass', capability: 'clean-window', duration: duration(scenario, 'clean-window', rng, 5, 15) },
+      ], orderId)
+    }
   }
   const dishBatchCount = Math.max(1, Math.ceil(scenario.covers / 3))
   for (let index = 0; index < dishBatchCount; index += 1) {

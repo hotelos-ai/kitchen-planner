@@ -171,6 +171,7 @@ test('keeps Plan controls and canvas in the phone viewport', async ({ page }) =>
   await openApp(page)
 
   const workspace = page.getByRole('region', { name: '2D plan workspace' })
+  await expect(workspace).toBeVisible()
   const toolbarBox = await page.locator('.app-header-row-2').boundingBox()
   const canvasBox = await page.getByTestId('plan-canvas').boundingBox()
 

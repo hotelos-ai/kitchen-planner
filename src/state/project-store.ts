@@ -378,7 +378,6 @@ export function createProjectStore(initialProject: KitchenProject): ProjectStore
         return result.ok
       },
       captureWorkingSnapshot: () => {
-        const project = get().project
         const variant = getActiveVariant(get())
         const clean = analyzeLayout(variant.architecture, variant.equipment, { layoutConstraints: variant.layoutConstraints }).length === 0
         if (!clean) return

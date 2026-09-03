@@ -16,9 +16,11 @@ const setAppViewInput = z.object({
   stage: z.enum(['space', 'equipment', 'simulate']).optional(),
   view: z.enum(['plan', 'scene', 'split']).optional(),
   overlay: z.enum(['compare', 'auto-layout']).nullable().optional(),
+  walkMode: z.boolean().optional(),
+  cameraMode: z.enum(['perspective', 'top']).optional(),
 }).strict().refine(
-  ({ stage, view, overlay }) => stage !== undefined || view !== undefined || overlay !== undefined,
-  { message: 'Provide at least one of stage, view, or overlay.' },
+  ({ stage, view, overlay, walkMode, cameraMode }) => stage !== undefined || view !== undefined || overlay !== undefined || walkMode !== undefined || cameraMode !== undefined,
+  { message: 'Provide at least one view field.' },
 )
 
 const selectComponentsInput = z.object({
@@ -31,6 +33,16 @@ const selectComponentsInput = z.object({
   }
 })
 
+const focusCameraInput = z.object({
+  target: z.enum(['fit', 'component', 'point']),
+  componentId: z.string().min(1).max(128).optional(),
+  point: z.object({ xMm: z.number().finite(), yMm: z.number().finite() }).strict().optional(),
+  cameraMode: z.enum(['perspective', 'top']).optional(),
+}).strict().superRefine((input, context) => {
+  if (input.target === 'component' && !input.componentId) context.addIssue({ code: 'custom', path: ['componentId'], message: 'componentId is required for component focus.' })
+  if (input.target === 'point' && !input.point) context.addIssue({ code: 'custom', path: ['point'], message: 'point is required for point focus.' })
+})
+
 const appStatePayload = (deps: ToolDependencies) => {
   const projectState = deps.store.getState()
   const appState = appStateStore.getState()
@@ -39,6 +51,8 @@ const appStatePayload = (deps: ToolDependencies) => {
     stage: appState.stage,
     view: appState.view,
     overlay: appState.overlay,
+    walkMode: appState.walkMode,
+    cameraMode: appState.cameraMode,
     activeVariantId: projectState.project.activeVariantId,
     activeScenarioId: projectState.project.activeScenarioId,
     selectedIds: [...projectState.selectedIds],
@@ -58,6 +72,8 @@ const setAppViewSchema: JsonSchemaObject = {
       enum: ['compare', 'auto-layout', null],
       description: 'Optional workspace overlay. Pass null to close the active overlay.',
     },
+    walkMode: { type: 'boolean', description: 'Enter or exit the first-person kitchen walk mode.' },
+    cameraMode: { type: 'string', enum: ['perspective', 'top'], description: 'Set the 3D camera projection preset.' },
   },
   description: 'Provide at least one field. Omitted fields keep their current values.',
 }
@@ -100,6 +116,8 @@ export function createAppTools(deps: ToolDependencies): WebMcpToolDefinition[] {
         if (parsed.value.stage !== undefined) state.setStage(parsed.value.stage)
         if (parsed.value.view !== undefined) appStateStore.getState().setView(parsed.value.view)
         if (parsed.value.overlay !== undefined) appStateStore.getState().setOverlay(parsed.value.overlay)
+        if (parsed.value.walkMode !== undefined) appStateStore.getState().setWalkMode(parsed.value.walkMode)
+        if (parsed.value.cameraMode !== undefined) appStateStore.getState().setCameraMode(parsed.value.cameraMode)
         return success(currentRevision(deps), appStatePayload(deps))
       } catch (error) {
         return failure(currentRevision(deps), 'internal-error', unknownErrorMessage(error))
@@ -185,5 +203,60 @@ export function createAppTools(deps: ToolDependencies): WebMcpToolDefinition[] {
     },
   }
 
-  return [getAppState, setAppView, selectComponents]
+  const focusCamera: WebMcpToolDefinition = {
+    name: 'focus_camera',
+    title: 'Focus camera',
+    description: 'Move the visible 3D camera to fit the room, frame a component, or inspect an exact millimetre point. Optionally switches between perspective and top view without changing the project revision.',
+    inputSchema: {
+      type: 'object',
+      additionalProperties: false,
+      required: ['target'],
+      properties: {
+        target: { type: 'string', enum: ['fit', 'component', 'point'], description: 'Camera target type.' },
+        componentId: { type: 'string', description: 'Required component ID when target is component.' },
+        point: {
+          type: 'object',
+          additionalProperties: false,
+          required: ['xMm', 'yMm'],
+          properties: {
+            xMm: { type: 'number', description: 'Horizontal millimetres from the room origin.' },
+            yMm: { type: 'number', description: 'Vertical millimetres from the room origin.' },
+          },
+          description: 'Required exact plan point when target is point.',
+        },
+        cameraMode: { type: 'string', enum: ['perspective', 'top'], description: 'Optional camera preset.' },
+      },
+    },
+    execute: (input) => {
+      try {
+        const parsed = parseInput(deps, focusCameraInput, input)
+        if (!parsed.ok) return failure(currentRevision(deps), 'invalid-input', 'Invalid camera focus request.', parsed.issues)
+        const projectState = deps.store.getState()
+        if (parsed.value.target === 'component') {
+          const variant = projectState.project.variants.find((candidate) => candidate.id === projectState.project.activeVariantId)
+          if (!variant?.equipment.some((item) => item.id === parsed.value.componentId)) {
+            return failure(projectState.revision, 'unknown-component', `Component ${parsed.value.componentId} does not exist in the active layout.`)
+          }
+          projectState.selectItems([parsed.value.componentId!])
+        }
+        const appState = appStateStore.getState()
+        appState.setStage('equipment')
+        appStateStore.getState().setView('scene')
+        appStateStore.getState().setOverlay(null)
+        appStateStore.getState().setWalkMode(false)
+        if (parsed.value.cameraMode) appStateStore.getState().setCameraMode(parsed.value.cameraMode)
+        const request = appStateStore.getState().requestCameraFocus({
+          target: parsed.value.target,
+          ...(parsed.value.componentId ? { componentId: parsed.value.componentId } : {}),
+          ...(parsed.value.point ? { point: { x: parsed.value.point.xMm, y: parsed.value.point.yMm } } : {}),
+          ...(parsed.value.cameraMode ? { cameraMode: parsed.value.cameraMode } : {}),
+        })
+        return success(projectState.revision, { requestId: request.id, target: request.target, ...appStatePayload(deps) })
+      } catch (error) {
+        return failure(currentRevision(deps), 'internal-error', unknownErrorMessage(error))
+      }
+    },
+  }
+
+  return [getAppState, setAppView, selectComponents, focusCamera]
 }

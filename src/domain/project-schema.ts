@@ -79,6 +79,29 @@ const taskDurationRangeSchema = z.object({
   minSeconds: z.number().positive().finite(),
   maxSeconds: z.number().positive().finite(),
 }).strict().refine((range) => range.minSeconds <= range.maxSeconds, 'Minimum duration cannot exceed maximum duration')
+const menuDurationRangeSchema = z.object({
+  minSeconds: z.number().finite().positive().max(86_400),
+  maxSeconds: z.number().finite().positive().max(86_400),
+}).strict().refine((range) => range.minSeconds <= range.maxSeconds, 'Minimum duration cannot exceed maximum duration')
+
+const menuItemIdSchema = z.string()
+  .min(1)
+  .max(128)
+  .regex(/^[A-Za-z0-9][A-Za-z0-9._:-]*$/, 'IDs may contain only letters, numbers, dots, underscores, colons, and hyphens')
+const menuItemNameSchema = z.string().trim().min(1).max(160)
+
+export const menuItemSchema = z.object({
+  id: menuItemIdSchema,
+  name: menuItemNameSchema,
+  sharePct: z.number().min(0).max(100),
+  source: z.enum(['user-provided', 'imported', 'template-estimate', 'system-inferred']),
+  steps: z.array(z.object({
+    label: menuItemNameSchema,
+    capability: capabilitySchema,
+    activeSeconds: z.number().positive().max(86_400),
+    passiveSeconds: menuDurationRangeSchema.optional(),
+  }).strict()).min(1).max(24),
+}).strict()
 
 export const operationalProfileSchema = z.object({
   covers: z.number().int().positive().optional(),
@@ -171,10 +194,11 @@ export const scenarioSchema = z.object({
   stationCapacities: z.record(z.string(), z.number().int().positive()).optional(),
   serviceStyle: z.string().min(1).optional(),
   variability: z.enum(['low', 'typical', 'high']).optional(),
+  menuItems: z.array(menuItemSchema).max(200).optional(),
 }).strict()
 
 export const projectSchema = z.object({
-  schemaVersion: z.literal(3),
+  schemaVersion: z.literal(4),
   id: z.string().min(1),
   name: z.string().min(1),
   displayUnit: z.enum(['mm', 'cm', 'in', 'ft']),

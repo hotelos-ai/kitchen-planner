@@ -2,9 +2,9 @@ import { z } from 'zod'
 import type { WorkspaceFacade } from '../core/workspace/workspace-facade'
 import { WORKSPACE_OPERATION_TYPES } from '../core/workspace/workspace-operation'
 import { analyzeLayout, type LayoutIssue } from '../domain/layout-diagnostics'
-import { exportProject } from '../state/persistence'
 import type { CapabilityManifest } from './capability-manifest'
 import type { JsonSchemaObject, WebMcpToolDefinition } from './model-context'
+import { workspaceOperationJsonSchema } from './webmcp-write-tools'
 import {
   currentRevision,
   failure,
@@ -94,6 +94,7 @@ export function createReadTools(deps: ReadToolDependencies): WebMcpToolDefinitio
           agentWorkflow: [...deps.manifest.agentWorkflow],
           uncertaintyGuidance: deps.manifest.uncertaintyGuidance,
           supportedOperations: [...WORKSPACE_OPERATION_TYPES],
+          operationSchema: structuredClone(workspaceOperationJsonSchema),
           tools: deps.getToolSummaries(),
           limitations: [...deps.manifest.limitations],
         })
@@ -337,6 +338,7 @@ export function createReadTools(deps: ReadToolDependencies): WebMcpToolDefinitio
             cookToOrderRatio: scenario.cookToOrderRatio,
             seed: scenario.seed,
             staff: scenario.staff.map((assignment) => ({ role: assignment.role, count: assignment.count })),
+            menuItems: scenario.menuItems ? structuredClone(scenario.menuItems) : undefined,
           })),
           activeScenarioId: state.project.activeScenarioId,
           editableParameters: [
@@ -352,6 +354,7 @@ export function createReadTools(deps: ReadToolDependencies): WebMcpToolDefinitio
             { field: 'stationCapacities', type: 'object', constraints: 'Component ID → positive integer capacity.' },
             { field: 'serviceStyle', type: 'string', constraints: 'Optional label, 1–160 characters.' },
             { field: 'variability', type: 'enum', constraints: 'low | typical | high.' },
+            { field: 'menuItems', type: 'array', constraints: 'Up to 200 weighted menu items with sharePct, source, and 1–24 predecessor-linked capability steps. Omit to preserve the legacy deterministic model.' },
           ],
           staffRoles: ['head-chef', 'sous-chef', 'cdp', 'busser-washer'],
           resultDefinitions: {
@@ -372,34 +375,5 @@ export function createReadTools(deps: ReadToolDependencies): WebMcpToolDefinitio
     },
   }
 
-  const exportProjectTool: WebMcpToolDefinition = {
-    name: 'export_project',
-    title: 'Export project JSON',
-    description:
-      'Return the complete validated project as JSON (all layout variants, architecture, scenarios, settings) plus a suggested filename. Use this to save or download the plan; the JSON is importable back into the app.',
-    inputSchema: {
-      type: 'object',
-      additionalProperties: false,
-      properties: {},
-      description: 'No parameters.',
-    },
-    annotations: { readOnlyHint: true },
-    execute: (input) => {
-      try {
-        const parsed = parseInput(deps, emptyInput, input)
-        if (!parsed.ok) return failure(currentRevision(deps), 'invalid-input', 'Input must be an empty object.', parsed.issues)
-        const state = deps.store.getState()
-        const projectJson = exportProject(state.project)
-        const slug = state.project.name.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'kitchen-plan'
-        return success(state.revision, {
-          filename: `${slug}-rev-${state.revision}.json`,
-          projectJson,
-        })
-      } catch (error) {
-        return failure(currentRevision(deps), 'export-failed', unknownErrorMessage(error))
-      }
-    },
-  }
-
-  return [getWorkspaceGuide, getComponentCatalog, getLayout, analyzeLayoutTool, suggestPlacement, getSimulationGuide, exportProjectTool]
+  return [getWorkspaceGuide, getComponentCatalog, getLayout, analyzeLayoutTool, suggestPlacement, getSimulationGuide]
 }

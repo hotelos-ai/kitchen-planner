@@ -3,7 +3,7 @@ import type { KitchenProject } from './project'
 import { projectSchema } from './project-schema'
 
 const validProject = {
-  schemaVersion: 3,
+  schemaVersion: 4,
   id: 'schema-fixture',
   name: 'Schema fixture kitchen',
   displayUnit: 'mm',
@@ -114,6 +114,45 @@ describe('project schema', () => {
     const invalidDuration = structuredClone(validProject)
     Object.assign(invalidDuration.scenarios[0], { taskDurations: { 'food-prep': { minSeconds: 90, maxSeconds: 30 } } })
     expect(projectSchema.safeParse(invalidDuration).success).toBe(false)
+  })
+
+  it('accepts persisted menu demand with bounded weighted task chains', () => {
+    const candidate = structuredClone(validProject)
+    Object.assign(candidate.scenarios[0], {
+      menuItems: [{
+        id: 'fish.special-1',
+        name: 'Grilled fish',
+        sharePct: 62.5,
+        source: 'user-provided',
+        steps: [
+          { label: 'Prepare', capability: 'food-prep', activeSeconds: 90 },
+          { label: 'Cook', capability: 'flat-top-cook', activeSeconds: 30, passiveSeconds: { minSeconds: 420, maxSeconds: 600 } },
+        ],
+      }],
+    })
+
+    expect(projectSchema.safeParse(candidate).success).toBe(true)
+  })
+
+  it('enforces menu item, step, share, source, and duration limits', () => {
+    const baseItem = {
+      id: 'item-1', name: 'Item 1', sharePct: 50, source: 'imported',
+      steps: [{ label: 'Prepare', capability: 'food-prep', activeSeconds: 30 }],
+    }
+    const withMenu = (menuItems: unknown[]) => {
+      const candidate = structuredClone(validProject)
+      Object.assign(candidate.scenarios[0], { menuItems })
+      return candidate
+    }
+
+    expect(projectSchema.safeParse(withMenu(Array.from({ length: 201 }, (_, index) => ({ ...baseItem, id: `item-${index}` })))).success).toBe(false)
+    expect(projectSchema.safeParse(withMenu([{ ...baseItem, sharePct: 101 }])).success).toBe(false)
+    expect(projectSchema.safeParse(withMenu([{ ...baseItem, source: 'guessed' }])).success).toBe(false)
+    expect(projectSchema.safeParse(withMenu([{ ...baseItem, steps: [] }])).success).toBe(false)
+    expect(projectSchema.safeParse(withMenu([{ ...baseItem, steps: Array.from({ length: 25 }, () => baseItem.steps[0]) }])).success).toBe(false)
+    expect(projectSchema.safeParse(withMenu([{ ...baseItem, steps: [{ ...baseItem.steps[0], activeSeconds: 86_401 }] }])).success).toBe(false)
+    expect(projectSchema.safeParse(withMenu([{ ...baseItem, steps: [{ ...baseItem.steps[0], passiveSeconds: { minSeconds: 60, maxSeconds: 30 } }] }])).success).toBe(false)
+    expect(projectSchema.safeParse(withMenu([{ ...baseItem, steps: [{ ...baseItem.steps[0], passiveSeconds: { minSeconds: 60, maxSeconds: 86_401 } }] }])).success).toBe(false)
   })
 
   it('accepts variant-owned architecture and reproducible layout metadata', () => {

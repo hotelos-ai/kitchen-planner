@@ -81,8 +81,6 @@ export function PlanCanvas({ store, showReference, sourceImageUrl = '/reference/
   const spanX = Math.max(1, bounds.maxX - bounds.minX)
   const spanY = Math.max(1, bounds.maxY - bounds.minY)
   const pixelsPerMm = Math.min((size.width - margin * 2) / spanX, (size.height - margin * 2) / spanY)
-  const planWidth = variant.architecture.widthMm * pixelsPerMm
-  const planHeight = variant.architecture.depthMm * pixelsPerMm
   const originX = (size.width - (bounds.maxX - bounds.minX) * pixelsPerMm) / 2 - bounds.minX * pixelsPerMm
   const originY = (size.height - (bounds.maxY - bounds.minY) * pixelsPerMm) / 2 - bounds.minY * pixelsPerMm
 

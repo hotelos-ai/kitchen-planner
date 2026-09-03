@@ -14,6 +14,7 @@ import type { ViewMode } from './workflow'
 import { ErrorBoundary } from './ErrorBoundary'
 import { HelpDialog } from './HelpDialog'
 import { CURRENT_PROJECT_KEY, LAST_GOOD_PROJECT_KEY, LEGACY_CURRENT_PROJECT_KEY, LEGACY_LAST_GOOD_PROJECT_KEY } from '../state/persistence'
+import { applyWorkspaceDeepLink, resolveWorkspaceDeepLink } from './workspace-deep-link'
 import './styles.css'
 
 export const SESSION_FLAG_KEY = 'calmkitchen-designer:session'
@@ -61,17 +62,30 @@ export function App() {
   const [closedLayout, setClosedLayout] = useState<{ name: string; revision: number; undo(): boolean } | null>(null)
   const [showStartScreen, setShowStartScreen] = useState(() => {
     if (typeof localStorage === 'undefined') return false
+    const hasMatchingDeepLink = typeof window !== 'undefined'
+      && resolveWorkspaceDeepLink(window.location.hash, projectStore.getState().project) !== null
     return !(
       localStorage.getItem(SESSION_FLAG_KEY)
       ?? localStorage.getItem(CURRENT_PROJECT_KEY)
       ?? localStorage.getItem(LAST_GOOD_PROJECT_KEY)
       ?? localStorage.getItem(LEGACY_CURRENT_PROJECT_KEY)
       ?? localStorage.getItem(LEGACY_LAST_GOOD_PROJECT_KEY)
-    )
+    ) && !hasMatchingDeepLink
   })
   const [helpOpen, setHelpOpen] = useState(false)
 
   useEffect(() => () => appStateStore.getState().reset(), [])
+
+  useEffect(() => {
+    const restoreDeepLink = () => {
+      if (!applyWorkspaceDeepLink(window.location.hash, projectStore, appStateStore)) return
+      localStorage.setItem(SESSION_FLAG_KEY, '1')
+      setShowStartScreen(false)
+    }
+    restoreDeepLink()
+    window.addEventListener('hashchange', restoreDeepLink)
+    return () => window.removeEventListener('hashchange', restoreDeepLink)
+  }, [])
 
   const beginSession = () => {
     localStorage.setItem(SESSION_FLAG_KEY, '1')

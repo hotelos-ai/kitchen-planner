@@ -69,10 +69,11 @@ describe('AgentToolsPanel', () => {
     const controller = createWebMcpController({ store, getFacade: () => getWorkspaceFacade(store), detect: () => detection })
     await controller.register()
     const variantId = store.getState().project.activeVariantId
-    const preview = await captured.find((tool) => tool.name === 'preview_layout_changes')!.execute({
+    const previewResult = await captured.find((tool) => tool.name === 'preview_layout_changes')!.execute({
       expectedRevision: store.getState().revision,
       operations: [{ type: 'nudge_components', variantId, componentIds: ['tandoor'], delta: { xMm: 40, yMm: 0 } }],
-    }) as { ok: boolean; previewToken: string }
+    }) as { structuredContent: { ok: boolean; previewToken: string } }
+    const preview = previewResult.structuredContent
     if (!preview.ok) throw new Error('preview failed')
     await captured.find((tool) => tool.name === 'apply_layout_changes')!.execute({ previewToken: preview.previewToken })
 

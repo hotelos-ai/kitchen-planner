@@ -5,12 +5,14 @@ import { createSeedProject } from '../../domain/seed-project'
 import { runSimulation } from '../../simulation/engine'
 import { createProjectStore, projectStore } from '../../state/project-store'
 import { appStateStore } from '../../state/app-state-store'
+import { createSimulationRunStore, simulationRunStore } from '../../state/simulation-run-store'
 import { SimulationWorkspace } from './SimulationWorkspace'
 
 describe('simulation workspace', () => {
   beforeEach(() => {
     projectStore.getState().replaceProject(createSeedProject())
     appStateStore.getState().reset()
+    simulationRunStore.getState().clear()
   })
 
   it('turns an agent-requested run into visible playback', async () => {
@@ -31,6 +33,64 @@ describe('simulation workspace', () => {
       scenario: expect.objectContaining({ seed: 4242 }),
     }))
     expect(appStateStore.getState().requestedSimulationRun).toBeNull()
+  })
+
+  it('presents an agent-requested non-active layout without changing the document selection', async () => {
+    const project = createSeedProject()
+    const target = structuredClone(project.variants[0])
+    target.id = 'agent-target-layout'
+    target.name = 'Agent target layout'
+    target.architecture.wallHeightMm = 4999
+    project.variants.push(target)
+    projectStore.getState().replaceProject(project)
+    const run = vi.fn(runSimulation)
+    appStateStore.getState().requestSimulationRun({
+      scenarioId: project.activeScenarioId,
+      variantId: target.id,
+      seed: 4242,
+      playback: false,
+    })
+
+    render(<SimulationWorkspace run={run} />)
+
+    expect(await screen.findByText(/Total staff travel/i)).toBeInTheDocument()
+    expect(run).toHaveBeenCalledWith(expect.objectContaining({
+      architecture: expect.objectContaining({ wallHeightMm: 4999 }),
+    }))
+    expect(projectStore.getState().project.activeVariantId).not.toBe(target.id)
+  })
+
+  it('reuses the exact agent-produced result instead of executing the engine twice', async () => {
+    const runStore = createSimulationRunStore()
+    const run = vi.fn(runSimulation)
+    const project = projectStore.getState().project
+    const variant = project.variants.find((candidate) => candidate.id === project.activeVariantId)!
+    const scenario = project.scenarios.find((candidate) => candidate.id === project.activeScenarioId)!
+    const agentResult = runSimulation({
+      architecture: variant.architecture,
+      equipment: variant.equipment,
+      scenario: { ...scenario, seed: 4242 },
+      layoutConstraints: variant.layoutConstraints,
+    })
+    runStore.getState().storeRun({
+      variantId: variant.id,
+      scenarioId: scenario.id,
+      result: agentResult,
+      seed: 4242,
+      ranAtRevision: projectStore.getState().revision,
+    })
+    appStateStore.getState().requestSimulationRun({
+      scenarioId: scenario.id,
+      variantId: variant.id,
+      seed: 4242,
+      playback: false,
+    })
+
+    render(<SimulationWorkspace run={run} runStore={runStore} />)
+
+    expect(await screen.findByText(/Total staff travel/i)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Play' })).toBeInTheDocument()
+    expect(run).not.toHaveBeenCalled()
   })
 
   it('runs the approved five-person 50-cover scenario and displays metrics', async () => {
@@ -80,5 +140,21 @@ describe('simulation workspace', () => {
       architecture: expect.objectContaining({ wallHeightMm: 4700 }),
       layoutConstraints: { minimumAisleMm: 0, noGoZones: [] },
     }))
+  })
+
+  it('persists generated and edited menu assumptions on the active scenario', async () => {
+    const store = createProjectStore(createSeedProject())
+    render(<SimulationWorkspace store={store} run={runSimulation} />)
+
+    await userEvent.click(screen.getByRole('button', { name: /Quick estimate/i }))
+
+    expect(store.getState().project.scenarios[0].menuItems).toHaveLength(4)
+    const share = screen.getByLabelText('Grilled fish share percent')
+    fireEvent.change(share, { target: { value: '24' } })
+    expect(store.getState().project.scenarios[0].menuItems?.[0].sharePct).toBe(24)
+
+    await userEvent.click(screen.getByRole('button', { name: 'Review assumptions' }))
+    fireEvent.change(screen.getByLabelText('Grilled fish Cook active seconds'), { target: { value: '55' } })
+    expect(store.getState().project.scenarios[0].menuItems?.[0].steps[2].activeSeconds).toBe(55)
   })
 })

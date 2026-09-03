@@ -16,11 +16,6 @@ import { EquipmentLibrary } from './EquipmentLibrary'
 
 type Props = { store: ProjectStore; stage: WorkflowStage; onBeginPlacement?(spec: import('./room-outline').PlacementSpec): void }
 
-const titleCase = (value: string) => value
-  .split('-')
-  .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-  .join(' ')
-
 const SPACE_GROUPS: { label: string; filter: (entry: CatalogEntry) => boolean }[] = [
   { label: 'Openings', filter: (entry) => entry.category === 'architecture' && entry.tags.includes('opening') },
   { label: 'Structure', filter: (entry) => entry.category === 'architecture' && (entry.tags.includes('fixed') || entry.tags.includes('obstruction')) },
