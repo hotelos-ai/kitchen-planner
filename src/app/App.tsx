@@ -6,6 +6,8 @@ import { configureWorkspaceAutoLayout, getWorkspaceFacade, getActiveVariant, pro
 import { AppHeader, StageToolbar } from './AppHeader'
 import { ProjectStartScreen } from './ProjectStartScreen'
 import { createBlankProject } from '../domain/blank-project'
+import { AgentToolsPanel } from '../features/webmcp/AgentToolsPanel'
+import { WebMcpProvider } from '../features/webmcp/WebMcpProvider'
 import type { ViewMode, WorkflowStage, WorkspaceOverlay } from './workflow'
 import { ErrorBoundary } from './ErrorBoundary'
 import './styles.css'
@@ -44,6 +46,7 @@ export function App() {
   const [sourceImageUrl, setSourceImageUrl] = useState('/reference/kitchen-sketch.png')
   const [closedLayout, setClosedLayout] = useState<{ name: string; revision: number; undo(): boolean } | null>(null)
   const [showStartScreen, setShowStartScreen] = useState(false)
+  const [aiToolsOpen, setAiToolsOpen] = useState(false)
 
   const dragResizeEnabled = Boolean(selectedItem && !selectedItem.dimensionsLocked)
   const canCompare = project.variants.length >= 2 || project.scenarios.length >= 2
@@ -79,20 +82,33 @@ export function App() {
 
   const openWizard = () => { setWizardStartsAtRoom(false); setWizardOpen(true) }
 
+  const focusTourStep = (step: number) => {
+    setOverlay(null)
+    if (step === 0) { setStage('space'); setView('plan') }
+    else if (step === 1) { setStage('equipment'); setView('plan') }
+    else if (step === 2) { setStage('simulate') }
+    else if (step === 3) { setOverlay('compare') }
+    else { setStage('equipment'); setView('plan') }
+  }
+
   return (
-    <main className="app-shell">
-      <AppHeader
-        store={projectStore}
-        view={view}
-        stage={stage}
-        overlay={overlay}
-        canCompare={canCompare}
-        showAutoLayout={showAutoLayout}
-        onViewChange={setView}
-        onStageChange={setStage}
-        onOpenCompare={() => setOverlay((current) => current === 'compare' ? null : 'compare')}
-        onOpenAutoLayout={() => setOverlay((current) => current === 'auto-layout' ? null : 'auto-layout')}
-        onCloseOverlay={() => setOverlay(null)}
+    <WebMcpProvider>
+      <main className="app-shell" data-app="calmkitchen-designer" data-app-stage={stage} data-app-view={view} data-app-overlay={overlay ?? 'none'}>
+        <AppHeader
+          store={projectStore}
+          view={view}
+          stage={stage}
+          overlay={overlay}
+          canCompare={canCompare}
+          showAutoLayout={showAutoLayout}
+          onViewChange={setView}
+          onStageChange={setStage}
+          onOpenCompare={() => setOverlay((current) => current === 'compare' ? null : 'compare')}
+          onOpenAutoLayout={() => setOverlay((current) => current === 'auto-layout' ? null : 'auto-layout')}
+          aiToolsOpen={aiToolsOpen}
+          onOpenAiTools={() => setAiToolsOpen((open) => !open)}
+          onTourFocus={focusTourStep}
+          onCloseOverlay={() => setOverlay(null)}
         onNewProject={() => {
           projectStore.getState().replaceProject(createBlankProject())
           setStage('space')
@@ -194,7 +210,17 @@ export function App() {
           </section>
           )}
         </Suspense>
+        {aiToolsOpen && <AgentToolsPanel onClose={() => setAiToolsOpen(false)} />}
       </ErrorBoundary>
-    </main>
+      <footer className="app-footer">
+        <span>CalmKitchen Designer · Part of the HotelOS suite</span>
+        <span className="footer-sep" aria-hidden="true"></span>
+        <a href="https://kitchen.hotelos.ai" target="_blank" rel="noreferrer">CalmKitchen home</a>
+        <span className="footer-right">
+          <a href="https://kitchen.hotelos.ai" target="_blank" rel="noreferrer">kitchen.hotelos.ai</a>
+        </span>
+      </footer>
+      </main>
+    </WebMcpProvider>
   )
 }

@@ -1,7 +1,15 @@
-import { useState, type ChangeEvent } from 'react'
+import { useEffect, useState, type ChangeEvent } from 'react'
 import { useStore } from 'zustand'
 import { exportProject, importProject } from '../state/persistence'
 import { projectStore, type ProjectStore } from '../state/project-store'
+
+const TOUR_STEPS = [
+  { title: 'Define the space', body: 'Drag the room outline to reshape it, or add doors, service windows, and pillars. The floor plan is shared by every layout.' },
+  { title: 'Fit out the kitchen', body: 'Add equipment from the library or drop in a station template. Select anything to inspect and configure it.' },
+  { title: 'Simulate service', body: 'Run a dinner peak to see queues, staff walking, and bottlenecks — deterministically, with playback.' },
+  { title: 'Compare layouts', body: 'With two layouts or scenarios, Compare shows metric deltas and evidence-backed findings side by side.' },
+  { title: 'Save your project', body: 'Save project downloads a resumable file. Export covers PDFs, equipment schedules, and reports.' },
+] as const
 
 function downloadText(filename: string, contents: string, type = 'application/json') {
   const blob = new Blob([contents], { type })
@@ -13,12 +21,17 @@ function downloadText(filename: string, contents: string, type = 'application/js
   setTimeout(() => URL.revokeObjectURL(url), 0)
 }
 
-export function ProjectExchange({ store = projectStore }: { store?: ProjectStore }) {
+export function ProjectExchange({ store = projectStore, onTourFocus }: { store?: ProjectStore; onTourFocus?(step: number): void }) {
   const project = useStore(store, (state) => state.project)
   const [message, setMessage] = useState<{ kind: 'status' | 'error'; text: string } | null>(null)
   const [showHelp, setShowHelp] = useState(false)
   const [showExport, setShowExport] = useState(false)
   const [tourStep, setTourStep] = useState<number | null>(null)
+
+  useEffect(() => {
+    if (tourStep !== null) onTourFocus?.(tourStep)
+  }, [tourStep, onTourFocus])
+
   const slug = project.name.toLowerCase().replace(/[^a-z0-9]+/g, '-')
   const onExport = () => {
     try {
@@ -85,18 +98,27 @@ export function ProjectExchange({ store = projectStore }: { store?: ProjectStore
       {message && <div className={`exchange-message ${message.kind}`} role={message.kind === 'error' ? 'alert' : 'status'}>{message.text}<button type="button" aria-label="Dismiss message" onClick={() => setMessage(null)}>×</button></div>}
       {tourStep !== null && (
         <div className="guided-tour" role="dialog" aria-label="Guided tour">
-          <strong>{['Define the space', 'Arrange equipment', 'Simulate service', 'Compare layouts', 'Save your project'][tourStep]}</strong>
-          <p>{[
-            'Start in Space to draw walls, doors and fixed objects. The room is shared by every layout.',
-            'Switch to Equipment and add items or a station template. Space stays locked until you return.',
-            'Simulate a dinner peak to see queues, walking and bottlenecks.',
-            'Compare appears once you have two layouts or scenarios.',
-            'Use Save project to download a resumable file. Export is for PDF, schedules and reports.',
-          ][tourStep]}</p>
+          <div className="tour-head">
+            <span className="eyebrow">Guided tour · {tourStep + 1} of {TOUR_STEPS.length}</span>
+            <button type="button" className="tour-close" aria-label="Close tour" onClick={() => setTourStep(null)}>×</button>
+          </div>
+          <strong>{TOUR_STEPS[tourStep].title}</strong>
+          <p>{TOUR_STEPS[tourStep].body}</p>
+          <div className="tour-dots" aria-hidden="true">
+            {TOUR_STEPS.map((_, index) => (
+              <i key={index} className={index === tourStep ? 'current' : index < tourStep ? 'done' : ''} />
+            ))}
+          </div>
           <footer>
-            <button type="button" onClick={() => setTourStep(null)}>Close tour</button>
-            {tourStep > 0 && <button type="button" onClick={() => setTourStep((step) => (step ?? 1) - 1)}>Back</button>}
-            {tourStep < 4 && <button type="button" onClick={() => setTourStep((step) => (step ?? 0) + 1)}>Next</button>}
+            <button type="button" className="link-button" onClick={() => setTourStep(null)}>End tour</button>
+            <span className="tour-nav">
+              {tourStep > 0 && (
+                <button type="button" className="btn btn-outline btn-sm" onClick={() => setTourStep((step) => (step ?? 1) - 1)}>Back</button>
+              )}
+              <button type="button" className="btn btn-primary btn-sm" onClick={() => setTourStep((step) => (step === TOUR_STEPS.length - 1 ? null : (step ?? 0) + 1))}>
+                {tourStep === TOUR_STEPS.length - 1 ? 'Finish' : 'Next'}
+              </button>
+            </span>
           </footer>
         </div>
       )}

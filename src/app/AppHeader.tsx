@@ -49,9 +49,12 @@ type AppHeaderProps = {
   onStageChange(stage: WorkflowStage): void
   onOpenCompare(): void
   onOpenAutoLayout(): void
+  aiToolsOpen: boolean
+  onOpenAiTools(): void
   onCloseOverlay(): void
   onNewProject(): void
   onOpenSettings(): void
+  onTourFocus?(step: number): void
 }
 
 const HOTElOS_SYMBOL_PATH = 'M190.1,0l-27.9,45.9c-3.5,5.7-9.8,9.4-16.6,9.4h-76.8c-6.8,0-13.3-3.7-16.8-9.4L24.4,0H0v214.2h24.4l27.7-45.6c3.5-5.9,10-9.4,16.8-9.4h76.8c6.8,0,13.1,3.5,16.6,9.4l27.9,45.6h24.2V0h-24.2ZM133,133.2h-51.9v-51.8h51.9v51.8Z'
@@ -185,9 +188,12 @@ export function AppHeader({
   onStageChange,
   onOpenCompare,
   onOpenAutoLayout,
+  aiToolsOpen,
+  onOpenAiTools,
   onCloseOverlay,
   onNewProject,
   onOpenSettings,
+  onTourFocus,
 }: AppHeaderProps) {
   const issues = useWorkflowIssues(store)
   const activeEntry = WORKFLOW_STAGES.find((entry) => entry.id === stage)
@@ -208,12 +214,12 @@ export function AppHeader({
 
   return (
     <header className="app-header">
-      <div className="brand-lockup">
+      <a className="brand-lockup" href="https://kitchen.hotelos.ai" target="_blank" rel="noreferrer" title="CalmKitchen home — kitchen.hotelos.ai">
         <svg className="brand-mark" viewBox="0 0 214.2 214.2" aria-hidden="true" focusable="false">
           <path fill="#b1d15b" d={HOTElOS_SYMBOL_PATH} />
         </svg>
         <h1>CalmKitchen <em>Designer</em></h1>
-      </div>
+      </a>
       <ProjectMenu store={store} onNewProject={onNewProject} onOpenSettings={onOpenSettings} />
       <nav aria-label="Workflow stages" className="workflow-navigator">
         {WORKFLOW_STAGES.map((entry) => {
@@ -251,13 +257,14 @@ export function AppHeader({
         </nav>
       )}
       <div className="global-actions">
+        <button type="button" aria-pressed={aiToolsOpen} onClick={onOpenAiTools}>AI tools</button>
         {canCompare && (
           <button type="button" aria-pressed={overlay === 'compare'} onClick={onOpenCompare}>Compare</button>
         )}
         {showAutoLayout && (
           <button type="button" aria-pressed={overlay === 'auto-layout'} onClick={onOpenAutoLayout}>Auto-layout</button>
         )}
-        <ProjectExchange store={store} />
+        <ProjectExchange store={store} onTourFocus={onTourFocus} />
       </div>
     </header>
   )
