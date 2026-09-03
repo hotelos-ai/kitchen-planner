@@ -1,4 +1,6 @@
 import { describe, expect, it } from 'vitest'
+import { compressToEncodedURIComponent } from 'lz-string'
+import { createBlankProject } from '../domain/blank-project'
 import { createSeedProject } from '../domain/seed-project'
 import { createAppStateStore } from '../state/app-state-store'
 import { createProjectStore } from '../state/project-store'
@@ -14,7 +16,7 @@ describe('workspace deep links', () => {
     const secondScenario = { ...project.scenarios[0], id: 'lunch & events', name: 'Lunch and events' }
     project.scenarios.push(secondScenario)
     const url = buildWorkspaceDeepLink({
-      projectId: project.id,
+      project,
       variantId: secondVariant.id,
       scenarioId: secondScenario.id,
       stage: 'simulate',
@@ -23,8 +25,9 @@ describe('workspace deep links', () => {
       selectedIds: ['flat-top-fryer', 'tandoor'],
     }, 'https://example.test/designer?embed=0#old')
 
-    expect(url).toContain('https://example.test/designer?embed=0#workspace=v1')
+    expect(url).toContain('https://example.test/designer?embed=0#workspace=v2')
     expect(resolveWorkspaceDeepLink(new URL(url).hash, project)).toEqual({
+      project,
       variantId: secondVariant.id,
       scenarioId: secondScenario.id,
       stage: 'simulate',
@@ -37,7 +40,7 @@ describe('workspace deep links', () => {
   it('refuses links for another project and bounds hostile fragments', () => {
     const project = createSeedProject()
     expect(resolveWorkspaceDeepLink('#workspace=v1&project=someone-else&stage=simulate', project)).toBeNull()
-    expect(resolveWorkspaceDeepLink(`#workspace=v1&project=${project.id}&${'x'.repeat(4_100)}`, project)).toBeNull()
+    expect(resolveWorkspaceDeepLink(`#workspace=v1&project=${project.id}&${'x'.repeat(50_000)}`, project)).toBeNull()
   })
 
   it('falls back from stale document IDs and ignores invalid UI enum values', () => {
@@ -62,7 +65,7 @@ describe('workspace deep links', () => {
     const projectStore = createProjectStore(project)
     const appStore = createAppStateStore()
     const hash = new URL(buildWorkspaceDeepLink({
-      projectId: project.id,
+      project,
       variantId: secondVariant.id,
       scenarioId: secondScenario.id,
       stage: 'equipment',
@@ -95,5 +98,67 @@ describe('workspace deep links', () => {
     const selectedHash = `${legacyHash}&select=flat-top-fryer&select=missing&select=flat-top-fryer`
     expect(applyWorkspaceDeepLink(selectedHash, projectStore, appStore)).toBe(true)
     expect(projectStore.getState().selectedIds).toEqual(['flat-top-fryer'])
+  })
+
+  it('restores a validated project snapshot in a fresh browser without local persistence', () => {
+    const sharedProject = createSeedProject()
+    sharedProject.name = 'Portable shared kitchen'
+    sharedProject.variants[0].equipment[0].label = 'Shared fryer'
+    const link = buildWorkspaceDeepLink({
+      project: sharedProject,
+      variantId: sharedProject.activeVariantId,
+      scenarioId: sharedProject.activeScenarioId,
+      stage: 'equipment',
+      view: 'plan',
+      overlay: null,
+      selectedIds: ['flat-top-fryer'],
+    })
+    const freshStore = createProjectStore(createBlankProject('Unrelated local project'))
+    const appStore = createAppStateStore()
+
+    expect(applyWorkspaceDeepLink(new URL(link).hash, freshStore, appStore)).toBe(true)
+    expect(freshStore.getState()).toMatchObject({
+      revision: 0,
+      project: { id: sharedProject.id, name: 'Portable shared kitchen' },
+      selectedIds: ['flat-top-fryer'],
+      past: [],
+    })
+    expect(freshStore.getState().project.variants[0].equipment[0].label).toBe('Shared fryer')
+  })
+
+  it('rejects malformed, non-strict, and oversized embedded projects', () => {
+    const project = createSeedProject()
+    const validLink = new URL(buildWorkspaceDeepLink({
+      project,
+      variantId: project.activeVariantId,
+      scenarioId: project.activeScenarioId,
+      stage: 'space',
+      view: 'plan',
+      overlay: null,
+    }))
+    validLink.hash = validLink.hash.replace(/payload=[^&]+/, 'payload=not-valid')
+    expect(resolveWorkspaceDeepLink(validLink.hash, createBlankProject())).toBeNull()
+
+    const nonStrict = { ...project, unexpected: true }
+    const invalidPayload = compressToEncodedURIComponent(JSON.stringify(nonStrict))
+    const invalidLink = new URL(buildWorkspaceDeepLink({
+      project,
+      variantId: project.activeVariantId,
+      scenarioId: project.activeScenarioId,
+      stage: 'space',
+      view: 'plan',
+      overlay: null,
+    }))
+    invalidLink.hash = invalidLink.hash.replace(/payload=[^&]+/, `payload=${invalidPayload}`)
+    expect(resolveWorkspaceDeepLink(invalidLink.hash, createBlankProject())).toBeNull()
+
+    expect(() => buildWorkspaceDeepLink({
+      project: { ...project, name: 'x'.repeat(128 * 1_024) },
+      variantId: project.activeVariantId,
+      scenarioId: project.activeScenarioId,
+      stage: 'space',
+      view: 'plan',
+      overlay: null,
+    })).toThrow(/too large/i)
   })
 })

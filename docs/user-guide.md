@@ -92,7 +92,7 @@ Keep exported checkpoints before major alternatives. JSON is the supported excha
 
 ## Driving the planner with an AI agent (WebMCP)
 
-In a browser that supports the experimental WebMCP API, the planner registers site tools that a compatible AI agent (browser assistant sidebar or built-in agent) can call directly on the open page. Open **AI tools** in the top bar to see availability, the registered tools, and a copyable starter prompt for your agent.
+The supported user path is ChatGPT desktop's built-in browser when Site tools are available to your account. Open the planner there, approve website access, and use the address-bar arrow to inspect available and recently used tools. For local Chrome development, enable `chrome://flags/#enable-webmcp-testing` and relaunch Chrome. The deployment deliberately has no Origin-Trial token: the Chrome flag is a development path, while ChatGPT desktop is the supported user path. Open **AI tools** in the planner's top bar to see availability, the registered tools, and a copyable starter prompt for your agent.
 
 Your agent can then do everything you can: read the coordinate system and catalog, read and draw the plan (add, move, rotate, resize, relabel, duplicate, remove components; edit walls, openings, pillars, zones), manage layout variants, edit service-simulation scenarios, run simulations and read their metrics, undo/redo, and export the project JSON to save or download. All geometry travels as exact millimetre coordinates — the agent works from the structured layout, so it never has to interpret screenshots of the canvas.
 

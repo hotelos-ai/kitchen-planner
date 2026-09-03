@@ -49,9 +49,6 @@ delete workspaceOperationJsonSchema.$schema
 
 type Schema = Record<string, unknown>
 
-const stringSchema: Schema = { type: 'string' }
-const numberSchema: Schema = { type: 'number' }
-const booleanSchema: Schema = { type: 'boolean' }
 const strictObject = (properties: Record<string, unknown>, required: string[] = []): Schema => ({
   type: 'object',
   additionalProperties: false,
@@ -59,51 +56,74 @@ const strictObject = (properties: Record<string, unknown>, required: string[] = 
   properties,
 })
 const strictPatch = (properties: Record<string, unknown>): Schema => ({ ...strictObject(properties), minProperties: 1 })
+const ref = (name: string): Schema => ({ $ref: `#/$defs/${name}` })
+const booleanSchema: Schema = { type: 'boolean' }
+const nullable = (schema: Schema): Schema => ({ anyOf: [schema, { type: 'null' }] })
 const operationBranch = (
   type: string | string[],
   properties: string[] = [],
   required: string[] = [],
 ): Schema => ({
-  additionalProperties: false,
-  required: ['type', 'variantId', ...required],
-  properties: {
-    type: Array.isArray(type) ? { type: 'string', enum: type } : { const: type },
-    variantId: {},
-    ...Object.fromEntries(properties.map((property) => [property, {}])),
-  },
+  properties: { type: Array.isArray(type) ? { enum: type } : { const: type } },
+  ...(required.length === 0 ? {} : { required }),
+  propertyNames: { enum: ['type', 'variantId', ...properties] },
 })
 
-const componentPatchSchema = strictPatch({
-  label: stringSchema, xMm: numberSchema, yMm: numberSchema,
-  category: { type: 'string', enum: ['cooking', 'cold', 'prep', 'washing', 'landing', 'storage', 'hood', 'custom'] },
-  heightMm: numberSchema, capabilities: { type: 'array', items: stringSchema },
-  clearance: { type: 'object' },
-  approximate: booleanSchema, notes: stringSchema,
-})
-const architecturePatchSchema = strictPatch({
-  widthMm: numberSchema, depthMm: numberSchema, wallHeightMm: numberSchema,
-  roomPolygon: { type: 'array', minItems: 3, items: { type: 'object' } },
-  openings: { type: 'array', items: { type: 'object' } },
-  pillars: { type: 'array', items: { type: 'object' } },
-  storageZones: { type: 'array', items: { type: 'object' } },
-  locked: booleanSchema,
-})
-const operationalProfilePatchSchema = strictPatch({
-  covers: numberSchema, peakDurationMinutes: numberSchema, arrivalPattern: stringSchema, serviceStyle: stringSchema,
-  menuAssumptions: { type: 'array', items: stringSchema },
-  staff: { type: 'array', items: { type: 'object' } },
-  targetCapacityPerHour: numberSchema,
-})
-const scenarioPatchSchema = strictPatch({
-  name: stringSchema, covers: numberSchema, durationMinutes: numberSchema, arrivalPattern: stringSchema,
-  cookToOrderRatio: numberSchema, seed: numberSchema, serviceStyle: stringSchema, variability: stringSchema,
-  staff: { type: 'array', items: { type: 'object' } }, checks: { type: 'object' }, taskDurations: { type: 'object' },
-  stationCapacities: { type: 'object' }, menuItems: { type: 'array', items: { type: 'object' } },
-})
+const capabilityEnum = ['flat-top-cook', 'fryer-cook', 'range-cook', 'tandoor-cook', 'cold-retrieval', 'food-prep', 'finish-plate', 'clean-window', 'dirty-window', 'dirty-landing', 'dish-pre-rinse', 'dish-wash', 'clean-landing', 'hand-wash', 'mix']
+const rectProperties = { id: ref('i'), xMm: ref('x'), yMm: ref('x'), widthMm: ref('d'), depthMm: ref('d') }
+const workspaceOperationDefinitions: Record<string, Schema> = {
+  i: { type: 'string', minLength: 1, maxLength: 128, pattern: '^[A-Za-z0-9][A-Za-z0-9._:-]*$' },
+  n: { type: 'string', minLength: 1, maxLength: 160 },
+  x: { type: 'number', minimum: -1_000_000, maximum: 1_000_000 },
+  a: { type: 'number', minimum: 0, maximum: 1_000_000 },
+  k: { type: 'number', minimum: 0, maximum: 100_000 },
+  d: { type: 'number', exclusiveMinimum: 0, maximum: 100_000 },
+  r: { type: 'number', minimum: -1_000_000, maximum: 1_000_000 },
+  p: strictObject({ xMm: ref('x'), yMm: ref('x') }, ['xMm', 'yMm']),
+  z: strictObject({ widthMm: ref('d'), depthMm: ref('d'), heightMm: ref('d') }, ['widthMm', 'depthMm']),
+  c: { type: 'string', enum: capabilityEnum },
+  l: strictObject({ frontMm: ref('k'), leftMm: ref('k'), rightMm: ref('k'), backMm: ref('k'), kind: { enum: ['work', 'door-swing', 'heat', 'service'] } }, ['frontMm', 'kind']),
+  o: strictObject({
+    id: ref('i'), label: ref('n'), kind: { enum: ['door', 'service-window', 'sealed-opening'] }, wall: { enum: ['top', 'right', 'bottom', 'left'] },
+    segmentIndex: { type: 'integer', minimum: 0, maximum: 999 }, offsetMm: ref('a'), widthMm: ref('d'), sillHeightMm: ref('k'),
+    heightMm: ref('d'), flow: { enum: ['entry', 'clean-out', 'dirty-in', 'closed'] }, swingDepthMm: ref('k'),
+  }, ['id', 'label', 'kind', 'wall', 'offsetMm', 'widthMm']),
+  q: strictObject({ ...rectProperties, shape: { const: 'round' } }, ['id', 'xMm', 'yMm', 'widthMm', 'depthMm']),
+  Q: strictObject({ id: ref('i'), xMm: ref('a'), yMm: ref('a'), widthMm: ref('d'), depthMm: ref('d') }, ['id', 'xMm', 'yMm', 'widthMm', 'depthMm']),
+  g: strictObject({ ...rectProperties, label: ref('n'), adjacent: booleanSchema }, ['id', 'xMm', 'yMm', 'widthMm', 'depthMm', 'label', 'adjacent']),
+  H: strictObject({ id: ref('i'), xMm: ref('a'), yMm: ref('a'), widthMm: ref('d'), depthMm: ref('d'), label: ref('n'), adjacent: booleanSchema }, ['id', 'xMm', 'yMm', 'widthMm', 'depthMm', 'label', 'adjacent']),
+  u: strictObject({ componentId: ref('i'), duplicateId: ref('i') }, ['componentId', 'duplicateId']),
+  f: strictObject({ role: { enum: ['head-chef', 'sous-chef', 'cdp', 'busser-washer'] }, count: { type: 'integer', minimum: 0, maximum: 100 } }, ['role', 'count']),
+  v: strictObject({ role: { enum: ['head-chef', 'sous-chef', 'cdp', 'busser-washer'] }, count: { type: 'integer', minimum: 0 } }, ['role', 'count']),
+  t: strictObject({ minSeconds: { type: 'number', exclusiveMinimum: 0, maximum: 86_400 }, maxSeconds: { type: 'number', exclusiveMinimum: 0, maximum: 86_400 } }, ['minSeconds', 'maxSeconds']),
+  m: strictObject({ label: ref('n'), capability: ref('c'), activeSeconds: { type: 'number', exclusiveMinimum: 0, maximum: 86_400 }, passiveSeconds: ref('t') }, ['label', 'capability', 'activeSeconds']),
+  e: strictObject({ id: ref('i'), name: ref('n'), sharePct: { type: 'number', minimum: 0, maximum: 100 }, source: { enum: ['user-provided', 'imported', 'template-estimate', 'system-inferred'] }, steps: { type: 'array', minItems: 1, maxItems: 24, items: ref('m') } }, ['id', 'name', 'sharePct', 'source', 'steps']),
+  C: strictPatch({ label: ref('n'), xMm: ref('x'), yMm: ref('x'), category: { enum: ['cooking', 'cold', 'prep', 'washing', 'landing', 'storage', 'hood', 'custom'] }, heightMm: ref('d'), capabilities: { type: 'array', maxItems: 100, items: ref('c') }, clearance: ref('l'), approximate: booleanSchema, notes: { type: 'string', maxLength: 4000 } }),
+  O: strictPatch({ label: ref('n'), kind: { enum: ['door', 'service-window', 'sealed-opening'] }, wall: { enum: ['top', 'right', 'bottom', 'left'] }, segmentIndex: nullable({ type: 'integer', minimum: 0, maximum: 999 }), offsetMm: ref('a'), widthMm: ref('d'), sillHeightMm: nullable(ref('a')), heightMm: nullable(ref('d')), flow: nullable({ enum: ['entry', 'clean-out', 'dirty-in', 'closed'] }), swingDepthMm: nullable(ref('a')) }),
+  P: strictPatch({ xMm: ref('a'), yMm: ref('a'), widthMm: ref('d'), depthMm: ref('d') }),
+  G: strictPatch({ xMm: ref('a'), yMm: ref('a'), widthMm: ref('d'), depthMm: ref('d'), label: ref('n'), adjacent: booleanSchema }),
+  A: strictPatch({ widthMm: ref('d'), depthMm: ref('d'), wallHeightMm: ref('d'), roomPolygon: { type: 'array', minItems: 3, maxItems: 1000, items: ref('p') }, openings: { type: 'array', maxItems: 1000, items: ref('o') }, pillars: { type: 'array', maxItems: 1000, items: ref('q') }, storageZones: { type: 'array', maxItems: 1000, items: ref('g') }, locked: booleanSchema }),
+  F: strictPatch({ covers: { type: 'integer', exclusiveMinimum: 0 }, peakDurationMinutes: { type: 'number', exclusiveMinimum: 0 }, arrivalPattern: { enum: ['seating-wave', 'steady', 'two-waves'] }, serviceStyle: { type: 'string', minLength: 1 }, menuAssumptions: { type: 'array', items: { type: 'string', minLength: 1 } }, staff: { type: 'array', items: ref('v') }, targetCapacityPerHour: { type: 'number', exclusiveMinimum: 0 } }),
+  W: strictPatch({ displayUnit: { enum: ['mm', 'cm', 'in', 'ft'] }, snapMm: ref('d') }),
+  S: strictPatch({ name: ref('n'), covers: { type: 'integer', minimum: 1, maximum: 100_000 }, durationMinutes: { type: 'number', exclusiveMinimum: 0, maximum: 10_080 }, arrivalPattern: { enum: ['seating-wave', 'steady', 'two-waves'] }, cookToOrderRatio: { type: 'number', minimum: 0, maximum: 1 }, seed: { type: 'integer', minimum: -2_147_483_648, maximum: 2_147_483_647 }, staff: { type: 'array', minItems: 1, maxItems: 100, items: ref('f') }, checks: strictPatch({ collisions: booleanSchema, doorSwings: booleanSchema, dirtyCleanCrossings: booleanSchema }), taskDurations: { type: 'object', propertyNames: { enum: capabilityEnum }, additionalProperties: ref('t') }, stationCapacities: { type: 'object', propertyNames: ref('i'), additionalProperties: { type: 'integer', minimum: 1, maximum: 100 } }, serviceStyle: ref('n'), variability: { enum: ['low', 'typical', 'high'] }, menuItems: { type: 'array', maxItems: 200, items: ref('e') } }),
+}
+
+const operationProperties: Record<string, Schema> = {
+  type: { type: 'string' }, variantId: ref('i'), name: ref('n'), parentVariantId: ref('i'), equipmentMode: { enum: ['duplicate', 'empty'] },
+  componentId: ref('i'), catalogId: ref('i'), position: ref('p'), dimensions: ref('z'), rotationDeg: ref('r'),
+  configurationId: ref('i'), skinId: ref('i'), label: ref('n'), capabilities: { type: 'array', maxItems: 100, items: ref('i') },
+  patch: { anyOf: ['C', 'O', 'P', 'G', 'A', 'F', 'W', 'S'].map(ref) }, componentIds: { type: 'array', minItems: 1, maxItems: 500, uniqueItems: true, items: ref('i') },
+  anchor: ref('p'), delta: ref('p'), deltaDeg: ref('r'), locked: booleanSchema,
+  components: { type: 'array', minItems: 1, maxItems: 500, items: ref('u') }, offset: ref('p'),
+  opening: ref('o'), pillar: ref('Q'), storageZone: ref('H'), id: ref('i'), scenarioId: ref('i'), runId: ref('i'), resultId: ref('i'), newVariantId: ref('i'),
+}
 
 /** Compact registration-time schema. Runtime parsing still applies every detailed numeric and enum constraint. */
 export const registeredWorkspaceOperationSchema: Schema = {
   type: 'object',
+  additionalProperties: false,
+  required: ['type', 'variantId'],
+  properties: operationProperties,
   oneOf: [
     operationBranch('create_layout', ['name', 'parentVariantId', 'equipmentMode'], ['name', 'equipmentMode']),
     operationBranch(['activate_layout', 'remove_layout']),
@@ -134,19 +154,28 @@ export const registeredWorkspaceOperationSchema: Schema = {
   ],
   allOf: [{
     if: { properties: { type: { const: 'update_component' } } },
-    then: { properties: { patch: componentPatchSchema } },
+    then: { properties: { patch: ref('C') } },
+  }, {
+    if: { properties: { type: { const: 'update_opening' } } },
+    then: { properties: { patch: ref('O') } },
+  }, {
+    if: { properties: { type: { const: 'update_pillar' } } },
+    then: { properties: { patch: ref('P') } },
+  }, {
+    if: { properties: { type: { const: 'update_storage_zone' } } },
+    then: { properties: { patch: ref('G') } },
   }, {
     if: { properties: { type: { const: 'update_architecture' } } },
-    then: { properties: { patch: architecturePatchSchema } },
+    then: { properties: { patch: ref('A') } },
   }, {
     if: { properties: { type: { const: 'update_operational_profile' } } },
-    then: { properties: { patch: operationalProfilePatchSchema } },
+    then: { properties: { patch: ref('F') } },
   }, {
     if: { properties: { type: { const: 'update_workspace_settings' } } },
-    then: { properties: { patch: strictPatch({ displayUnit: stringSchema, snapMm: numberSchema }) } },
+    then: { properties: { patch: ref('W') } },
   }, {
     if: { properties: { type: { const: 'update_scenario' } } },
-    then: { properties: { patch: scenarioPatchSchema } },
+    then: { properties: { patch: ref('S') } },
   }],
 }
 
@@ -155,14 +184,15 @@ const operationsSchema: Schema = { type: 'array', minItems: 1, maxItems: 200, it
 const operationSchemaDescription: JsonSchemaObject = {
   type: 'object',
   additionalProperties: false,
+  ...({ $defs: workspaceOperationDefinitions } as Record<string, unknown>),
   required: ['expectedRevision', 'operations'],
   properties: {
-    expectedRevision: { type: 'number', description: 'Revision read from get_layout or get_workspace_guide; stale writes fail.' },
+    expectedRevision: { type: 'integer', minimum: 0, description: 'Revision read from get_layout or get_workspace_guide; stale writes fail.' },
     operations: {
       ...operationsSchema,
       description: 'Ordered atomic batch. See get_workspace_guide for numeric constraints. Any invalid item rejects the batch.',
     },
-    intent: { type: 'string', description: 'Optional history label.' },
+    intent: { type: 'string', maxLength: 2000, description: 'Optional history label.' },
   },
 }
 
@@ -233,6 +263,7 @@ export function createWriteTools(deps: WriteToolDependencies): WebMcpToolDefinit
     inputSchema: {
       type: 'object',
       additionalProperties: false,
+      ...({ $defs: workspaceOperationDefinitions } as Record<string, unknown>),
       ...({
         oneOf: [
           { required: ['previewToken'] },
@@ -240,11 +271,11 @@ export function createWriteTools(deps: WriteToolDependencies): WebMcpToolDefinit
         ],
       } as Record<string, unknown>),
       properties: {
-        previewToken: { type: 'string', description: 'Single-use preview token; do not mix with direct fields.' },
-        expectedRevision: { type: 'number', description: 'Latest revision for direct apply.' },
+        previewToken: { type: 'string', minLength: 1, maxLength: 200, description: 'Single-use preview token; do not mix with direct fields.' },
+        expectedRevision: { type: 'integer', minimum: 0, description: 'Latest revision for direct apply.' },
         operations: { ...operationsSchema, description: 'Direct operation batch.' },
-        intent: { type: 'string', description: 'Optional history label.' },
-        idempotencyKey: { type: 'string', description: 'Optional retry key.' },
+        intent: { type: 'string', maxLength: 2000, description: 'Optional history label.' },
+        idempotencyKey: { type: 'string', minLength: 1, maxLength: 200, description: 'Optional retry key.' },
       },
     },
     execute: (input, context) => {

@@ -78,6 +78,11 @@ const simulationScopeFailure = (
   return null
 }
 
+const simulationCancelledFailure = (revision: number, message: string) => ({
+  ...failure(revision, 'cancelled', message),
+  recovery: recoveryForErrorCode('cancelled'),
+})
+
 export type RunToolDependencies = ToolDependencies & {
   getFacade: () => WorkspaceFacade
   runStore?: SimulationRunStore
@@ -106,7 +111,9 @@ export function createRunTools(deps: RunToolDependencies): WebMcpToolDefinition[
     },
     execute: async (input, context) => {
       try {
-        if (context?.signal?.aborted) return failure(currentRevision(deps), 'aborted', 'The simulation request was cancelled before it started.')
+        if (context?.signal?.aborted) {
+          return simulationCancelledFailure(currentRevision(deps), 'The simulation request was cancelled before it started.')
+        }
         const parsed = parseInput(deps, runSimulationInput, input)
         if (!parsed.ok) return failure(currentRevision(deps), 'invalid-input', 'Invalid simulation request.', parsed.issues)
         const state = deps.store.getState()
@@ -133,7 +140,7 @@ export function createRunTools(deps: RunToolDependencies): WebMcpToolDefinition[
           const scopeFailure = simulationScopeFailure(deps, state.documentId, state.revision)
           if (scopeFailure) return scopeFailure
           if (error instanceof SimulationRunCancelledError || context?.signal?.aborted) {
-            return failure(state.revision, 'cancelled', 'The simulation request was cancelled.')
+            return simulationCancelledFailure(state.revision, 'The simulation request was cancelled.')
           }
           return failure(state.revision, 'simulation-failed', unknownErrorMessage(error))
         }
@@ -145,7 +152,9 @@ export function createRunTools(deps: RunToolDependencies): WebMcpToolDefinition[
         if (!isFullSimulationResult(result)) {
           return failure(state.revision, 'simulation-failed', 'The simulation service did not return a complete result for presentation.')
         }
-        if (context?.signal?.aborted) return failure(currentRevision(deps), 'aborted', 'The simulation request was cancelled before publishing its result.')
+        if (context?.signal?.aborted) {
+          return simulationCancelledFailure(currentRevision(deps), 'The simulation request was cancelled before publishing its result.')
+        }
 
         const playback = parsed.value.playback ?? 'play'
         runStore.getState().storeRun({
@@ -201,6 +210,9 @@ export function createRunTools(deps: RunToolDependencies): WebMcpToolDefinition[
         }
         return success(state.revision, payload)
       } catch (error) {
+        if (error instanceof SimulationRunCancelledError || context?.signal?.aborted) {
+          return simulationCancelledFailure(currentRevision(deps), 'The simulation request was cancelled.')
+        }
         return failure(currentRevision(deps), 'internal-error', unknownErrorMessage(error))
       }
     },

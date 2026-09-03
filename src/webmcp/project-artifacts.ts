@@ -3,6 +3,9 @@ import type { LayoutFinding, MetricDelta } from '../simulation/recommendations'
 import type { SimulationResultSummary } from '../simulation/types'
 import { exportProject } from '../state/persistence'
 
+export const SHARED_RESULT_SECTIONS = ['plan', 'metrics', 'findings', 'assumptions'] as const
+export type SharedResultSection = typeof SHARED_RESULT_SECTIONS[number]
+
 const escapeText = (value: unknown): string => String(value ?? '')
   .replaceAll('&', '&amp;')
   .replaceAll('<', '&lt;')
@@ -149,6 +152,7 @@ export function buildReportHtml(input: {
   findings?: readonly ReportFinding[]
   comparison?: { baselineLabel: string; candidateLabel: string; deltas: readonly MetricDelta[] }
   generatedAt?: string
+  sections?: readonly SharedResultSection[]
 }): string {
   const { project, variant, simulation } = input
   const scenario = input.scenario ?? project.scenarios.find((candidate) => candidate.id === project.activeScenarioId) ?? project.scenarios[0]
@@ -160,7 +164,14 @@ export function buildReportHtml(input: {
     : '<p>No findings are available without a current simulation result.</p>'
   const equipmentRows = variant.equipment.map((item) => `<tr><td>${escapeText(item.label)}</td><td>${escapeText(item.category)}</td><td>${escapeText(`${item.widthMm} × ${item.depthMm}`)}</td><td>${escapeText(`${item.xMm}, ${item.yMm}`)}</td></tr>`).join('')
   const generatedAt = input.generatedAt ?? new Date().toISOString()
-  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>${escapeText(project.name)} planning report</title><style>:root{color-scheme:light}*{box-sizing:border-box}body{font:15px/1.5 system-ui,sans-serif;color:#20251e;max-width:980px;margin:40px auto;padding:0 24px}h1,h2,h3{line-height:1.15}h2{margin-top:32px}svg{width:100%;max-height:560px;border:1px solid #ccd2c6;background:#fff}table{width:100%;border-collapse:collapse}th,td{text-align:left;vertical-align:top;border-bottom:1px solid #dfe3da;padding:8px}.assumptions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px 24px}.assumptions div{border-bottom:1px solid #dfe3da;padding:6px 0}.assumptions dt,.rank{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#596253}.assumptions dd{margin:2px 0}.finding{border-left:5px solid #d59d3d;padding:2px 16px;margin:16px 0;background:#faf8f1}.finding.high{border-color:#b24c3f}.finding.positive{border-color:#668f40}.disclaimer{margin-top:32px;padding:14px;background:#f3f5ef}@media(max-width:640px){.assumptions{grid-template-columns:1fr}}@media print{body{margin:0;max-width:none}.finding,table,svg{break-inside:avoid}}</style></head><body><header><p>CalmKitchen Designer · planning report</p><h1>${escapeText(project.name)}</h1><p>${escapeText(variant.name)} · generated ${escapeText(generatedAt)}</p></header><section><h2>Plan</h2>${planSvg(variant)}</section>${scenarioSection(scenario, variant)}${simulationSection(simulation, variant)}${comparisonSection(input.comparison)}<section><h2>Ranked findings</h2>${findingMarkup}</section><section><h2>Equipment schedule</h2><table><thead><tr><th>Item</th><th>Category</th><th>Size (mm)</th><th>Position (mm)</th></tr></thead><tbody>${equipmentRows}</tbody></table></section><p class="disclaimer"><strong>Professional review required.</strong> This comparative planning report does not certify architectural, fire, ventilation, food-safety, accessibility, structural, utility, or occupational-safety compliance.</p></body></html>`
+  const sections = new Set(input.sections ?? SHARED_RESULT_SECTIONS)
+  const planMarkup = sections.has('plan')
+    ? `<section><h2>Plan</h2>${planSvg(variant)}</section><section><h2>Equipment schedule</h2><table><thead><tr><th>Item</th><th>Category</th><th>Size (mm)</th><th>Position (mm)</th></tr></thead><tbody>${equipmentRows}</tbody></table></section>`
+    : ''
+  const assumptionsMarkup = sections.has('assumptions') ? scenarioSection(scenario, variant) : ''
+  const metricsMarkup = sections.has('metrics') ? `${simulationSection(simulation, variant)}${comparisonSection(input.comparison)}` : ''
+  const findingsMarkup = sections.has('findings') ? `<section><h2>Ranked findings</h2>${findingMarkup}</section>` : ''
+  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>${escapeText(project.name)} planning report</title><style>:root{color-scheme:light}*{box-sizing:border-box}body{font:15px/1.5 system-ui,sans-serif;color:#20251e;max-width:980px;margin:40px auto;padding:0 24px}h1,h2,h3{line-height:1.15}h2{margin-top:32px}svg{width:100%;max-height:560px;border:1px solid #ccd2c6;background:#fff}table{width:100%;border-collapse:collapse}th,td{text-align:left;vertical-align:top;border-bottom:1px solid #dfe3da;padding:8px}.assumptions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px 24px}.assumptions div{border-bottom:1px solid #dfe3da;padding:6px 0}.assumptions dt,.rank{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#596253}.assumptions dd{margin:2px 0}.finding{border-left:5px solid #d59d3d;padding:2px 16px;margin:16px 0;background:#faf8f1}.finding.high{border-color:#b24c3f}.finding.positive{border-color:#668f40}.disclaimer{margin-top:32px;padding:14px;background:#f3f5ef}@media(max-width:640px){.assumptions{grid-template-columns:1fr}}@media print{body{margin:0;max-width:none}.finding,table,svg{break-inside:avoid}}</style></head><body><header><p>CalmKitchen Designer · planning report</p><h1>${escapeText(project.name)}</h1><p>${escapeText(variant.name)} · generated ${escapeText(generatedAt)}</p></header>${planMarkup}${assumptionsMarkup}${metricsMarkup}${findingsMarkup}<p class="disclaimer"><strong>Professional review required.</strong> This comparative planning report does not certify architectural, fire, ventilation, food-safety, accessibility, structural, utility, or occupational-safety compliance.</p></body></html>`
 }
 
 export function buildResultsReportHtml(input: {
@@ -171,6 +182,7 @@ export function buildResultsReportHtml(input: {
     simulation?: SimulationResultSummary | null
   }[]
   generatedAt?: string
+  sections?: readonly SharedResultSection[]
 }): string {
   const generatedAt = input.generatedAt ?? new Date().toISOString()
   const layouts = input.reports.map(({ variant, scenario, simulation }) => {
@@ -180,6 +192,7 @@ export function buildResultsReportHtml(input: {
       scenario,
       simulation,
       generatedAt,
+      sections: input.sections,
     })
     const body = report.match(/<body>([\s\S]*)<\/body>/)?.[1] ?? report
     const withoutHeaderAndDisclaimer = body
@@ -198,6 +211,7 @@ export function resultsReportArtifact(input: {
     scenario?: SimulationScenario
     simulation?: SimulationResultSummary | null
   }[]
+  sections?: readonly SharedResultSection[]
 }): { filename: string; mimeType: string; contents: string } {
   return {
     filename: `${projectSlug(input.project)}-results-rev-${input.revision}.html`,

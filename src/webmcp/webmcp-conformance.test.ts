@@ -31,15 +31,74 @@ const acceptsRegisteredOperationShape = (schema: Record<string, unknown>, input:
     additionalProperties?: boolean
     required?: string[]
     properties?: Record<string, { const?: string; enum?: string[] }>
+    propertyNames?: { enum?: string[] }
   }>
+  const rootProperties = schema.properties as Record<string, unknown>
+  const rootRequired = schema.required as string[]
+  if (!rootRequired.every((field) => Object.hasOwn(input, field))) return false
+  if (schema.additionalProperties === false && !Object.keys(input).every((field) => Object.hasOwn(rootProperties, field))) return false
   return branches.filter((branch) => {
     const properties = branch.properties ?? {}
     const discriminator = properties.type
     const typeMatches = discriminator?.const === input.type || discriminator?.enum?.includes(input.type as string)
     const requiredMatch = (branch.required ?? []).every((field) => Object.hasOwn(input, field))
-    const propertiesMatch = branch.additionalProperties !== false || Object.keys(input).every((field) => Object.hasOwn(properties, field))
+    const allowed = branch.propertyNames?.enum
+    const propertiesMatch = allowed
+      ? Object.keys(input).every((field) => allowed.includes(field))
+      : branch.additionalProperties !== false || Object.keys(input).every((field) => Object.hasOwn(properties, field))
     return typeMatches && requiredMatch && propertiesMatch
   }).length === 1
+}
+
+const conformsToSchema = (root: Record<string, unknown>, schema: Record<string, unknown>, value: unknown): boolean => {
+  if (typeof schema.$ref === 'string') {
+    const target = schema.$ref.slice(2).split('/').reduce<unknown>((current, key) => (
+      current !== null && typeof current === 'object' ? (current as Record<string, unknown>)[key] : undefined
+    ), root)
+    return target !== null && typeof target === 'object' && conformsToSchema(root, target as Record<string, unknown>, value)
+  }
+  if (Array.isArray(schema.allOf) && !schema.allOf.every((branch) => conformsToSchema(root, branch as Record<string, unknown>, value))) return false
+  if (Array.isArray(schema.anyOf) && !schema.anyOf.some((branch) => conformsToSchema(root, branch as Record<string, unknown>, value))) return false
+  if (Array.isArray(schema.oneOf) && schema.oneOf.filter((branch) => conformsToSchema(root, branch as Record<string, unknown>, value)).length !== 1) return false
+  if (schema.if && conformsToSchema(root, schema.if as Record<string, unknown>, value) && schema.then && !conformsToSchema(root, schema.then as Record<string, unknown>, value)) return false
+  if (schema.const !== undefined && value !== schema.const) return false
+  if (Array.isArray(schema.enum) && !schema.enum.includes(value)) return false
+  if (schema.type === 'null' && value !== null) return false
+  if (schema.type === 'string') {
+    if (typeof value !== 'string') return false
+    if (typeof schema.minLength === 'number' && value.length < schema.minLength) return false
+    if (typeof schema.maxLength === 'number' && value.length > schema.maxLength) return false
+    if (typeof schema.pattern === 'string' && !new RegExp(schema.pattern).test(value)) return false
+  }
+  if (schema.type === 'number' || schema.type === 'integer') {
+    if (typeof value !== 'number' || !Number.isFinite(value) || (schema.type === 'integer' && !Number.isInteger(value))) return false
+    if (typeof schema.minimum === 'number' && value < schema.minimum) return false
+    if (typeof schema.maximum === 'number' && value > schema.maximum) return false
+    if (typeof schema.exclusiveMinimum === 'number' && value <= schema.exclusiveMinimum) return false
+  }
+  if (schema.type === 'boolean' && typeof value !== 'boolean') return false
+  if (schema.type === 'array') {
+    if (!Array.isArray(value)) return false
+    if (typeof schema.minItems === 'number' && value.length < schema.minItems) return false
+    if (typeof schema.maxItems === 'number' && value.length > schema.maxItems) return false
+    if (schema.uniqueItems === true && new Set(value.map((item) => JSON.stringify(item))).size !== value.length) return false
+    if (schema.items && !value.every((item) => conformsToSchema(root, schema.items as Record<string, unknown>, item))) return false
+  }
+  const objectKeywords = schema.type === 'object' || schema.properties || schema.required || schema.propertyNames || schema.additionalProperties !== undefined
+  if (objectKeywords) {
+    if (value === null || typeof value !== 'object' || Array.isArray(value)) return false
+    const record = value as Record<string, unknown>
+    const properties = (schema.properties ?? {}) as Record<string, Record<string, unknown>>
+    if (Array.isArray(schema.required) && !schema.required.every((key) => Object.hasOwn(record, key))) return false
+    if (typeof schema.minProperties === 'number' && Object.keys(record).length < schema.minProperties) return false
+    if (schema.propertyNames && !Object.keys(record).every((key) => conformsToSchema(root, schema.propertyNames as Record<string, unknown>, key))) return false
+    for (const [key, child] of Object.entries(record)) {
+      if (properties[key] && !conformsToSchema(root, properties[key], child)) return false
+      if (!properties[key] && schema.additionalProperties === false) return false
+      if (!properties[key] && schema.additionalProperties && typeof schema.additionalProperties === 'object' && !conformsToSchema(root, schema.additionalProperties as Record<string, unknown>, child)) return false
+    }
+  }
+  return true
 }
 
 describe('WebMCP protocol conformance', () => {
@@ -101,7 +160,7 @@ describe('WebMCP protocol conformance', () => {
     controller.dispose()
   })
 
-  it('keeps tool descriptions below 500 characters and registration manifests below 8 KiB', async () => {
+  it('keeps descriptions and registration manifests within explicit byte budgets', async () => {
     const { controller, tools } = await captureRegisteredTools()
     const byteLength = (value: unknown) => new TextEncoder().encode(JSON.stringify(value)).byteLength
 
@@ -115,7 +174,10 @@ describe('WebMCP protocol conformance', () => {
         inputSchema: tool.inputSchema,
         annotations: tool.annotations,
       }
-      expect(byteLength(registrationManifest), tool.name).toBeLessThan(8 * 1024)
+      // The complete 31-operation write union, including strict nested object schemas,
+      // cannot fit the generic 8 KiB budget without unresolved external references.
+      const budget = ['preview_layout_changes', 'apply_layout_changes'].includes(tool.name) ? 16 * 1024 : 8 * 1024
+      expect(byteLength(registrationManifest), tool.name).toBeLessThan(budget)
     }
     controller.dispose()
   })
@@ -155,6 +217,61 @@ describe('WebMCP protocol conformance', () => {
     expect(applySchema.oneOf[0].required).toEqual(['previewToken'])
     expect(applySchema.oneOf[1].required).toEqual(['expectedRevision', 'operations'])
     expect(applySchema.oneOf[1].required).not.toContain('idempotencyKey')
+    controller.dispose()
+  })
+
+  it('publishes explicit schemas for every operation field and representative nested values', async () => {
+    const { controller, tools } = await captureRegisteredTools()
+    for (const name of ['preview_layout_changes', 'apply_layout_changes']) {
+      const inputSchema = tools.find((tool) => tool.name === name)!.inputSchema as Record<string, unknown>
+      const definitions = inputSchema.$defs as Record<string, Record<string, unknown>>
+      const operations = (inputSchema.properties as Record<string, { items?: Record<string, unknown> }>).operations
+      const item = operations.items!
+      const emptySchemas: string[] = []
+      const visit = (value: unknown, path: string): void => {
+        if (value === null || typeof value !== 'object' || Array.isArray(value)) return
+        const record = value as Record<string, unknown>
+        if (Object.keys(record).length === 0) emptySchemas.push(path)
+        for (const [key, child] of Object.entries(record)) {
+          if (Array.isArray(child)) child.forEach((entry, index) => visit(entry, `${path}.${key}[${index}]`))
+          else visit(child, `${path}.${key}`)
+        }
+      }
+      visit(item, 'operations.items')
+      visit(definitions, '$defs')
+      expect(emptySchemas).toEqual([])
+      expect(item).toMatchObject({ type: 'object', additionalProperties: false, required: ['type', 'variantId'] })
+      expect((item.properties as Record<string, unknown>).variantId).toEqual({ $ref: '#/$defs/i' })
+      expect((item.properties as Record<string, unknown>).opening).toEqual({ $ref: '#/$defs/o' })
+      expect(definitions.o).toMatchObject({
+        type: 'object', additionalProperties: false,
+        required: ['id', 'label', 'kind', 'wall', 'offsetMm', 'widthMm'],
+      })
+      expect(definitions.Q).toMatchObject({ type: 'object', additionalProperties: false, required: ['id', 'xMm', 'yMm', 'widthMm', 'depthMm'] })
+      expect((definitions.A.properties as Record<string, unknown>).roomPolygon).toMatchObject({ type: 'array', items: { $ref: '#/$defs/p' } })
+      expect((definitions.S.properties as Record<string, unknown>).staff).toMatchObject({ type: 'array', items: { $ref: '#/$defs/f' } })
+      expect((definitions.e.properties as Record<string, unknown>).steps).toMatchObject({ type: 'array', items: { $ref: '#/$defs/m' } })
+      const updateOpening = (item.allOf as Array<{ if: { properties: { type: { const: string } } }; then: { properties: { patch: unknown } } }>)
+        .find((condition) => condition.if.properties.type.const === 'update_opening')
+      expect(updateOpening?.then.properties.patch).toEqual({ $ref: '#/$defs/O' })
+      expect(definitions.O).toMatchObject({ type: 'object', additionalProperties: false, minProperties: 1 })
+
+      const validOpening = {
+        type: 'add_opening', variantId: 'layout-a',
+        opening: { id: 'door-a', label: 'Door A', kind: 'door', wall: 'left', offsetMm: 400, widthMm: 900 },
+      }
+      expect(conformsToSchema(inputSchema, inputSchema, { expectedRevision: 0, operations: [validOpening] })).toBe(true)
+      expect(conformsToSchema(inputSchema, inputSchema, { expectedRevision: 0, operations: [{ ...validOpening, variantId: 4 }] })).toBe(false)
+      expect(conformsToSchema(inputSchema, inputSchema, { expectedRevision: 0, operations: [{ ...validOpening, opening: {} }] })).toBe(false)
+      expect(conformsToSchema(inputSchema, inputSchema, {
+        expectedRevision: 0,
+        operations: [{ type: 'update_pillar', variantId: 'layout-a', id: 'pillar-a', patch: { xMm: -1 } }],
+      })).toBe(false)
+      expect(conformsToSchema(inputSchema, inputSchema, {
+        expectedRevision: 0,
+        operations: [{ type: 'update_scenario', variantId: 'layout-a', scenarioId: 'dinner', patch: { staff: [{ role: 'head-chef', count: 1, rogue: true }] } }],
+      })).toBe(false)
+    }
     controller.dispose()
   })
 })

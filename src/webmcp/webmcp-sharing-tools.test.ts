@@ -3,6 +3,7 @@ import { createSeedProject } from '../domain/seed-project'
 import { appStateStore } from '../state/app-state-store'
 import { createProjectStore } from '../state/project-store'
 import { createSimulationRunStore } from '../state/simulation-run-store'
+import { resolveWorkspaceDeepLink } from '../app/workspace-deep-link'
 import type { WebMcpToolDefinition } from './model-context'
 import { createSharingTools } from './webmcp-sharing-tools'
 
@@ -35,12 +36,13 @@ describe('share_results WebMCP tool', () => {
       simulationStatus: 'not-run',
       mimeType: expect.stringContaining('text/html'),
       downloaded: false,
-      workspaceUrlScope: expect.stringContaining('already saved'),
+      workspaceUrlScope: expect.stringContaining('without local persistence'),
     })
     expect(result.contents).toMatch(/<!doctype html>[\s\S]*<svg[\s\S]*Professional review required/)
     const url = new URL(result.workspaceUrl as string)
     expect(url.origin).toBe('https://example.test')
     expect(url.hash).toContain(`project=${encodeURIComponent(store.getState().project.id)}`)
+    expect(url.hash).toContain('payload=')
     expect(url.hash).toContain('stage=equipment')
     expect(url.hash).toContain('view=split')
     expect(url.hash).toContain('overlay=compare')
@@ -87,9 +89,41 @@ describe('share_results WebMCP tool', () => {
     expect(reportOnly).not.toHaveProperty('workspaceUrl')
 
     const linkOnly = call({ include: ['workspace-link'], returnContents: false })
-    expect(linkOnly).toMatchObject({ ok: true, workspaceUrl: expect.stringContaining('#workspace=v1') })
+    expect(linkOnly).toMatchObject({ ok: true, workspaceUrl: expect.stringContaining('#workspace=v2') })
     expect(linkOnly).not.toHaveProperty('contents')
     expect(linkOnly).not.toHaveProperty('filename')
+  })
+
+  it('supports section-level report includes while preserving the report shorthand', () => {
+    const { call } = setup()
+    const selected = call({ include: ['plan', 'assumptions'] })
+    expect(selected).toMatchObject({
+      ok: true,
+      include: ['plan', 'assumptions'],
+      reportSections: ['plan', 'assumptions'],
+      mimeType: expect.stringContaining('text/html'),
+    })
+    expect(selected.contents).toMatch(/<h2>Plan<\/h2>[\s\S]*Scenario and menu assumptions/)
+    expect(selected.contents).not.toMatch(/Simulation evidence|Ranked findings/)
+
+    const all = call({ include: ['report'] })
+    expect(all).toMatchObject({ reportSections: ['plan', 'metrics', 'findings', 'assumptions'] })
+    expect(all.contents).toMatch(/<h2>Plan<\/h2>[\s\S]*Scenario and menu assumptions[\s\S]*Simulation evidence[\s\S]*Ranked findings/)
+  })
+
+  it('embeds the scoped project in workspace links for fresh-browser restoration', () => {
+    const { store, call } = setup()
+    const result = call({ include: ['workspace-link'] })
+    const resolved = resolveWorkspaceDeepLink(new URL(result.workspaceUrl as string).hash)
+
+    expect(resolved).toMatchObject({
+      project: {
+        id: store.getState().project.id,
+        variants: [{ id: store.getState().project.activeVariantId }],
+        scenarios: [{ id: store.getState().project.activeScenarioId }],
+      },
+      variantId: store.getState().project.activeVariantId,
+    })
   })
 
   it('rejects invalid IDs and unknown fields without mutating the document', () => {

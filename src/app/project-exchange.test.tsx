@@ -132,9 +132,10 @@ describe('project exchange', () => {
 
     expect(writeText).toHaveBeenCalledOnce()
     const sharedUrl = new URL(writeText.mock.calls[0][0])
-    expect(sharedUrl.hash).toContain('workspace=v1')
+    expect(sharedUrl.hash).toContain('workspace=v2')
     expect(sharedUrl.hash).toContain(`project=${encodeURIComponent(projectStore.getState().project.id)}`)
-    expect(screen.getByRole('status')).toHaveTextContent(/reopens this saved project in this browser/i)
+    expect(sharedUrl.hash).toContain('payload=')
+    expect(screen.getByRole('status')).toHaveTextContent(/includes this project snapshot/i)
   })
 
   it('atomically replaces the document and invalidates previews from the previous document', async () => {

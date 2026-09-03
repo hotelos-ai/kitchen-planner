@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { createSeedProject } from '../domain/seed-project'
 import { runSimulation } from '../simulation/engine'
+import { SimulationRunCancelledError } from '../simulation/responsive-runner'
 import type { SimulationInput, SimulationResult } from '../simulation/types'
 import { appStateStore } from '../state/app-state-store'
 import { createProjectStore, getWorkspaceFacade } from '../state/project-store'
@@ -37,11 +38,72 @@ const setup = () => {
     if (!capturedInput) throw new Error('Simulation did not start')
     pending.resolve(runSimulation(capturedInput))
   }
-  return { store, runStore, tool, finish }
+  return { store, runStore, tool, finish, runSimulationDependency }
 }
 
 describe('run_simulation concurrency', () => {
   beforeEach(() => appStateStore.getState().reset())
+
+  it('normalizes an already-aborted request to the stable cancellation taxonomy', async () => {
+    const { runStore, tool, runSimulationDependency } = setup()
+    const controller = new AbortController()
+    controller.abort()
+
+    await expect(tool.execute({}, { signal: controller.signal })).resolves.toMatchObject({
+      ok: false,
+      revision: 0,
+      code: 'cancelled',
+      recovery: recoveryForErrorCode('cancelled'),
+    })
+    expect(runSimulationDependency).not.toHaveBeenCalled()
+    expect(runStore.getState().runs).toEqual({})
+    expect(appStateStore.getState()).toMatchObject({ stage: 'space', requestedSimulationRun: null })
+  })
+
+  it('normalizes cancellation raised during computation and does not publish a run', async () => {
+    const store = createProjectStore(createSeedProject())
+    const runStore = createSimulationRunStore()
+    const tool = createRunTools({
+      store,
+      runStore,
+      getFacade: () => getWorkspaceFacade(store),
+      runSimulation: async () => { throw new SimulationRunCancelledError() },
+    }).find((candidate) => candidate.name === 'run_simulation')!
+
+    await expect(tool.execute({})).resolves.toMatchObject({
+      ok: false,
+      revision: 0,
+      code: 'cancelled',
+      recovery: recoveryForErrorCode('cancelled'),
+    })
+    expect(runStore.getState().runs).toEqual({})
+    expect(appStateStore.getState()).toMatchObject({ stage: 'space', requestedSimulationRun: null })
+  })
+
+  it('discards a completed result when aborted before publication', async () => {
+    const store = createProjectStore(createSeedProject())
+    const runStore = createSimulationRunStore()
+    const controller = new AbortController()
+    const tool = createRunTools({
+      store,
+      runStore,
+      getFacade: () => getWorkspaceFacade(store),
+      runSimulation: async (input) => {
+        const result = runSimulation(input)
+        controller.abort()
+        return result
+      },
+    }).find((candidate) => candidate.name === 'run_simulation')!
+
+    await expect(tool.execute({}, { signal: controller.signal })).resolves.toMatchObject({
+      ok: false,
+      revision: 0,
+      code: 'cancelled',
+      recovery: recoveryForErrorCode('cancelled'),
+    })
+    expect(runStore.getState().runs).toEqual({})
+    expect(appStateStore.getState()).toMatchObject({ stage: 'space', requestedSimulationRun: null })
+  })
 
   it('discards a Worker result when the document revision changes before completion', async () => {
     const { store, runStore, tool, finish } = setup()

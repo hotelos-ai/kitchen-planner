@@ -79,7 +79,7 @@ export function ProjectExchange({ store = projectStore, runStore = simulationRun
       if (!navigator.clipboard?.writeText) throw new Error('Clipboard access is unavailable in this browser.')
       const appState = appStateStore.getState()
       await navigator.clipboard.writeText(buildWorkspaceDeepLink({
-        projectId: project.id,
+        project,
         variantId: project.activeVariantId,
         scenarioId: project.activeScenarioId,
         stage: appState.stage,
@@ -88,7 +88,7 @@ export function ProjectExchange({ store = projectStore, runStore = simulationRun
         selectedIds: store.getState().selectedIds,
       }))
       setShowExport(false)
-      setMessage({ kind: 'status', text: 'Workspace link copied. It reopens this saved project in this browser.' })
+      setMessage({ kind: 'status', text: 'Portable workspace link copied. It includes this project snapshot.' })
     } catch (error) {
       setMessage({ kind: 'error', text: error instanceof Error ? error.message : 'Could not copy workspace link.' })
     }

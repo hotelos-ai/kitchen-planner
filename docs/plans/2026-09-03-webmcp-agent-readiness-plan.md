@@ -59,10 +59,10 @@ Known defect: `intent` is stored on the preview candidate and discarded on apply
 
 - [ ] Add `src/webmcp/tool-result.ts` with `toolResult(payload)` returning `{ content: [{type:'text', text: JSON.stringify(payload)}], structuredContent, isError: payload.ok === false }` and a 262_144-byte cap that degrades to a `result-too-large` envelope.
 - [ ] Apply it in the `webmcp-controller.ts` wrapper **after** the activity log reads the payload (otherwise every entry records `ok: undefined`).
-- [ ] Register the origin trial for `https://planner.kitchen.hotelos.ai`; add `<meta http-equiv="origin-trial">` to `index.html` **and** `public/_headers` with `Origin-Trial:` + `Permissions-Policy: tools=(self)`. Record the expiry date in-repo.
+- [x] Deliberately omit an Origin-Trial token. Use ChatGPT desktop's built-in browser as the supported Site tools path, or Chrome with `chrome://flags/#enable-webmcp-testing` as the explicit developer path. Restrict the WebMCP permission to self with `Permissions-Policy: tools=(self)`.
 - [ ] Rewrite `register()`: retry detection on `0/250/750/2000/5000ms` backoff; re-register on `pageshow` when `event.persisted`; listen for `toolchange`; add a "Retry registration" button to `AgentToolsPanel` and show the verbatim detection reason.
 - [ ] Drop `destructiveHint`/`openWorldHint` from `model-context.ts` (spec has only `readOnlyHint` and `untrustedContentHint`). Set `untrustedContentHint: true` on `get_layout`, `get_component_catalog`, `export_project`, `import_project`.
-- [ ] Thread `execute`'s second-arg `AbortSignal` into `run_simulation` and the auto-layout tools; return `{ ok:false, code:'cancelled' }`.
+- [ ] Thread `execute`'s second-arg `AbortSignal` into `run_simulation` and the auto-layout tools; `run_simulation` now returns the stable `{ ok:false, code:'cancelled' }` result, while the auto-layout tools still need verification.
 - [ ] Test: each description < 500 chars, whole manifest < 8KB. Move long prose into `get_workspace_guide`. `get_layout` and `preview_layout_changes` are over budget today.
 
 ## Phase 2 — App state store + app tools (3d)

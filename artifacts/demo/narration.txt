@@ -1,0 +1,13 @@
+Commercial kitchens are spatial designs and live operating systems. CalmKitchen lets a person and an AI agent design, inspect, and pressure-test one exact model together before anything is built.
+
+This is not screenshot automation. The page exposes twenty-six typed WebMCP tools. An agent discovers exact millimetre geometry, stable component IDs, visible app state, revision rules, and the schemas it needs to work safely.
+
+Here, the agent creates a candidate layout and clears the prep aisle. Preview validates the complete ordered batch without changing the project. Apply commits the single-use token as one revision and one undo step. The intent and affected items remain visible in Revision history with an Agent badge.
+
+Selection and navigation are tools too. The agent focuses the changed working table and reveals the same stable component in Plan and 3D. Human and agent always share one live canvas.
+
+Next, it runs the dinner-peak scenario with a fixed seed. The exact retained run powers both the visible playback and the agent's evidence: staff movement, queues, throughput, ticket times, crossings, and ranked findings.
+
+Both saved layouts are then compared under the same scenario and seed. CalmKitchen shows spatial changes, modeled service deltas, and evidence side by side, while the user keeps the final decision.
+
+For handoff, the agent creates a portable workspace link and a self-contained planning report. WebMCP turns a complex professional canvas into a trustworthy shared instrument: precise, visible, revision-guarded, and reversible.

@@ -7,7 +7,12 @@ import {
 } from '../state/simulation-run-store'
 import { buildWorkspaceDeepLink } from '../app/workspace-deep-link'
 import type { WebMcpToolDefinition } from './model-context'
-import { downloadArtifact, resultsReportArtifact } from './project-artifacts'
+import {
+  downloadArtifact,
+  resultsReportArtifact,
+  SHARED_RESULT_SECTIONS,
+  type SharedResultSection,
+} from './project-artifacts'
 import {
   currentRevision,
   failure,
@@ -18,8 +23,10 @@ import {
   type ToolDependencies,
 } from './webmcp-tool-utils'
 
+const shareIncludeValues = ['report', 'workspace-link', ...SHARED_RESULT_SECTIONS] as const
+
 const shareResultsInput = z.object({
-  include: z.array(z.enum(['report', 'workspace-link'])).min(1).max(2)
+  include: z.array(z.enum(shareIncludeValues)).min(1).max(shareIncludeValues.length)
     .default(['report', 'workspace-link']),
   variantIds: z.array(z.string().min(1).max(128)).min(1).max(12).optional(),
   /** @deprecated Use variantIds. */
@@ -37,8 +44,8 @@ const shareResultsInput = z.object({
   if (input.variantIds && input.variantId) {
     context.addIssue({ code: 'custom', path: ['variantId'], message: 'Use variantIds or the deprecated variantId alias, not both.' })
   }
-  if (input.download && !input.include.includes('report')) {
-    context.addIssue({ code: 'custom', path: ['download'], message: 'download requires report in include.' })
+  if (input.download && !input.include.some((value) => value === 'report' || SHARED_RESULT_SECTIONS.includes(value as SharedResultSection))) {
+    context.addIssue({ code: 'custom', path: ['download'], message: 'download requires report or at least one report section in include.' })
   }
 })
 
@@ -48,7 +55,7 @@ export type SharingToolDependencies = ToolDependencies & {
 }
 
 /**
- * Creates the portable report + local-project deep link sharing surface. Add
+ * Creates the portable report + self-contained deep link sharing surface. Add
  * this factory to createWebMcpTools so it is included in the guide and normal
  * controller registration lifecycle.
  */
@@ -57,12 +64,12 @@ export function createSharingTools(deps: SharingToolDependencies): WebMcpToolDef
   return [{
     name: 'share_results',
     title: 'Share planning results',
-    description: 'Create a scoped, self-contained HTML report, a compact workspace deep link, or both for selected layouts and one scenario. The portable report contains only requested layouts; the link restores the first layout in the same locally saved project, including view and selection.',
+    description: 'Create selected plan, metrics, findings, and assumptions sections as a scoped HTML report, a compressed self-contained workspace link, or both. The legacy report value requests every report section; workspace-link remains compatible.',
     inputSchema: {
       type: 'object',
       additionalProperties: false,
       properties: {
-        include: { type: 'array', items: { type: 'string', enum: ['report', 'workspace-link'] }, description: 'Artifacts to produce. Defaults to both report and workspace-link.' },
+        include: { type: 'array', items: { type: 'string', enum: shareIncludeValues }, description: 'Content to produce. plan, metrics, findings, and assumptions create a report containing only those sections. report is the compatibility shorthand for all sections; workspace-link adds a portable project link. Defaults to report plus workspace-link.' },
         variantIds: { type: 'array', items: { type: 'string' }, description: 'One or more layout variants to include. Defaults to the active layout; the first is used by the workspace link.' },
         variantId: { type: 'string', description: 'Deprecated single-layout alias retained for compatibility. Use variantIds for new calls.' },
         scenarioId: { type: 'string', description: 'Scenario to share; defaults to the active scenario.' },
@@ -100,31 +107,37 @@ export function createSharingTools(deps: SharingToolDependencies): WebMcpToolDef
         })
         const shareProject = structuredClone(state.project)
         shareProject.variants = selectedVariants.map((variant) => structuredClone(variant))
+        shareProject.scenarios = [structuredClone(scenario)]
         shareProject.activeVariantId = primaryVariant.id
         shareProject.activeScenarioId = scenario.id
         shareProject.architecture = structuredClone(primaryVariant.architecture)
-        const artifact = resultsReportArtifact({
+        delete shareProject.lastWorking
+        const requestedSections = parsed.value.include.filter((value): value is SharedResultSection =>
+          SHARED_RESULT_SECTIONS.includes(value as SharedResultSection))
+        const includeFullReport = parsed.value.include.includes('report')
+        const includeReport = includeFullReport || requestedSections.length > 0
+        const artifact = includeReport ? resultsReportArtifact({
           project: shareProject,
           revision: state.revision,
           reports,
-        })
+          ...(includeFullReport ? {} : { sections: requestedSections }),
+        }) : undefined
+        const includeWorkspaceLink = parsed.value.include.includes('workspace-link')
         const appState = appStateStore.getState()
-        const workspaceUrl = buildWorkspaceDeepLink({
-          projectId: state.project.id,
+        const workspaceUrl = includeWorkspaceLink ? buildWorkspaceDeepLink({
+          project: shareProject,
           variantId: primaryVariant.id,
           scenarioId: scenario.id,
           stage: appState.stage,
           view: appState.view,
           overlay: appState.overlay,
           selectedIds: state.selectedIds.filter((id) => primaryVariant.equipment.some((item) => item.id === id)),
-        }, deps.getHref?.())
-        const includeReport = parsed.value.include.includes('report')
-        const includeWorkspaceLink = parsed.value.include.includes('workspace-link')
-        const downloaded = includeReport && parsed.value.download ? downloadArtifact(artifact) : false
+        }, deps.getHref?.()) : undefined
+        const downloaded = artifact && parsed.value.download ? downloadArtifact(artifact) : false
         if (parsed.value.download && !downloaded) {
           return failure(state.revision, 'download-unavailable', 'The share report was generated, but this environment cannot start a browser download.', {
-            ...(includeReport ? { filename: artifact.filename, mimeType: artifact.mimeType } : {}),
-            ...(parsed.value.returnContents ? { contents: artifact.contents } : {}),
+            ...(artifact ? { filename: artifact.filename, mimeType: artifact.mimeType } : {}),
+            ...(artifact && parsed.value.returnContents ? { contents: artifact.contents } : {}),
             ...(includeWorkspaceLink ? { workspaceUrl } : {}),
           })
         }
@@ -135,15 +148,16 @@ export function createSharingTools(deps: SharingToolDependencies): WebMcpToolDef
           scenarioId: scenario.id,
           simulationStatus: reports[0].simulationStatus,
           simulationStatuses: reports.map(({ variant, simulationStatus }) => ({ variantId: variant.id, status: simulationStatus })),
-          ...(includeReport ? {
+          ...(artifact ? {
             filename: artifact.filename,
             mimeType: artifact.mimeType,
+            reportSections: includeFullReport ? [...SHARED_RESULT_SECTIONS] : requestedSections,
             ...(parsed.value.returnContents ? { contents: artifact.contents } : {}),
             downloaded,
           } : {}),
           ...(includeWorkspaceLink ? {
             workspaceUrl,
-            workspaceUrlScope: 'Restores state only where this project is already saved; use the self-contained report for portable sharing.',
+            workspaceUrlScope: 'Portable snapshot: restores the shared layouts, scenario, view, and selection without local persistence.',
           } : {}),
         })
       } catch (error) {

@@ -1,5 +1,6 @@
 import { render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { createBlankProject } from '../domain/blank-project'
 import { createSeedProject } from '../domain/seed-project'
 import { appStateStore } from '../state/app-state-store'
 import { projectStore } from '../state/project-store'
@@ -17,21 +18,21 @@ describe('App workspace deep-link restoration', () => {
     project.variants.push(secondVariant)
     const secondScenario = { ...project.scenarios[0], id: 'deep-link-scenario', name: 'Deep-link scenario' }
     project.scenarios.push(secondScenario)
-    projectStore.getState().replaceProject(project)
     const link = buildWorkspaceDeepLink({
-      projectId: project.id,
+      project,
       variantId: secondVariant.id,
       scenarioId: secondScenario.id,
       stage: 'equipment',
       view: 'scene',
       overlay: null,
     }, window.location.href)
+    projectStore.getState().replaceProject(createBlankProject('Unrelated fresh-browser project'))
     window.history.replaceState(null, '', new URL(link).hash)
   })
 
   afterEach(() => window.history.replaceState(null, '', '/'))
 
-  it('bypasses the start screen and restores the linked document and view', async () => {
+  it('bypasses the start screen and restores the linked document and view without local persistence', async () => {
     render(<App />)
 
     await waitFor(() => expect(projectStore.getState().project).toMatchObject({

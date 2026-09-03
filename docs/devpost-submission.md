@@ -66,7 +66,7 @@ Say: “WebMCP turns a complex professional canvas into a trustworthy shared ins
 
 ## Testing instructions
 
-Open <https://planner.kitchen.hotelos.ai/> in ChatGPT's in-app browser, where Site tools are enabled, or in Chrome 149+ with `chrome://flags/#enable-webmcp-testing` enabled. Select **Use your AI agent** and verify that the panel says **Agent tools active** with 26 registered tools. Copy its starter prompt, then ask the agent to inspect the workspace and make one previewed change. The project began on 31 August 2026 during the submission period; the first WebMCP implementation landed in commit `ebd3758`.
+Open <https://planner.kitchen.hotelos.ai/> in the ChatGPT desktop app's built-in browser with an account that has Site tools access. Approve website access, then use the address-bar arrow to inspect the available tools. Alternatively, for local Chrome development, enable `chrome://flags/#enable-webmcp-testing` and relaunch Chrome. Select **Use your AI agent** and verify that the panel says **Agent tools active** with 26 registered tools. Copy its starter prompt, then ask the agent to inspect the workspace and make one previewed change. The deployment deliberately does not ship an Origin-Trial token; ChatGPT desktop is the supported user path and the Chrome flag is the explicit developer test path. The project began on 31 August 2026 during the submission period; the first WebMCP implementation landed in commit `ebd3758`.
 
 ## Submission checklist
 
