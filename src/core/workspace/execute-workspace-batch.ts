@@ -1,7 +1,7 @@
 import { applyEquipmentConfiguration } from '../../domain/equipment-configurations'
 import { APPEARANCE_SKINS } from '../../domain/catalog/appearance-skins'
 import { getCatalogEntry } from '../../domain/catalog/kitchen-catalog'
-import { normalizeRotation, snapMm } from '../../domain/geometry'
+import { normalizeRotation, rotateInPlace, snapMm } from '../../domain/geometry'
 import type { Architecture, EquipmentItem, KitchenProject, LayoutVariant, PointMm, StationCapability } from '../../domain/project'
 import { architectureSchema, operationalProfileSchema, projectSchema, scenarioSchema } from '../../domain/project-schema'
 import { workspaceOperationSchema, type WorkspaceOperation } from './workspace-operation'
@@ -215,7 +215,7 @@ export function executeWorkspaceBatch(options: BatchOptions): WorkspaceBatchResu
           : operation.type === 'nudge_components' ? operationPoint(operation.delta) : undefined
         variant.equipment = variant.equipment.map((item) => {
           if (!ids.includes(item.id)) return item
-          if (operation.type === 'rotate_components') return { ...item, rotationDeg: normalizeRotation(item.rotationDeg + operation.deltaDeg) }
+          if (operation.type === 'rotate_components') return { ...item, ...rotateInPlace(item, operation.deltaDeg) }
           return { ...item, xMm: snapMm(item.xMm + delta!.x, project.snapMm), yMm: snapMm(item.yMm + delta!.y, project.snapMm) }
         })
         changedIds.push(...ids)

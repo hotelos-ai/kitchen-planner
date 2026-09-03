@@ -31,13 +31,14 @@ type Props = {
   onWarningBadgeClick?(itemId: string): void
   placement?: PlacementSpec | null
   onPlacementDone?(): void
+  selectedSpaceItem?: { kind: 'pillar' | 'zone' | 'opening'; id: string } | null
   onSelectItem?(selection: { kind: 'pillar' | 'zone' | 'opening'; id: string } | null): void
 }
 
 type ContextRequest = { itemId: string; position: OverlayPosition }
 type QuickRequest = ContextRequest & { mode: QuickConfigurationMode }
 
-export function PlanCanvas({ store, showReference, sourceImageUrl = '/reference/kitchen-sketch.png', sourceOpacity = 22, mode = 'layout', variantOverride, readOnly = false, onInspectComponentIn3D, onComponentLockChange, onSkinChange, onWarningBadgeClick, placement = null, onPlacementDone, onSelectItem }: Props) {
+export function PlanCanvas({ store, showReference, sourceImageUrl = '/reference/kitchen-sketch.png', sourceOpacity = 22, mode = 'layout', variantOverride, readOnly = false, onInspectComponentIn3D, onComponentLockChange, onSkinChange, onWarningBadgeClick, placement = null, onPlacementDone, selectedSpaceItem = null, onSelectItem }: Props) {
   const containerRef = useRef<HTMLDivElement>(null)
   const [size, setSize] = useState({ width: 740, height: 720 })
   const [contextRequest, setContextRequest] = useState<ContextRequest>()
@@ -107,6 +108,7 @@ export function PlanCanvas({ store, showReference, sourceImageUrl = '/reference/
   }
 
   const selectItems = (ids: string[]) => {
+    if (ids.length > 0) onSelectItem?.(null)
     if (readOnly) setPreviewSelectedIds(ids)
     else store.getState().selectItems(ids)
   }
@@ -147,6 +149,7 @@ export function PlanCanvas({ store, showReference, sourceImageUrl = '/reference/
         if (event.target === event.target.getStage()) {
           if (readOnly) setPreviewSelectedIds([])
           else store.getState().clearSelection()
+          onSelectItem?.(null)
           setContextRequest(undefined)
           setQuickRequest(undefined)
         }
@@ -175,14 +178,16 @@ export function PlanCanvas({ store, showReference, sourceImageUrl = '/reference/
           />
         )}
         <OpeningOverlayLayer architecture={variant.architecture} pixelsPerMm={pixelsPerMm} originX={originX} originY={originY} />
-        {mode === 'space' && !readOnly && (
+        {!readOnly && (
           <RoomOutlineLayer
             architecture={variant.architecture}
             pixelsPerMm={pixelsPerMm}
             originX={originX}
             originY={originY}
             snapMm={project.snapMm}
-            placement={placement}
+            editRoomOutline={mode === 'space'}
+            placement={mode === 'space' ? placement : null}
+            selectedItem={selectedSpaceItem}
             onCommit={(next) => { store.getState().applySharedArchitecture(next) }}
             onPlacementDone={() => onPlacementDone?.()}
             onSelectItem={onSelectItem}

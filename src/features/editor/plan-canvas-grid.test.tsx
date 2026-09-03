@@ -9,6 +9,7 @@ vi.mock('./ArchitectureLayer', () => ({ ArchitectureLayer: ({ architecture }: { 
 vi.mock('./GridLayer', () => ({ GridLayer: () => <div data-testid="grid-layer" /> }))
 vi.mock('./EquipmentNode', () => ({ EquipmentLayer: () => <div data-testid="equipment-layer" /> }))
 vi.mock('./OpeningOverlayLayer', () => ({ OpeningOverlayLayer: () => <div data-testid="opening-layer" /> }))
+vi.mock('./RoomOutlineLayer', () => ({ RoomOutlineLayer: () => <div data-testid="room-outline-layer" /> }))
 
 import { PlanCanvas } from './PlanCanvas'
 

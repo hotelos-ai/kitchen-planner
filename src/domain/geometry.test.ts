@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { EquipmentItem, PointMm } from './project'
-import { normalizeRotation, polygonsOverlap, rotatedFootprint, snapMm } from './geometry'
+import { normalizeRotation, polygonsOverlap, rotateInPlace, rotatedFootprint, snapMm } from './geometry'
 
 const item = (overrides: Partial<EquipmentItem> = {}): EquipmentItem => ({
   id: 'station',
@@ -37,6 +37,19 @@ describe('metric geometry', () => {
       { x: 1300, y: 900 },
       { x: 100, y: 900 },
     ])
+  })
+
+  it('keeps the footprint center fixed while rotating', () => {
+    const source = item()
+    const rotated = { ...source, ...rotateInPlace(source, 90) }
+    const center = (points: PointMm[]) => ({
+      x: points.reduce((total, point) => total + point.x, 0) / points.length,
+      y: points.reduce((total, point) => total + point.y, 0) / points.length,
+    })
+
+    expect(rotated.rotationDeg).toBe(90)
+    expect(center(rotatedFootprint(rotated))).toEqual(center(rotatedFootprint(source)))
+    expect({ ...rotated, ...rotateInPlace(rotated, -90) }).toMatchObject({ xMm: source.xMm, yMm: source.yMm, rotationDeg: 0 })
   })
 
   it('treats touching edges as clear but detects area overlap', () => {

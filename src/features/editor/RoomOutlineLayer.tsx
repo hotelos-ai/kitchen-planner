@@ -34,7 +34,9 @@ type Props = {
   originX: number
   originY: number
   snapMm: number
+  editRoomOutline?: boolean
   placement: PlacementSpec | null
+  selectedItem?: SelectedItem | null
   onCommit(next: Architecture): void
   onPlacementDone(): void
   onSelectItem?(selection: { kind: 'pillar' | 'zone' | 'opening'; id: string } | null): void
@@ -51,11 +53,10 @@ const isTypingTarget = (target: EventTarget | null) =>
 
 type SelectedItem = { kind: 'pillar' | 'zone' | 'opening'; id: string }
 
-export function RoomOutlineLayer({ architecture, pixelsPerMm, originX, originY, snapMm, placement, onCommit, onPlacementDone, onSelectItem }: Props) {
+export function RoomOutlineLayer({ architecture, pixelsPerMm, originX, originY, snapMm, editRoomOutline = true, placement, selectedItem = null, onCommit, onPlacementDone, onSelectItem }: Props) {
   const [dragPolygon, setDragPolygon] = useState<PointMm[] | null>(null)
   const [draggingEdge, setDraggingEdge] = useState<number | null>(null)
   const [selectedVertex, setSelectedVertex] = useState<number | null>(null)
-  const [selectedItem, setSelectedItem] = useState<SelectedItem | null>(null)
   const [placing, setPlacing] = useState<{ from: PointMm; to: PointMm } | null>(null)
   const polygon = dragPolygon ?? architecture.roomPolygon
 
@@ -66,8 +67,6 @@ export function RoomOutlineLayer({ architecture, pixelsPerMm, originX, originY, 
     return () => { stage?.style.setProperty('cursor', 'default') }
   }, [placement])
 
-  useEffect(() => { onSelectItem?.(selectedItem) }, [selectedItem, onSelectItem])
-
   useEffect(() => {
     if (selectedVertex === null && selectedItem === null && !placement) return
     const onKeyDown = (event: KeyboardEvent) => {
@@ -75,7 +74,7 @@ export function RoomOutlineLayer({ architecture, pixelsPerMm, originX, originY, 
       if (event.key === 'Escape') {
         event.preventDefault()
         setSelectedVertex(null)
-        setSelectedItem(null)
+        onSelectItem?.(null)
         setPlacing(null)
         return
       }
@@ -89,25 +88,25 @@ export function RoomOutlineLayer({ architecture, pixelsPerMm, originX, originY, 
       }
       if (selectedItem?.kind === 'opening') {
         const index = architecture.openings.findIndex((opening) => opening.id === selectedItem.id)
-        setSelectedItem(null)
+        onSelectItem?.(null)
         if (index >= 0) onCommit(removeOpening(architecture, index))
         return
       }
       if (selectedItem?.kind === 'pillar') {
         const index = architecture.pillars.findIndex((pillar) => pillar.id === selectedItem.id)
-        setSelectedItem(null)
+        onSelectItem?.(null)
         if (index >= 0) onCommit(removePillar(architecture, index))
         return
       }
       if (selectedItem?.kind === 'zone') {
         const index = architecture.storageZones.findIndex((zone) => zone.id === selectedItem.id)
-        setSelectedItem(null)
+        onSelectItem?.(null)
         if (index >= 0) onCommit(removeZone(architecture, index))
       }
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-  }, [selectedVertex, selectedItem, placement, architecture, onCommit])
+  }, [selectedVertex, selectedItem, placement, architecture, onCommit, onSelectItem])
 
   const toPx = (point: PointMm) => ({ x: originX + point.x * pixelsPerMm, y: originY + point.y * pixelsPerMm })
   const toMm = (x: number, y: number) => ({ x: (x - originX) / pixelsPerMm, y: (y - originY) / pixelsPerMm })
@@ -200,7 +199,7 @@ export function RoomOutlineLayer({ architecture, pixelsPerMm, originX, originY, 
           : <Rect x={Math.min(a.x, b.x)} y={Math.min(a.y, b.y)} width={Math.abs(a.x - b.x)} height={Math.abs(a.y - b.y)} fill="rgba(202,78,142,0.10)" stroke="#ca4e8e" strokeWidth={2} dash={[9, 7]} listening={false} />
       })()}
 
-      {polygon.map((start, index) => {
+      {editRoomOutline && polygon.map((start, index) => {
         const end = polygon[(index + 1) % polygon.length]
         const a = toPx(start)
         const b = toPx(end)
@@ -258,7 +257,7 @@ export function RoomOutlineLayer({ architecture, pixelsPerMm, originX, originY, 
         )
       })}
 
-      {polygon.map((vertex, index) => {
+      {editRoomOutline && polygon.map((vertex, index) => {
         const position = toPx(vertex)
         const isSelected = selectedVertex === index
         return (
@@ -301,18 +300,26 @@ export function RoomOutlineLayer({ architecture, pixelsPerMm, originX, originY, 
         return (
           <Group key={`outline-opening-${opening.id}`}>
             <Group draggable
+              onDragStart={() => onSelectItem?.({ kind: 'opening', id: opening.id })}
               onDragEnd={(event) => {
                 const node = event.target
                 const point = toMm(node.x() + position.x, node.y() + position.y)
                 node.position({ x: 0, y: 0 })
                 onCommit(moveOpening(architecture, index, point, snapMm))
               }}
+              onMouseEnter={(event) => showTooltip(event, 'Drag along walls · click to select')}
+              onMouseMove={(event) => showTooltip(event, 'Drag along walls · click to select')}
+              onMouseLeave={hideTooltip}
+              onClick={() => onSelectItem?.(isSelected ? null : { kind: 'opening', id: opening.id })}
             >
+              <Line
+                points={[startPx.x, startPx.y, endPx.x, endPx.y]}
+                stroke={isSelected ? 'rgba(202,78,142,0.48)' : 'rgba(0,0,0,0)'}
+                strokeWidth={isSelected ? 8 : 1}
+                hitStrokeWidth={24}
+              />
               <Circle x={position.x} y={position.y} radius={OPENING_RADIUS} fill="#ca4e8e" opacity={isSelected ? 1 : 0.9} stroke="#fbfaf5" strokeWidth={2} hitStrokeWidth={22}
-                onMouseEnter={(event) => showTooltip(event, 'Drag along walls · click to select')}
-                onMouseMove={(event) => showTooltip(event, 'Drag along walls · click to select')}
-                onMouseLeave={hideTooltip}
-                onClick={() => setSelectedItem((current) => current?.id === opening.id ? null : { kind: 'opening', id: opening.id })} />
+              />
               <Circle x={position.x} y={position.y} radius={3} fill="#fbfaf5" listening={false} />
             </Group>
             {isSelected && (['start', 'end'] as const).map((end) => {
@@ -338,7 +345,7 @@ export function RoomOutlineLayer({ architecture, pixelsPerMm, originX, originY, 
         )
       })}
 
-      {architecture.pillars.map((pillar, index) => {
+      {editRoomOutline && architecture.pillars.map((pillar, index) => {
         const position = toPx({ x: pillar.xMm + pillar.widthMm / 2, y: pillar.yMm + pillar.depthMm / 2 })
         const isSelected = pillarIndex === index
         const round = pillar.shape === 'round'
@@ -352,7 +359,7 @@ export function RoomOutlineLayer({ architecture, pixelsPerMm, originX, originY, 
           hitStrokeWidth: 22,
           onMouseEnter: (event: KonvaEventObject<MouseEvent>) => showTooltip(event, 'Drag to move · click to select'),
           onMouseLeave: hideTooltip,
-          onClick: () => setSelectedItem((current) => current?.id === pillar.id ? null : { kind: 'pillar', id: pillar.id }),
+          onClick: () => onSelectItem?.(isSelected ? null : { kind: 'pillar', id: pillar.id }),
           onDragEnd: (event: KonvaEventObject<DragEvent>) => {
             const node = event.target
             const point = toMm(node.x() + PILLAR_HALF, node.y() + PILLAR_HALF)
@@ -364,7 +371,7 @@ export function RoomOutlineLayer({ architecture, pixelsPerMm, originX, originY, 
           : <Rect key={pillar.id} {...handleProps} cornerRadius={3} stroke="#1b3a36" strokeWidth={2.5} />
       })}
 
-      {architecture.storageZones.map((zone, index) => {
+      {editRoomOutline && architecture.storageZones.map((zone, index) => {
         const a = toPx({ x: zone.xMm, y: zone.yMm })
         const size = toPx({ x: zone.xMm + zone.widthMm, y: zone.yMm + zone.depthMm })
         const isSelected = zoneIndex === index
@@ -373,7 +380,7 @@ export function RoomOutlineLayer({ architecture, pixelsPerMm, originX, originY, 
             fill={isSelected ? 'rgba(202,78,142,0.08)' : 'rgba(0,0,0,0)'} stroke={isSelected ? '#ca4e8e' : 'rgba(0,0,0,0)'} strokeWidth={2} dash={[8, 6]} draggable hitStrokeWidth={24}
             onMouseEnter={(event) => showTooltip(event, 'Drag to move · click to select')}
             onMouseLeave={hideTooltip}
-            onClick={() => setSelectedItem((current) => current?.id === zone.id ? null : { kind: 'zone', id: zone.id })}
+            onClick={() => onSelectItem?.(isSelected ? null : { kind: 'zone', id: zone.id })}
             onDragEnd={(event) => {
               const node = event.target
               const point = toMm(node.x(), node.y())
@@ -383,7 +390,7 @@ export function RoomOutlineLayer({ architecture, pixelsPerMm, originX, originY, 
         )
       })}
 
-      {selectedRect && rectHandles(selectedRect).map(({ handle, at }) => {
+      {editRoomOutline && selectedRect && rectHandles(selectedRect).map(({ handle, at }) => {
         const px = toPx(at)
         const isCorner = handle.length === 2
         return (

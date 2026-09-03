@@ -11,10 +11,22 @@ type LayerHarnessProps = {
   onOpenContextMenu(id: string, position: { x: number; y: number }): void
 }
 
+type RoomOutlineHarnessProps = {
+  editRoomOutline: boolean
+  onSelectItem(selection: { kind: 'opening'; id: string }): void
+}
+
 vi.mock('react-konva', () => ({ Stage: ({ children }: { children: ReactNode }) => <div>{children}</div> }))
 vi.mock('./ArchitectureLayer', () => ({ ArchitectureLayer: () => null }))
 vi.mock('./GridLayer', () => ({ GridLayer: () => null }))
 vi.mock('./OpeningOverlayLayer', () => ({ OpeningOverlayLayer: () => null }))
+vi.mock('./RoomOutlineLayer', () => ({
+  RoomOutlineLayer: (props: RoomOutlineHarnessProps) => (
+    <button type="button" onClick={() => props.onSelectItem({ kind: 'opening', id: 'd2' })}>
+      {props.editRoomOutline ? 'Select door while editing room' : 'Select door from plan'}
+    </button>
+  ),
+}))
 vi.mock('./EquipmentNode', () => ({
   EquipmentLayer: (props: LayerHarnessProps) => <div>
     <button type="button" onClick={() => props.onQuickConfigure('tandoor', { x: 100, y: 120 })}>Open quick configuration</button>
@@ -103,5 +115,15 @@ describe('PlanCanvas component gestures', () => {
     expect(store.getState().project.variants[0].equipment).toHaveLength(1)
     expect(store.getState().project.variants[0].equipment[0]).toMatchObject({ catalogId: 'prep-work-table' })
     expect(store.getState().selectedIds).toHaveLength(1)
+  })
+
+  it('keeps door interaction enabled in the layout plan', async () => {
+    const user = userEvent.setup()
+    const onSelectItem = vi.fn()
+    render(<PlanCanvas store={createProjectStore(createSeedProject())} showReference={false} onSelectItem={onSelectItem} />)
+
+    await user.click(screen.getByRole('button', { name: 'Select door from plan' }))
+
+    expect(onSelectItem).toHaveBeenCalledWith({ kind: 'opening', id: 'd2' })
   })
 })

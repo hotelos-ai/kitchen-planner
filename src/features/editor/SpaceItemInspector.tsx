@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { useStore } from 'zustand'
 import type { Architecture } from '../../domain/project'
 import { getActiveVariant, type ProjectStore } from '../../state/project-store'
@@ -23,6 +24,16 @@ const NumberField = ({ label, value, onChange }: { label: string; value: number;
   </label>
 )
 
+const TextField = ({ label, value, onCommit }: { label: string; value: string; onCommit(value: string): void }) => {
+  const [draft, setDraft] = useState(value)
+  const commit = () => {
+    const next = draft.trim()
+    if (next) onCommit(next)
+    else setDraft(value)
+  }
+  return <label>{label}<input value={draft} onChange={(event) => setDraft(event.target.value)} onBlur={commit} onKeyDown={(event) => { if (event.key === 'Enter') event.currentTarget.blur() }} /></label>
+}
+
 export function SpaceItemInspector({ store, selection, onClearSelection }: Props) {
   const variant = useStore(store, getActiveVariant)
   const architecture = variant.architecture
@@ -45,10 +56,11 @@ export function SpaceItemInspector({ store, selection, onClearSelection }: Props
     return (
       <aside className="inspector space-item-inspector" aria-label="Selected opening">
         <div className="panel-heading"><span className="eyebrow">{opening.kind === 'service-window' ? 'Service window' : 'Door'}</span><h2>{opening.label}</h2></div>
-        <label>Label<input value={opening.label} onChange={(event) => patch({ label: event.target.value })} /></label>
+        <TextField key={`${opening.id}-${opening.label}`} label="Label" value={opening.label} onCommit={(label) => patch({ label })} />
         <div className="field-pair">
           <NumberField label="Offset (mm)" value={opening.offsetMm} onChange={(offsetMm) => patch({ offsetMm })} />
           <NumberField label="Width (mm)" value={opening.widthMm} onChange={(widthMm) => patch({ widthMm })} />
+          {opening.kind === 'door' && <NumberField label="Swing depth (mm)" value={opening.swingDepthMm ?? opening.widthMm} onChange={(swingDepthMm) => patch({ swingDepthMm })} />}
         </div>
         <label>Flow
           <select value={opening.flow ?? 'closed'} onChange={(event) => patch({ flow: event.target.value as typeof opening.flow })}>
@@ -93,7 +105,7 @@ export function SpaceItemInspector({ store, selection, onClearSelection }: Props
   return (
     <aside className="inspector space-item-inspector" aria-label="Selected zone">
       <div className="panel-heading"><span className="eyebrow">Zone</span><h2>{zone.label}</h2></div>
-      <label>Label<input value={zone.label} onChange={(event) => patch({ label: event.target.value })} /></label>
+      <TextField key={`${zone.id}-${zone.label}`} label="Label" value={zone.label} onCommit={(label) => patch({ label })} />
       <div className="field-pair">
         <NumberField label="X (mm)" value={zone.xMm} onChange={(xMm) => patch({ xMm })} />
         <NumberField label="Y (mm)" value={zone.yMm} onChange={(yMm) => patch({ yMm })} />

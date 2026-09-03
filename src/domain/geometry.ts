@@ -3,6 +3,27 @@ import type { EquipmentItem, PointMm } from './project'
 export const snapMm = (value: number, interval: number) => Math.round(value / interval) * interval
 export const normalizeRotation = (degrees: number) => ((degrees % 360) + 360) % 360
 
+type RotatableRect = Pick<EquipmentItem, 'xMm' | 'yMm' | 'widthMm' | 'depthMm' | 'rotationDeg'>
+
+export function rotateInPlace(item: RotatableRect, deltaDeg: number): Pick<EquipmentItem, 'xMm' | 'yMm' | 'rotationDeg'> {
+  const previousRadians = normalizeRotation(item.rotationDeg) * Math.PI / 180
+  const rotationDeg = normalizeRotation(item.rotationDeg + deltaDeg)
+  const nextRadians = rotationDeg * Math.PI / 180
+  const halfWidth = item.widthMm / 2
+  const halfDepth = item.depthMm / 2
+  const rotatedCenterOffset = (radians: number) => ({
+    x: halfWidth * Math.cos(radians) - halfDepth * Math.sin(radians),
+    y: halfWidth * Math.sin(radians) + halfDepth * Math.cos(radians),
+  })
+  const previousOffset = rotatedCenterOffset(previousRadians)
+  const nextOffset = rotatedCenterOffset(nextRadians)
+  return {
+    xMm: item.xMm + previousOffset.x - nextOffset.x,
+    yMm: item.yMm + previousOffset.y - nextOffset.y,
+    rotationDeg,
+  }
+}
+
 export function rotatedFootprint(item: EquipmentItem): PointMm[] {
   const radians = normalizeRotation(item.rotationDeg) * Math.PI / 180
   const corners = [

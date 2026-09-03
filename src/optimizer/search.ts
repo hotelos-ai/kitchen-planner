@@ -1,6 +1,7 @@
 import type { LayoutVariant } from '../domain/project'
 import { createCatalogEquipmentItem, KITCHEN_CATALOG } from '../domain/catalog/kitchen-catalog'
 import { suggestCatalogPlacement } from '../domain/catalog/suggest-placement'
+import { rotateInPlace } from '../domain/geometry'
 import { physicalStationCapacity } from '../simulation/validation'
 import { canonicalLayoutHash } from './canonical-layout'
 import { optimizerManifestSchema } from './experiment-schema'
@@ -23,7 +24,6 @@ type SearchOptions = {
   onProgress?(progress: { phase: 'feasibility' | 'simulation' | 'confirmation'; candidates: number; evaluations: number; bestHash?: string }): void
 }
 
-const normalizeRotation = (rotation: number) => ((rotation % 360) + 360) % 360
 const seededRandom = (seed: number) => {
   let state = (seed | 0) ^ 0x9e3779b9
   return () => {
@@ -51,7 +51,7 @@ export function generateCandidates(baseline: LayoutVariant, manifest: OptimizerM
       for (const deltaDeg of [-90, 90]) {
         const candidate = structuredClone(baseline)
         const changed = candidate.equipment.find((value) => value.id === item.id)!
-        changed.rotationDeg = normalizeRotation(changed.rotationDeg + deltaDeg)
+        Object.assign(changed, rotateInPlace(changed, deltaDeg))
         candidates.push(candidate)
       }
     })
@@ -84,7 +84,7 @@ export function generateCandidates(baseline: LayoutVariant, manifest: OptimizerM
           const axis = random() < .5 ? 'xMm' : 'yMm'
           const distance = (random() < .5 ? -1 : 1) * (random() < .5 ? 200 : 400)
           changed[axis] += distance
-          if (random() < .35) changed.rotationDeg = normalizeRotation(changed.rotationDeg + (random() < .5 ? -90 : 90))
+          if (random() < .35) Object.assign(changed, rotateInPlace(changed, random() < .5 ? -90 : 90))
         })
         candidates.push(candidate)
       }

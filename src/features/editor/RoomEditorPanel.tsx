@@ -8,10 +8,11 @@ type Props = {
   store: ProjectStore
   selection: SpaceSelection
   onClearSelection(): void
+  onSelectItem(selection: Exclude<SpaceSelection, null>): void
   onContinueToEquipment?(): void
 }
 
-export function RoomEditorPanel({ store, selection, onClearSelection, onContinueToEquipment }: Props) {
+export function RoomEditorPanel({ store, selection, onClearSelection, onSelectItem, onContinueToEquipment }: Props) {
   const variant = useStore(store, getActiveVariant)
   const architecture = variant.architecture
 
@@ -39,7 +40,7 @@ export function RoomEditorPanel({ store, selection, onClearSelection, onContinue
         <div className="space-stack-body">
           {architecture.openings.length === 0 && <p className="stage-summary">None yet — add one from the catalog.</p>}
           {architecture.openings.map((opening) => (
-            <button key={opening.id} type="button" className="equipment-row" onClick={() => onClearSelection()}>
+            <button key={opening.id} type="button" className="equipment-row" onClick={() => onSelectItem({ kind: 'opening', id: opening.id })}>
               <span className="category-dot" style={{ background: opening.kind === 'service-window' ? 'var(--cat-cold)' : 'var(--cat-prep)' }} />
               <span><strong>{opening.label}</strong><small>{opening.widthMm} mm · {opening.flow ?? 'closed'}</small></span>
             </button>
@@ -51,7 +52,7 @@ export function RoomEditorPanel({ store, selection, onClearSelection, onContinue
         <div className="space-stack-body">
           {architecture.pillars.length === 0 && <p className="stage-summary">None yet.</p>}
           {architecture.pillars.map((pillar) => (
-            <div key={pillar.id} className="equipment-row"><span className="category-dot" style={{ background: 'var(--ink-3)' }} /><span><strong>{pillar.shape === 'round' ? 'Round column' : 'Pillar'}</strong><small>{pillar.widthMm} × {pillar.depthMm} mm</small></span></div>
+            <button key={pillar.id} type="button" className="equipment-row" onClick={() => onSelectItem({ kind: 'pillar', id: pillar.id })}><span className="category-dot" style={{ background: 'var(--ink-3)' }} /><span><strong>{pillar.shape === 'round' ? 'Round column' : 'Pillar'}</strong><small>{pillar.widthMm} × {pillar.depthMm} mm</small></span></button>
           ))}
         </div>
       </details>
@@ -60,7 +61,7 @@ export function RoomEditorPanel({ store, selection, onClearSelection, onContinue
         <div className="space-stack-body">
           {architecture.storageZones.length === 0 && <p className="stage-summary">None yet.</p>}
           {architecture.storageZones.map((zone) => (
-            <div key={zone.id} className="equipment-row"><span className="category-dot" style={{ background: 'var(--cat-wash)' }} /><span><strong>{zone.label}</strong><small>{zone.widthMm} × {zone.depthMm} mm</small></span></div>
+            <button key={zone.id} type="button" className="equipment-row" onClick={() => onSelectItem({ kind: 'zone', id: zone.id })}><span className="category-dot" style={{ background: 'var(--cat-wash)' }} /><span><strong>{zone.label}</strong><small>{zone.widthMm} × {zone.depthMm} mm</small></span></button>
           ))}
         </div>
       </details>

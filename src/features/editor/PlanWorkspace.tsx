@@ -156,6 +156,14 @@ export function PlanWorkspace({
   const [localCatalogOpen, setLocalCatalogOpen] = useState(includeToolbar ? drawersInitiallyOpen() : catalogOpen)
   const [localInspectorOpen, setLocalInspectorOpen] = useState(includeToolbar ? drawersInitiallyOpen() : inspectorOpen)
 
+  const selectSpaceItem = (selection: SpaceSelection) => {
+    setSpaceSelection(selection)
+    if (!selection) return
+    store.getState().clearSelection()
+    setLocalInspectorOpen(true)
+    onInspectorOpenChange?.(true)
+  }
+
   const referenceVisible = includeToolbar ? localReference : showReference
   const catalogVisible = includeToolbar ? localCatalogOpen : catalogOpen
   const inspectorVisible = (includeToolbar ? localInspectorOpen : inspectorOpen) || essentialsVisible || revisionsVisible
@@ -245,7 +253,8 @@ export function PlanWorkspace({
                 mode={stage === 'space' ? 'space' : 'layout'}
                 placement={stage === 'space' ? placement : null}
                 onPlacementDone={() => setPlacement(null)}
-                onSelectItem={setSpaceSelection}
+                selectedSpaceItem={spaceSelection}
+                onSelectItem={selectSpaceItem}
                 showReference={compact ? false : referenceVisible}
                 sourceImageUrl={localSourceUrl}
                 sourceOpacity={sourceOpacity}
@@ -307,10 +316,12 @@ export function PlanWorkspace({
                 </section>
               )}
               {revisionsVisible && <RevisionHistory store={store} />}
-              {!essentialsVisible && !revisionsVisible && (selectedIds.length > 0 ? (
+              {!essentialsVisible && !revisionsVisible && (spaceSelection ? (
+                <RoomEditorPanel store={store} selection={spaceSelection} onClearSelection={() => setSpaceSelection(null)} onSelectItem={selectSpaceItem} onContinueToEquipment={continueToEquipment} />
+              ) : selectedIds.length > 0 ? (
                 <EquipmentInspector store={store} />
               ) : stage === 'space' ? (
-                <RoomEditorPanel store={store} selection={spaceSelection} onClearSelection={() => setSpaceSelection(null)} onContinueToEquipment={continueToEquipment} />
+                <RoomEditorPanel store={store} selection={null} onClearSelection={() => setSpaceSelection(null)} onSelectItem={selectSpaceItem} onContinueToEquipment={continueToEquipment} />
               ) : showInspectorContent ? (
                 <StageOverview
                   store={store}

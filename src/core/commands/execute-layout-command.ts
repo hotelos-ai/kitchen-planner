@@ -1,4 +1,4 @@
-import { normalizeRotation, snapMm } from '../../domain/geometry'
+import { rotateInPlace, snapMm } from '../../domain/geometry'
 import type { ProjectEnvelope, SpatialDocumentAdapter, SpatialItem, SpatialProject } from '../spatial/types'
 import { layoutCommandSchema, type LayoutCommand } from './layout-command'
 
@@ -67,7 +67,7 @@ export function executeLayoutCommand<TProject, TItem extends SpatialItem, TScena
           if (!ids.includes(item.id) || !item.movable) return item
           return value.type === 'nudge-items'
             ? { ...item, xMm: item.xMm + value.delta.x, yMm: item.yMm + value.delta.y }
-            : { ...item, rotationDeg: normalizeRotation(item.rotationDeg + value.deltaDeg) }
+            : { ...item, ...rotateInPlace(item, value.deltaDeg) }
         })
         changedIds.push(...ids)
         break

@@ -23,7 +23,7 @@ describe('workspace facade', () => {
     const applied = facade.applyLayoutChanges({ previewToken: preview.previewToken })
     expect(applied).toMatchObject({ ok: true, revision: 1, changedIds: ['tandoor'] })
     expect(store.getState().past).toHaveLength(1)
-    expect(getActiveItem(store.getState(), 'tandoor')).toMatchObject({ xMm: 2200, yMm: 1000, rotationDeg: 90 })
+    expect(getActiveItem(store.getState(), 'tandoor')).toMatchObject({ xMm: 2900, yMm: 1000, rotationDeg: 90 })
     expect(facade.applyLayoutChanges({ previewToken: preview.previewToken })).toMatchObject({ ok: false, code: 'used-preview-token', revision: 1 })
 
     store.getState().undo()

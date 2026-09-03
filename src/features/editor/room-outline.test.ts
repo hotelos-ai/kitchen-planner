@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { Architecture, PointMm } from '../../domain/project'
-import { constrainToAxes, createOpeningAt, createRectItemAt, edgeMidpoint, insertVertexOnSegment, moveOpening, moveVertex, nearestSegment, openingCenter, polygonCentroid, removeVertex, resizeOpening, resizePillarRect, slideEdge, squarePointAround } from './room-outline'
+import { constrainToAxes, createOpeningAt, createRectItemAt, edgeMidpoint, insertVertexOnSegment, moveOpening, moveVertex, nearestSegment, openingCenter, openingEnds, polygonCentroid, removeVertex, resizeOpening, resizePillarRect, slideEdge, squarePointAround } from './room-outline'
 
 const polygon: PointMm[] = [
   { x: 0, y: 0 },
@@ -118,6 +118,20 @@ describe('cross-wall opening movement', () => {
     expect(next.openings[0].segmentIndex).toBe(1)
     expect(next.openings[0].wall).toBe('right')
     expect(next.openings[0].offsetMm).toBe(1100)
+  })
+
+  it('keeps rendered geometry moving in the drag direction on a reverse-oriented wall', () => {
+    const source: Architecture = {
+      ...architecture,
+      openings: [{ id: 'door', label: 'Door', kind: 'door', wall: 'left', offsetMm: 200, widthMm: 600, flow: 'entry' as const }],
+    }
+    const next = moveOpening(source, 0, { x: 0, y: 1500 }, 100)
+    const center = openingCenter(next, next.openings[0])
+    const ends = openingEnds(next, next.openings[0])
+
+    expect(next.openings[0].segmentIndex).toBe(3)
+    expect(center.y).toBe(1500)
+    expect((ends.start.y + ends.end.y) / 2).toBe(1500)
   })
 
   it('clamps width when the only reachable wall is shorter than the opening', () => {

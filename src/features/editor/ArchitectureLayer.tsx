@@ -1,5 +1,6 @@
 import { Circle, Group, Layer, Line, Rect, Text } from 'react-konva'
 import type { Architecture } from '../../domain/project'
+import { openingEnds } from './room-outline'
 
 type Props = {
   architecture: Architecture
@@ -30,14 +31,12 @@ export function ArchitectureLayer({ architecture, pixelsPerMm: scale, originX, o
         </Group>
       ))}
       {architecture.openings.map((opening) => {
-        const vertical = opening.wall === 'left' || opening.wall === 'right'
-        const x = opening.wall === 'left' ? originX : opening.wall === 'right' ? originX + px(architecture.widthMm) : originX + px(opening.offsetMm)
-        const y = opening.wall === 'top' ? originY : opening.wall === 'bottom' ? originY + px(architecture.depthMm) : originY + px(opening.offsetMm)
-        const length = px(opening.widthMm)
+        const ends = openingEnds(architecture, opening)
+        const points = [originX + px(ends.start.x), originY + px(ends.start.y), originX + px(ends.end.x), originY + px(ends.end.y)]
         const color = opening.flow === 'clean-out' ? '#4b7ce1' : opening.flow === 'dirty-in' ? '#a47932' : opening.flow === 'closed' ? '#a32f1d' : '#5e6b5a'
         return (
           <Group key={opening.id}>
-            <Line points={vertical ? [x, y, x, y + length] : [x, y, x + length, y]} stroke={color} strokeWidth={opening.kind === 'sealed-opening' ? 7 : 5} dash={opening.kind === 'sealed-opening' ? [5, 4] : undefined} />
+            <Line points={points} stroke={color} strokeWidth={opening.kind === 'sealed-opening' ? 7 : 5} dash={opening.kind === 'sealed-opening' ? [5, 4] : undefined} />
           </Group>
         )
       })}

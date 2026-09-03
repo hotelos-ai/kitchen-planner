@@ -50,6 +50,28 @@ describe('executeWorkspaceBatch', () => {
     })).toMatchObject({ ok: false, operationIndex: 0, causeCode: 'locked-component' })
   })
 
+  it('rotates components around their own center', () => {
+    const project = createSeedProject()
+    const before = project.variants[0].equipment.find((item) => item.id === 'two-door-fridge')!
+    const center = { x: before.xMm + before.widthMm / 2, y: before.yMm + before.depthMm / 2 }
+    const result = executeWorkspaceBatch({
+      project,
+      revision: 0,
+      operations: [{ type: 'rotate_components', variantId: 'baseline-trace', componentIds: [before.id], deltaDeg: 90 }],
+    })
+
+    expect(result.ok).toBe(true)
+    if (!result.ok) throw new Error(result.message)
+    const after = result.project.variants[0].equipment.find((item) => item.id === before.id)!
+    const radians = after.rotationDeg * Math.PI / 180
+    const rotatedCenter = {
+      x: after.xMm + after.widthMm / 2 * Math.cos(radians) - after.depthMm / 2 * Math.sin(radians),
+      y: after.yMm + after.widthMm / 2 * Math.sin(radians) + after.depthMm / 2 * Math.cos(radians),
+    }
+    expect(rotatedCenter.x).toBeCloseTo(center.x)
+    expect(rotatedCenter.y).toBeCloseTo(center.y)
+  })
+
   it('applies physical configuration and appearance skin as distinct operations', () => {
     const project = createSeedProject()
     const result = executeWorkspaceBatch({
