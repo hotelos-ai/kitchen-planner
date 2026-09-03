@@ -116,7 +116,7 @@ export function App() {
       equipment: variant.equipment,
       scenario,
       layoutConstraints: variant.layoutConstraints,
-    }).filter((result) => result.severity !== 'professional-review').length
+    }).filter((result) => result.severity === 'blocker').length
   }, [project])
 
   const autoLayoutRunner = useMemo(() => {

@@ -189,7 +189,7 @@ export function SimulationWorkspace({
           {hasValidationErrors && <button type="button" className="simulation-autofix-button" onClick={runAutomaticFix}>Auto-fix plan</button>}
           <button type="button" className="run-simulation" disabled={hasValidationErrors} onClick={startRun}>Run {scenario.durationMinutes}-minute service</button>
         </div>
-        {(validationErrors.length > 0 || autoFixStatus) && <div role="alert" className="simulation-validation">
+        {(validationErrors.length > 0 || autoFixStatus) && <div role={validationErrors.length > 0 ? 'alert' : 'status'} className="simulation-validation">
           <strong>{validationErrors.length > 0 ? `${validationErrors.length} blocking issue${validationErrors.length === 1 ? '' : 's'} must be resolved before simulation` : 'Ready to simulate'}</strong>
           {autoFixStatus && <span>{autoFixStatus}</span>}
           {validationErrors.length > 0 && <button type="button" onClick={() => setAutoFixOpen(true)}>Review issues</button>}
