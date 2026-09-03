@@ -163,6 +163,49 @@ export function buildReportHtml(input: {
   return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>${escapeText(project.name)} planning report</title><style>:root{color-scheme:light}*{box-sizing:border-box}body{font:15px/1.5 system-ui,sans-serif;color:#20251e;max-width:980px;margin:40px auto;padding:0 24px}h1,h2,h3{line-height:1.15}h2{margin-top:32px}svg{width:100%;max-height:560px;border:1px solid #ccd2c6;background:#fff}table{width:100%;border-collapse:collapse}th,td{text-align:left;vertical-align:top;border-bottom:1px solid #dfe3da;padding:8px}.assumptions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px 24px}.assumptions div{border-bottom:1px solid #dfe3da;padding:6px 0}.assumptions dt,.rank{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#596253}.assumptions dd{margin:2px 0}.finding{border-left:5px solid #d59d3d;padding:2px 16px;margin:16px 0;background:#faf8f1}.finding.high{border-color:#b24c3f}.finding.positive{border-color:#668f40}.disclaimer{margin-top:32px;padding:14px;background:#f3f5ef}@media(max-width:640px){.assumptions{grid-template-columns:1fr}}@media print{body{margin:0;max-width:none}.finding,table,svg{break-inside:avoid}}</style></head><body><header><p>CalmKitchen Designer · planning report</p><h1>${escapeText(project.name)}</h1><p>${escapeText(variant.name)} · generated ${escapeText(generatedAt)}</p></header><section><h2>Plan</h2>${planSvg(variant)}</section>${scenarioSection(scenario, variant)}${simulationSection(simulation, variant)}${comparisonSection(input.comparison)}<section><h2>Ranked findings</h2>${findingMarkup}</section><section><h2>Equipment schedule</h2><table><thead><tr><th>Item</th><th>Category</th><th>Size (mm)</th><th>Position (mm)</th></tr></thead><tbody>${equipmentRows}</tbody></table></section><p class="disclaimer"><strong>Professional review required.</strong> This comparative planning report does not certify architectural, fire, ventilation, food-safety, accessibility, structural, utility, or occupational-safety compliance.</p></body></html>`
 }
 
+export function buildResultsReportHtml(input: {
+  project: KitchenProject
+  reports: readonly {
+    variant: LayoutVariant
+    scenario?: SimulationScenario
+    simulation?: SimulationResultSummary | null
+  }[]
+  generatedAt?: string
+}): string {
+  const generatedAt = input.generatedAt ?? new Date().toISOString()
+  const layouts = input.reports.map(({ variant, scenario, simulation }) => {
+    const report = buildReportHtml({
+      project: input.project,
+      variant,
+      scenario,
+      simulation,
+      generatedAt,
+    })
+    const body = report.match(/<body>([\s\S]*)<\/body>/)?.[1] ?? report
+    const withoutHeaderAndDisclaimer = body
+      .replace(/^<header>[\s\S]*?<\/header>/, '')
+      .replace(/<p class="disclaimer">[\s\S]*?<\/p>$/, '')
+    return `<article class="layout-report" data-variant-id="${escapeText(variant.id)}"><header><p>Layout result</p><h2>${escapeText(variant.name)}</h2><p>Layout ID: ${escapeText(variant.id)}</p></header>${withoutHeaderAndDisclaimer}</article>`
+  }).join('')
+  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>${escapeText(input.project.name)} shared planning results</title><style>:root{color-scheme:light}*{box-sizing:border-box}body{font:15px/1.5 system-ui,sans-serif;color:#20251e;max-width:980px;margin:40px auto;padding:0 24px}h1,h2,h3{line-height:1.15}h2{margin-top:32px}svg{width:100%;max-height:560px;border:1px solid #ccd2c6;background:#fff}table{width:100%;border-collapse:collapse}th,td{text-align:left;vertical-align:top;border-bottom:1px solid #dfe3da;padding:8px}.assumptions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px 24px}.assumptions div{border-bottom:1px solid #dfe3da;padding:6px 0}.assumptions dt,.rank{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#596253}.assumptions dd{margin:2px 0}.finding{border-left:5px solid #d59d3d;padding:2px 16px;margin:16px 0;background:#faf8f1}.finding.high{border-color:#b24c3f}.finding.positive{border-color:#668f40}.layout-report{border-top:3px solid #34412d;margin-top:40px;padding-top:8px}.disclaimer{margin-top:32px;padding:14px;background:#f3f5ef}@media(max-width:640px){.assumptions{grid-template-columns:1fr}}@media print{body{margin:0;max-width:none}.layout-report{break-before:page}.layout-report:first-of-type{break-before:auto}.finding,table,svg{break-inside:avoid}}</style></head><body><header><p>CalmKitchen Designer · shared planning results</p><h1>${escapeText(input.project.name)}</h1><p>${escapeText(`${input.reports.length} layout${input.reports.length === 1 ? '' : 's'} · generated ${generatedAt}`)}</p></header>${layouts}<p class="disclaimer"><strong>Professional review required.</strong> This comparative planning report does not certify architectural, fire, ventilation, food-safety, accessibility, structural, utility, or occupational-safety compliance.</p></body></html>`
+}
+
+export function resultsReportArtifact(input: {
+  project: KitchenProject
+  revision: number
+  reports: readonly {
+    variant: LayoutVariant
+    scenario?: SimulationScenario
+    simulation?: SimulationResultSummary | null
+  }[]
+}): { filename: string; mimeType: string; contents: string } {
+  return {
+    filename: `${projectSlug(input.project)}-results-rev-${input.revision}.html`,
+    mimeType: 'text/html;charset=utf-8',
+    contents: buildResultsReportHtml(input),
+  }
+}
+
 export function projectArtifact(input: {
   project: KitchenProject
   variant: LayoutVariant

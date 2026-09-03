@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
+import { createBlankProject } from '../../domain/blank-project'
 import { createSeedProject } from '../../domain/seed-project'
 import { createProjectStore, getActiveItem } from '../../state/project-store'
 import { createWorkspaceFacade } from './workspace-facade'
@@ -89,5 +90,32 @@ describe('workspace facade', () => {
     expect(facade.runSimulation({ variantId: 'baseline-trace', scenarioId: 'dinner-peak', seed: 7, outputMode: 'metrics-only' })).toMatchObject({ outputMode: 'metrics-only' })
     expect(runSimulation).toHaveBeenNthCalledWith(1, expect.objectContaining({ outputMode: 'full' }))
     expect(runSimulation).toHaveBeenNthCalledWith(2, expect.objectContaining({ outputMode: 'metrics-only' }))
+  })
+
+  it('previews and commits granular architecture operations as one undoable revision', () => {
+    const store = createProjectStore(createBlankProject())
+    const facade = createWorkspaceFacade({ store })
+    const architectureOperations = [
+      { type: 'add_pillar', variantId: 'layout-a', pillar: { id: 'column-a', xMm: 1200, yMm: 1000, widthMm: 300, depthMm: 300 } },
+      { type: 'update_pillar', variantId: 'layout-a', id: 'column-a', patch: { widthMm: 400 } },
+      { type: 'remove_opening', variantId: 'layout-a', id: 'main-entry' },
+    ] as const
+
+    const preview = facade.previewLayoutChanges({ expectedRevision: 0, operations: architectureOperations, intent: 'Apply structural survey' })
+    expect(preview).toMatchObject({ ok: true, revision: 0, changedIds: ['column-a', 'main-entry'] })
+    expect(store.getState().project.variants[0].architecture).toMatchObject({ pillars: [], openings: [{ id: 'main-entry' }] })
+    if (!preview.ok) throw new Error(preview.message)
+
+    expect(facade.applyLayoutChanges({ previewToken: preview.previewToken })).toMatchObject({
+      ok: true,
+      revision: 1,
+      changedIds: ['column-a', 'main-entry'],
+      intent: 'Apply structural survey',
+    })
+    expect(store.getState().project.variants[0].architecture).toMatchObject({ pillars: [{ id: 'column-a', widthMm: 400 }], openings: [] })
+    expect(store.getState().past).toHaveLength(1)
+
+    store.getState().undo()
+    expect(store.getState().project.variants[0].architecture).toMatchObject({ pillars: [], openings: [{ id: 'main-entry' }] })
   })
 })

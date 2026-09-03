@@ -1,5 +1,6 @@
-import { describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it } from 'vitest'
 import { createBlankProject } from '../domain/blank-project'
+import { appStateStore } from '../state/app-state-store'
 import { createProjectStore, getActiveVariant, getWorkspaceFacade } from '../state/project-store'
 import type { WebMcpToolDefinition } from './model-context'
 import { createArchitectureTools } from './webmcp-architecture-tools'
@@ -16,6 +17,7 @@ const setup = (mutate?: (project: ReturnType<typeof createBlankProject>) => void
 }
 
 describe('edit_architecture WebMCP tool', () => {
+  beforeEach(() => appStateStore.getState().reset())
   it('commits ordered granular edits as one validated, undoable transaction', () => {
     const { store, call } = setup()
     const before = structuredClone(getActiveVariant(store.getState()).architecture)
@@ -42,6 +44,16 @@ describe('edit_architecture WebMCP tool', () => {
       changedIds: ['room', 'pass', 'column-a', 'dry-store', 'main-entry'],
     })
     expect(store.getState().past).toHaveLength(1)
+    expect(store.getState().revisionEntries).toContainEqual(expect.objectContaining({
+      revision: 1,
+      author: 'agent',
+      intent: 'Model the structural survey',
+      variantIds: ['layout-a'],
+    }))
+    expect(appStateStore.getState().lastAgentAction).toMatchObject({
+      revision: 1,
+      intent: 'Model the structural survey',
+    })
     expect(getActiveVariant(store.getState()).architecture).toMatchObject({
       widthMm: 7000,
       depthMm: 5000,

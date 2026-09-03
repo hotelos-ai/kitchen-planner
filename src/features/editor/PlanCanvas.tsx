@@ -38,7 +38,7 @@ type Props = {
 type ContextRequest = { itemId: string; position: OverlayPosition }
 type QuickRequest = ContextRequest & { mode: QuickConfigurationMode }
 
-export function PlanCanvas({ store, showReference, sourceImageUrl = '/reference/kitchen-sketch.png', sourceOpacity = 22, mode = 'layout', variantOverride, readOnly = false, onInspectComponentIn3D, onComponentLockChange, onSkinChange, onWarningBadgeClick, placement = null, onPlacementDone, selectedSpaceItem = null, onSelectItem }: Props) {
+export function PlanCanvas({ store, showReference, sourceImageUrl = '/reference/kitchen-sketch.webp', sourceOpacity = 22, mode = 'layout', variantOverride, readOnly = false, onInspectComponentIn3D, onComponentLockChange, onSkinChange, onWarningBadgeClick, placement = null, onPlacementDone, selectedSpaceItem = null, onSelectItem }: Props) {
   const containerRef = useRef<HTMLDivElement>(null)
   const [size, setSize] = useState({ width: 740, height: 720 })
   const [contextRequest, setContextRequest] = useState<ContextRequest>()

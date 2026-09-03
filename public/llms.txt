@@ -38,7 +38,7 @@ The live manifest and each tool's strict JSON input schema are authoritative. Ca
 - `export_project` — JSON, CSV equipment schedule, self-contained HTML report, or SVG plan, optionally downloaded.
 - `import_project` — validated project replacement or active-layout import as a variant.
 - `manage_checkpoints` — list, create, or restore named layout checkpoints.
-- `share_results` — scoped workspace deep link plus a current-evidence self-contained report.
+- `share_results` — requested `report` and/or `workspace-link` artifacts for `variantIds` and a scenario. Reports are self-contained and use current evidence; links restore the first layout plus the workspace view and component selection. The deprecated single `variantId` input remains accepted.
 
 ### Visible workspace controls
 

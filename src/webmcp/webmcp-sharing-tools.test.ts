@@ -30,6 +30,8 @@ describe('share_results WebMCP tool', () => {
     expect(result).toMatchObject({
       ok: true,
       revision: 0,
+      include: ['report', 'workspace-link'],
+      variantIds: [store.getState().project.activeVariantId],
       simulationStatus: 'not-run',
       mimeType: expect.stringContaining('text/html'),
       downloaded: false,
@@ -44,11 +46,59 @@ describe('share_results WebMCP tool', () => {
     expect(url.hash).toContain('overlay=compare')
   })
 
+  it('scopes a multi-layout report and restores the first layout plus current selection', () => {
+    const { store, call } = setup()
+    const second = structuredClone(store.getState().project.variants[0])
+    second.id = 'courtyard-option'
+    second.name = 'Courtyard option'
+    second.equipment[0].label = 'Courtyard fryer'
+    const candidate = structuredClone(store.getState().project)
+    candidate.variants.push(second)
+    store.getState().commitProjectCandidate(candidate, 0, store.getState().documentId)
+    store.getState().selectItems(['flat-top-fryer'])
+
+    const result = call({
+      include: ['report', 'workspace-link'],
+      variantIds: ['courtyard-option', 'baseline-trace'],
+      scenarioId: 'dinner-peak',
+    })
+
+    expect(result).toMatchObject({
+      ok: true,
+      variantId: 'courtyard-option',
+      variantIds: ['courtyard-option', 'baseline-trace'],
+      scenarioId: 'dinner-peak',
+      simulationStatuses: [
+        { variantId: 'courtyard-option', status: 'not-run' },
+        { variantId: 'baseline-trace', status: 'not-run' },
+      ],
+    })
+    expect(result.contents).toMatch(/data-variant-id="courtyard-option"[\s\S]*Courtyard fryer/)
+    expect(result.contents).toMatch(/data-variant-id="baseline-trace"[\s\S]*Flat-top \+ fryer/)
+    const url = new URL(result.workspaceUrl as string)
+    expect(url.hash).toContain('variant=courtyard-option')
+    expect(url.hash).toContain('select=flat-top-fryer')
+  })
+
+  it('can return only the requested artifact and accepts the deprecated variantId alias', () => {
+    const { call } = setup()
+    const reportOnly = call({ include: ['report'], variantId: 'baseline-trace' })
+    expect(reportOnly).toMatchObject({ ok: true, variantIds: ['baseline-trace'], mimeType: expect.stringContaining('text/html') })
+    expect(reportOnly).not.toHaveProperty('workspaceUrl')
+
+    const linkOnly = call({ include: ['workspace-link'], returnContents: false })
+    expect(linkOnly).toMatchObject({ ok: true, workspaceUrl: expect.stringContaining('#workspace=v1') })
+    expect(linkOnly).not.toHaveProperty('contents')
+    expect(linkOnly).not.toHaveProperty('filename')
+  })
+
   it('rejects invalid IDs and unknown fields without mutating the document', () => {
     const { store, call } = setup()
     expect(call({ variantId: 'missing' })).toMatchObject({ ok: false, code: 'missing-variant', revision: 0 })
     expect(call({ scenarioId: 'missing' })).toMatchObject({ ok: false, code: 'missing-scenario', revision: 0 })
     expect(call({ surprise: true })).toMatchObject({ ok: false, code: 'invalid-input', revision: 0 })
+    expect(call({ variantId: 'baseline-trace', variantIds: ['baseline-trace'] })).toMatchObject({ ok: false, code: 'invalid-input', revision: 0 })
+    expect(call({ include: ['workspace-link'], download: true })).toMatchObject({ ok: false, code: 'invalid-input', revision: 0 })
     expect(store.getState().revision).toBe(0)
   })
 })

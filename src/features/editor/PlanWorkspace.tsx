@@ -52,7 +52,7 @@ const drawersInitiallyOpen = () => typeof globalThis.matchMedia !== 'function' |
 
 const duplicateId = (sourceId: string, index: number) => `${sourceId}-copy-${globalThis.crypto?.randomUUID?.() ?? Math.random().toString(36).slice(2)}-${index + 1}`
 
-const DEFAULT_SOURCE_IMAGE_URL = '/reference/kitchen-sketch.png'
+const DEFAULT_SOURCE_IMAGE_URL = '/reference/kitchen-sketch.webp'
 
 type SourceReferencePopoverProps = {
   sourceOpacity: number

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { createSeedProject } from '../domain/seed-project'
 import { emptyMetrics } from '../simulation/metrics'
 import type { SimulationResultSummary } from '../simulation/types'
-import { buildReportHtml, equipmentScheduleCsv } from './project-artifacts'
+import { buildReportHtml, buildResultsReportHtml, equipmentScheduleCsv } from './project-artifacts'
 
 describe('project artifacts', () => {
   it('neutralizes formula-like CSV fields, including formulas hidden by whitespace', () => {
@@ -64,5 +64,27 @@ describe('project artifacts', () => {
     expect(html).toMatch(/Ranked findings[\s\S]*Priority 1 · high[\s\S]*unreachable task legs/)
     expect(html).toMatch(/Representative menu[\s\S]*User Provided[\s\S]*Food Prep/)
     expect(html).not.toMatch(/<link|<script/)
+  })
+
+  it('builds one self-contained report containing each requested layout once', () => {
+    const project = createSeedProject()
+    const second = structuredClone(project.variants[0])
+    second.id = 'second-layout'
+    second.name = 'Second layout'
+    project.variants.push(second)
+
+    const html = buildResultsReportHtml({
+      project,
+      reports: [
+        { variant: project.variants[0], scenario: project.scenarios[0] },
+        { variant: second, scenario: project.scenarios[0] },
+      ],
+      generatedAt: '2026-09-03T00:00:00.000Z',
+    })
+
+    expect(html.match(/<!doctype html>/g)).toHaveLength(1)
+    expect(html.match(/Professional review required/g)).toHaveLength(1)
+    expect(html).toMatch(/data-variant-id="baseline-trace"[\s\S]*data-variant-id="second-layout"/)
+    expect(html).not.toMatch(/<link|<script|<iframe/)
   })
 })

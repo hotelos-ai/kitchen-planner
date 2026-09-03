@@ -74,6 +74,7 @@ test('agents discover tools, edit the plan, run simulations, and export — with
   await page.getByRole('button', { name: 'Use your AI agent' }).click()
   await expect(page.getByRole('dialog', { name: 'AI agent tools' })).toBeVisible()
   await expect(page.getByText('Agent tools active')).toBeVisible()
+  await page.getByRole('button', { name: 'Close AI tools' }).click()
 
   const guide = await call('get_workspace_guide', {})
   expect(guide.ok).toBe(true)
@@ -110,8 +111,34 @@ test('agents discover tools, edit the plan, run simulations, and export — with
   expect(markerPreserved).toBe(true)
   await expect(page.getByText(/Rev 1/).first()).toBeVisible()
 
+  const revealed = await call('select_components', { componentIds: ['tandoor'], mode: 'replace', reveal: 'both' })
+  expect(revealed.ok).toBe(true)
+  await expect(page.locator('[data-app="calmkitchen-designer"]')).toHaveAttribute('data-app-stage', 'equipment')
+  await expect(page.locator('[data-app="calmkitchen-designer"]')).toHaveAttribute('data-app-view', 'split')
+  await expect(page.locator('[data-workspace-surface="plan"]')).toHaveAttribute('aria-hidden', 'false')
+  await expect(page.locator('[data-workspace-surface="scene"]')).toHaveAttribute('aria-hidden', 'false')
+
+  const inspected = await call('set_app_view', { stage: 'equipment', view: 'plan', panels: { inspector: true } })
+  expect(inspected.ok).toBe(true)
+  await expect(page.getByLabel('Equipment label')).toHaveValue('Tandoor')
+
+  const scene = await call('set_app_view', {
+    stage: 'equipment',
+    view: 'scene',
+    panels: { inspector: true },
+    showClearances: true,
+    wallsTransparent: true,
+    showLabels: true,
+  })
+  expect(scene.ok).toBe(true)
+  await expect(page.locator('[data-app="calmkitchen-designer"]')).toHaveAttribute('data-app-view', 'scene')
+  await expect(page.locator('[data-workspace-surface="scene"]')).toHaveAttribute('aria-hidden', 'false')
+  await expect(page.locator('[data-workspace-surface="plan"]')).toHaveAttribute('aria-hidden', 'true')
+
   const simulation = await call('run_simulation', {})
   expect(simulation.ok).toBe(true)
+  await expect(page.locator('[data-app="calmkitchen-designer"]')).toHaveAttribute('data-app-stage', 'simulate')
+  await expect(page.getByRole('button', { name: 'Pause' })).toBeVisible()
 
   const exported = await call('export_project', {})
   expect(exported.ok).toBe(true)
@@ -122,6 +149,7 @@ test('agents discover tools, edit the plan, run simulations, and export — with
   const reverted = await call('get_layout', {})
   expect(reverted.components?.find((component) => component.id === 'tandoor')?.xMm).toBe(tandoor?.xMm)
 
+  await page.getByRole('button', { name: 'Use your AI agent' }).click()
   await expect(page.getByText(/preview_layout_changes/).first()).toBeVisible()
   await expect(page.getByText(/No agent activity yet/i)).toHaveCount(0)
 })
@@ -155,17 +183,14 @@ test('an agent recovers from a stale preview by re-reading and recomputing its d
   })
   expect(originalPreview.ok).toBe(true)
 
-  const competingEdit = await call('apply_layout_changes', {
-    expectedRevision: before.revision,
-    idempotencyKey: 'e2e-competing-edit',
-    operations: [{
-      type: 'nudge_components',
-      variantId: 'baseline-trace',
-      componentIds: ['six-burner'],
-      delta: { xMm: 100, yMm: 0 },
-    }],
+  const selectedForHumanEdit = await call('select_components', {
+    componentIds: ['six-burner'],
+    mode: 'replace',
+    reveal: 'plan',
   })
-  expect(competingEdit).toMatchObject({ ok: true, revision: 1 })
+  expect(selectedForHumanEdit.ok).toBe(true)
+  await page.getByRole('button', { name: 'Rotate selected right 90 degrees' }).click()
+  await expect(page.getByText(/Rev 1/).first()).toBeVisible()
 
   const stale = await call('apply_layout_changes', { previewToken: originalPreview.previewToken })
   expect(stale).toMatchObject({

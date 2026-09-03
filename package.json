@@ -6,7 +6,7 @@
   "description": "Browser-based commercial kitchen planning, 3D walkthrough, and deterministic service simulation.",
   "repository": {
     "type": "git",
-    "url": "git+ssh://git@github.com/hotelos-ai/kitchen-planner.git"
+    "url": "git+https://github.com/hotelos-ai/kitchen-planner.git"
   },
   "type": "module",
   "scripts": {

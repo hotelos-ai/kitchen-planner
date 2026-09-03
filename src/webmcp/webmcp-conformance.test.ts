@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { WORKSPACE_OPERATION_TYPES } from '../core/workspace/workspace-operation'
 import { createSeedProject } from '../domain/seed-project'
 import { createProjectStore, getWorkspaceFacade } from '../state/project-store'
 import { kitchenCapabilityManifest } from './capability-manifest'
@@ -23,6 +24,22 @@ const captureRegisteredTools = async () => {
   })
   await controller.register()
   return { controller, tools }
+}
+
+const acceptsRegisteredOperationShape = (schema: Record<string, unknown>, input: Record<string, unknown>) => {
+  const branches = schema.oneOf as Array<{
+    additionalProperties?: boolean
+    required?: string[]
+    properties?: Record<string, { const?: string; enum?: string[] }>
+  }>
+  return branches.filter((branch) => {
+    const properties = branch.properties ?? {}
+    const discriminator = properties.type
+    const typeMatches = discriminator?.const === input.type || discriminator?.enum?.includes(input.type as string)
+    const requiredMatch = (branch.required ?? []).every((field) => Object.hasOwn(input, field))
+    const propertiesMatch = branch.additionalProperties !== false || Object.keys(input).every((field) => Object.hasOwn(properties, field))
+    return typeMatches && requiredMatch && propertiesMatch
+  }).length === 1
 }
 
 describe('WebMCP protocol conformance', () => {
@@ -100,6 +117,44 @@ describe('WebMCP protocol conformance', () => {
       }
       expect(byteLength(registrationManifest), tool.name).toBeLessThan(8 * 1024)
     }
+    controller.dispose()
+  })
+
+  it('registers strict discriminated operation items for preview and apply', async () => {
+    const { controller, tools } = await captureRegisteredTools()
+    for (const name of ['preview_layout_changes', 'apply_layout_changes']) {
+      const schema = tools.find((tool) => tool.name === name)!.inputSchema
+      const operations = schema.properties.operations as { items: Record<string, unknown> }
+      expect(operations.items).not.toEqual({})
+      const registeredTypes = (operations.items.oneOf as Array<{ properties: { type: { const?: string; enum?: string[] } } }>)
+        .flatMap((branch) => branch.properties.type.enum ?? [branch.properties.type.const!])
+      expect(registeredTypes.sort()).toEqual([...WORKSPACE_OPERATION_TYPES].sort())
+      expect(acceptsRegisteredOperationShape(operations.items, {})).toBe(false)
+      expect(acceptsRegisteredOperationShape(operations.items, {
+        type: 'activate_layout', variantId: 'layout-a', name: 'not-allowed',
+      })).toBe(false)
+      expect(acceptsRegisteredOperationShape(operations.items, {
+        type: 'rename_layout', variantId: 'layout-a',
+      })).toBe(false)
+      expect(acceptsRegisteredOperationShape(operations.items, {
+        type: 'rename_layout', variantId: 'layout-a', name: 'Updated name',
+      })).toBe(true)
+      expect(acceptsRegisteredOperationShape(operations.items, {
+        type: 'add_opening', variantId: 'layout-a', opening: {},
+      })).toBe(true)
+      expect(acceptsRegisteredOperationShape(operations.items, {
+        type: 'update_pillar', variantId: 'layout-a', id: 'pillar-a', patch: {}, storageZone: {},
+      })).toBe(false)
+      expect(acceptsRegisteredOperationShape(operations.items, {
+        type: 'remove_storage_zone', variantId: 'layout-a', id: 'zone-a',
+      })).toBe(true)
+    }
+    const applySchema = tools.find((tool) => tool.name === 'apply_layout_changes')!.inputSchema as typeof tools[number]['inputSchema'] & {
+      oneOf: Array<{ required: string[] }>
+    }
+    expect(applySchema.oneOf[0].required).toEqual(['previewToken'])
+    expect(applySchema.oneOf[1].required).toEqual(['expectedRevision', 'operations'])
+    expect(applySchema.oneOf[1].required).not.toContain('idempotencyKey')
     controller.dispose()
   })
 })

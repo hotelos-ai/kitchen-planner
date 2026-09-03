@@ -10,8 +10,10 @@ export type WorkspaceOperationErrorCode =
   | 'missing-variant'
   | 'missing-component'
   | 'missing-scenario'
+  | 'missing-architecture-element'
   | 'locked-component'
   | 'locked-architecture'
+  | 'locked-architecture-element'
   | 'duplicate-id'
   | 'last-variant'
   | 'invalid-candidate'
@@ -63,6 +65,29 @@ const requireComponents = (variant: LayoutVariant, ids: readonly string[]): Equi
 }
 
 const operationPoint = (point: { xMm: number; yMm: number }): PointMm => ({ x: point.xMm, y: point.yMm })
+
+type ArchitectureElement = Architecture['openings'][number] | Architecture['pillars'][number] | Architecture['storageZones'][number]
+
+const allArchitectureElementIds = (architecture: Architecture) => new Set([
+  ...architecture.openings.map((value) => value.id),
+  ...architecture.pillars.map((value) => value.id),
+  ...architecture.storageZones.map((value) => value.id),
+])
+
+const replaceArchitectureElement = <T extends ArchitectureElement>(values: T[], id: string, replacement: T): T[] =>
+  values.map((value) => value.id === id ? replacement : value)
+
+const withoutArchitectureElement = <T extends ArchitectureElement>(values: T[], id: string): T[] =>
+  values.filter((value) => value.id !== id)
+
+const withNullablePatch = <T extends ArchitectureElement>(value: T, patch: object): T => {
+  const candidate = { ...value } as Record<string, unknown>
+  for (const [key, next] of Object.entries(patch)) {
+    if (next === null) delete candidate[key]
+    else candidate[key] = next
+  }
+  return candidate as unknown as T
+}
 
 const architecturePatch = (patch: Extract<WorkspaceOperation, { type: 'update_architecture' }>['patch']): Partial<Architecture> => {
   const { roomPolygon, ...rest } = patch
@@ -269,6 +294,75 @@ export function executeWorkspaceBatch(options: BatchOptions): WorkspaceBatchResu
         if (items.some((item) => !item.removable || variant.layoutConstraints?.lockedComponentIds?.includes(item.id))) return fail('locked-component', 'One or more targeted components are locked.')
         variant.equipment = variant.equipment.filter((item) => !operation.componentIds.includes(item.id))
         changedIds.push(...operation.componentIds)
+        return
+      }
+      case 'add_opening':
+      case 'update_opening':
+      case 'remove_opening':
+      case 'add_pillar':
+      case 'update_pillar':
+      case 'remove_pillar':
+      case 'add_storage_zone':
+      case 'update_storage_zone':
+      case 'remove_storage_zone': {
+        if (variant.architecture.locked) return fail('locked-architecture', 'Architecture must be explicitly unlocked before it can be changed.')
+        const targetId = 'id' in operation ? operation.id : operation.type === 'add_opening'
+          ? operation.opening.id : operation.type === 'add_pillar' ? operation.pillar.id : operation.storageZone.id
+        if (variant.layoutConstraints?.lockedArchitectureElementIds?.includes(targetId)) {
+          return fail('locked-architecture-element', `Architecture element ${targetId} is locked.`)
+        }
+        if (
+          (operation.type === 'add_opening' || operation.type === 'add_pillar' || operation.type === 'add_storage_zone')
+          && allArchitectureElementIds(variant.architecture).has(targetId)
+        ) return fail('duplicate-id', `Architecture element ${targetId} already exists.`)
+
+        const candidate = structuredClone(variant.architecture)
+        switch (operation.type) {
+          case 'add_opening':
+            candidate.openings.push(operation.opening)
+            break
+          case 'update_opening': {
+            const value = candidate.openings.find((opening) => opening.id === operation.id)
+            if (!value) return fail('missing-architecture-element', `Opening ${operation.id} does not exist.`)
+            candidate.openings = replaceArchitectureElement(candidate.openings, operation.id, withNullablePatch(value, operation.patch))
+            break
+          }
+          case 'remove_opening':
+            if (!candidate.openings.some((opening) => opening.id === operation.id)) return fail('missing-architecture-element', `Opening ${operation.id} does not exist.`)
+            candidate.openings = withoutArchitectureElement(candidate.openings, operation.id)
+            break
+          case 'add_pillar':
+            candidate.pillars.push(operation.pillar)
+            break
+          case 'update_pillar': {
+            const value = candidate.pillars.find((pillar) => pillar.id === operation.id)
+            if (!value) return fail('missing-architecture-element', `Pillar ${operation.id} does not exist.`)
+            candidate.pillars = replaceArchitectureElement(candidate.pillars, operation.id, withNullablePatch(value, operation.patch))
+            break
+          }
+          case 'remove_pillar':
+            if (!candidate.pillars.some((pillar) => pillar.id === operation.id)) return fail('missing-architecture-element', `Pillar ${operation.id} does not exist.`)
+            candidate.pillars = withoutArchitectureElement(candidate.pillars, operation.id)
+            break
+          case 'add_storage_zone':
+            candidate.storageZones.push(operation.storageZone)
+            break
+          case 'update_storage_zone': {
+            const value = candidate.storageZones.find((zone) => zone.id === operation.id)
+            if (!value) return fail('missing-architecture-element', `Storage zone ${operation.id} does not exist.`)
+            candidate.storageZones = replaceArchitectureElement(candidate.storageZones, operation.id, withNullablePatch(value, operation.patch))
+            break
+          }
+          case 'remove_storage_zone':
+            if (!candidate.storageZones.some((zone) => zone.id === operation.id)) return fail('missing-architecture-element', `Storage zone ${operation.id} does not exist.`)
+            candidate.storageZones = withoutArchitectureElement(candidate.storageZones, operation.id)
+            break
+        }
+        const parsed = architectureSchema.safeParse(candidate)
+        if (!parsed.success) return fail('invalid-candidate', 'Architecture update is invalid.', parsed.error.issues)
+        variant.architecture = parsed.data
+        if (project.activeVariantId === variant.id) project.architecture = structuredClone(parsed.data)
+        changedIds.push(targetId)
         return
       }
       case 'update_architecture': {

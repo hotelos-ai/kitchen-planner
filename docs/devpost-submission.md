@@ -64,6 +64,10 @@ Say: “WebMCP turns a complex professional canvas into a trustworthy shared ins
 - Include the deployed URL and public repository URL in the video description.
 - Avoid claiming regulatory certification; call simulations planning evidence, not observed facts.
 
+## Testing instructions
+
+Open <https://planner.kitchen.hotelos.ai/> in ChatGPT's in-app browser, where Site tools are enabled, or in Chrome 149+ with `chrome://flags/#enable-webmcp-testing` enabled. Select **Use your AI agent** and verify that the panel says **Agent tools active** with 26 registered tools. Copy its starter prompt, then ask the agent to inspect the workspace and make one previewed change. The project began on 31 August 2026 during the submission period; the first WebMCP implementation landed in commit `58c4861`.
+
 ## Submission checklist
 
 - Working public app: <https://planner.kitchen.hotelos.ai/>

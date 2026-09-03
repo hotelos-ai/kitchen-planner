@@ -55,19 +55,19 @@ const expectedTopLevelRequired: Record<string, readonly string[]> = {
 
 const expectedStableErrorCodes = [
   'aborted', 'auto-layout-active', 'auto-layout-failed', 'auto-layout-not-configured',
-  'batch-operation-failed', 'cancelled', 'checkpoint-failed', 'comparison-failed',
+  'baseline-mismatch', 'batch-operation-failed', 'cancelled', 'checkpoint-failed', 'comparison-failed',
   'download-unavailable', 'duplicate-id', 'empty-batch', 'expired-preview-token',
   'export-failed', 'idempotency-conflict', 'import-failed', 'internal-error',
-  'invalid-candidate', 'invalid-input', 'invalid-operation', 'invalid-preview-token',
-  'invalid-project', 'invalid-room-geometry', 'last-variant', 'locked-architecture',
+  'invalid-baseline', 'invalid-candidate', 'invalid-input', 'invalid-manifest', 'invalid-operation', 'invalid-preview-token',
+  'invalid-project', 'invalid-room-geometry', 'invalid-scenarios', 'last-variant', 'locked-architecture',
   'locked-architecture-element', 'locked-component', 'missing-architecture-element',
   'missing-checkpoint', 'missing-component', 'missing-scenario', 'missing-simulation-result',
   'missing-variant', 'preview-document-mismatch', 'preview-kind-mismatch',
   'preview-revision-changed', 'result-consumed', 'result-not-finalist',
   'result-not-serializable', 'result-too-large', 'room-polygon-required', 'run-not-active',
   'run-not-complete', 'run-not-found', 'same-variant', 'share-failed', 'simulation-failed',
-  'simulation-not-configured', 'stale-revision', 'unknown-catalog-entry', 'unknown-component',
-  'unsupported-operation', 'used-preview-token', 'wrong-document', 'wrong-run-revision',
+  'simulation-not-configured', 'stale-document', 'stale-revision', 'unknown-catalog-entry', 'unknown-component',
+  'unsupported-operation', 'used-preview-token', 'worker-error', 'wrong-document', 'wrong-run-revision',
 ] as const
 
 const visitSchema = (value: unknown, path: string, visit: (schema: SchemaNode, path: string) => void): void => {
@@ -78,6 +78,49 @@ const visitSchema = (value: unknown, path: string, visit: (schema: SchemaNode, p
     if (Array.isArray(child)) child.forEach((entry, index) => visitSchema(entry, `${path}.${key}[${index}]`, visit))
     else visitSchema(child, `${path}.${key}`, visit)
   }
+}
+
+const wrongValueFor = (schema: SchemaNode): unknown => {
+  if (schema.const !== undefined) return `not-${String(schema.const)}`
+  if (schema.enum !== undefined) return '__not_in_declared_enum__'
+  switch (schema.type) {
+    case 'object': return 'not-an-object'
+    case 'array': return 'not-an-array'
+    case 'string': return 17
+    case 'number':
+    case 'integer': return 'not-a-number'
+    case 'boolean': return 'not-a-boolean'
+    default: return null
+  }
+}
+
+const sparseInputAt = (path: readonly (string | number)[], value: unknown): unknown => {
+  let result = value
+  for (let index = path.length - 1; index >= 0; index -= 1) {
+    const segment = path[index]
+    result = typeof segment === 'number' ? [result] : { [segment]: result }
+  }
+  return result
+}
+
+const schemaFuzzInputs = (schema: SchemaNode): unknown[] => {
+  const cases: unknown[] = [null, true, 'unexpected', ['not', 'an', 'object'], { __unknownProperty: true }]
+  const walk = (value: unknown, path: readonly (string | number)[]): void => {
+    if (value === null || typeof value !== 'object' || Array.isArray(value)) return
+    const node = value as SchemaNode
+    if (path.length > 0) cases.push(sparseInputAt(path, wrongValueFor(node)))
+    const properties = node.properties
+    if (properties !== null && typeof properties === 'object' && !Array.isArray(properties)) {
+      for (const [key, child] of Object.entries(properties as Record<string, unknown>)) walk(child, [...path, key])
+    }
+    if (node.items !== undefined) walk(node.items, [...path, 0])
+    for (const combinator of ['allOf', 'anyOf', 'oneOf']) {
+      const branches = node[combinator]
+      if (Array.isArray(branches)) branches.forEach((branch) => walk(branch, path))
+    }
+  }
+  walk(schema, [])
+  return [...new Map(cases.map((input) => [JSON.stringify(input), input])).values()]
 }
 
 describe('WebMCP schema and read-only conformance', () => {
@@ -166,10 +209,11 @@ describe('WebMCP schema and read-only conformance', () => {
     }
   })
 
-  it('never throws for malformed root inputs on any registered tool', async () => {
+  it('fuzzes every registered schema at root and nested properties without throwing', async () => {
     const { tools } = setup()
-    const malformedInputs: unknown[] = [null, true, 'unexpected', ['not', 'an', 'object']]
     for (const tool of tools) {
+      const malformedInputs = schemaFuzzInputs(tool.inputSchema as SchemaNode)
+      expect(malformedInputs.length, `${tool.name} fuzz coverage`).toBeGreaterThanOrEqual(5)
       for (const input of malformedInputs) {
         const result = await Promise.resolve().then(() => tool.execute(input))
         expect(result).toBeDefined()

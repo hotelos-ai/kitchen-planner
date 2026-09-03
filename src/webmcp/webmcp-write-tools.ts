@@ -35,7 +35,6 @@ const applyInput = z.object({
   if (!input.previewToken) {
     if (input.expectedRevision === undefined) context.addIssue({ code: 'custom', path: ['expectedRevision'], message: 'expectedRevision is required for direct apply.' })
     if (!input.operations) context.addIssue({ code: 'custom', path: ['operations'], message: 'operations are required for direct apply.' })
-    if (!input.idempotencyKey) context.addIssue({ code: 'custom', path: ['idempotencyKey'], message: 'idempotencyKey is required for direct apply.' })
   }
 })
 
@@ -48,18 +47,122 @@ export const workspaceOperationJsonSchema = z.toJSONSchema(workspaceOperationSch
 }) as Record<string, unknown>
 delete workspaceOperationJsonSchema.$schema
 
+type Schema = Record<string, unknown>
+
+const stringSchema: Schema = { type: 'string' }
+const numberSchema: Schema = { type: 'number' }
+const booleanSchema: Schema = { type: 'boolean' }
+const strictObject = (properties: Record<string, unknown>, required: string[] = []): Schema => ({
+  type: 'object',
+  additionalProperties: false,
+  ...(required.length === 0 ? {} : { required }),
+  properties,
+})
+const strictPatch = (properties: Record<string, unknown>): Schema => ({ ...strictObject(properties), minProperties: 1 })
+const operationBranch = (
+  type: string | string[],
+  properties: string[] = [],
+  required: string[] = [],
+): Schema => ({
+  additionalProperties: false,
+  required: ['type', 'variantId', ...required],
+  properties: {
+    type: Array.isArray(type) ? { type: 'string', enum: type } : { const: type },
+    variantId: {},
+    ...Object.fromEntries(properties.map((property) => [property, {}])),
+  },
+})
+
+const componentPatchSchema = strictPatch({
+  label: stringSchema, xMm: numberSchema, yMm: numberSchema,
+  category: { type: 'string', enum: ['cooking', 'cold', 'prep', 'washing', 'landing', 'storage', 'hood', 'custom'] },
+  heightMm: numberSchema, capabilities: { type: 'array', items: stringSchema },
+  clearance: { type: 'object' },
+  approximate: booleanSchema, notes: stringSchema,
+})
+const architecturePatchSchema = strictPatch({
+  widthMm: numberSchema, depthMm: numberSchema, wallHeightMm: numberSchema,
+  roomPolygon: { type: 'array', minItems: 3, items: { type: 'object' } },
+  openings: { type: 'array', items: { type: 'object' } },
+  pillars: { type: 'array', items: { type: 'object' } },
+  storageZones: { type: 'array', items: { type: 'object' } },
+  locked: booleanSchema,
+})
+const operationalProfilePatchSchema = strictPatch({
+  covers: numberSchema, peakDurationMinutes: numberSchema, arrivalPattern: stringSchema, serviceStyle: stringSchema,
+  menuAssumptions: { type: 'array', items: stringSchema },
+  staff: { type: 'array', items: { type: 'object' } },
+  targetCapacityPerHour: numberSchema,
+})
+const scenarioPatchSchema = strictPatch({
+  name: stringSchema, covers: numberSchema, durationMinutes: numberSchema, arrivalPattern: stringSchema,
+  cookToOrderRatio: numberSchema, seed: numberSchema, serviceStyle: stringSchema, variability: stringSchema,
+  staff: { type: 'array', items: { type: 'object' } }, checks: { type: 'object' }, taskDurations: { type: 'object' },
+  stationCapacities: { type: 'object' }, menuItems: { type: 'array', items: { type: 'object' } },
+})
+
+/** Compact registration-time schema. Runtime parsing still applies every detailed numeric and enum constraint. */
+export const registeredWorkspaceOperationSchema: Schema = {
+  type: 'object',
+  oneOf: [
+    operationBranch('create_layout', ['name', 'parentVariantId', 'equipmentMode'], ['name', 'equipmentMode']),
+    operationBranch(['activate_layout', 'remove_layout']),
+    operationBranch('rename_layout', ['name'], ['name']),
+    operationBranch('add_component', ['componentId', 'catalogId', 'position', 'dimensions', 'rotationDeg', 'configurationId', 'skinId'], ['componentId', 'catalogId', 'position']),
+    operationBranch('add_custom_component', ['componentId', 'label', 'position', 'dimensions', 'rotationDeg', 'capabilities'], ['componentId', 'label', 'position', 'dimensions']),
+    operationBranch('configure_component', ['componentId', 'configurationId'], ['componentId', 'configurationId']),
+    operationBranch('skin_component', ['componentId', 'skinId'], ['componentId', 'skinId']),
+    operationBranch('update_component', ['componentId', 'patch'], ['componentId', 'patch']),
+    operationBranch('move_components', ['componentIds', 'anchor'], ['componentIds', 'anchor']),
+    operationBranch('nudge_components', ['componentIds', 'delta'], ['componentIds', 'delta']),
+    operationBranch('rotate_components', ['componentIds', 'deltaDeg'], ['componentIds', 'deltaDeg']),
+    operationBranch('resize_component', ['componentId', 'dimensions'], ['componentId', 'dimensions']),
+    operationBranch('set_component_dimensions_lock', ['componentId', 'locked'], ['componentId', 'locked']),
+    operationBranch('duplicate_components', ['components', 'offset'], ['components']),
+    operationBranch('lock_components', ['componentIds', 'locked'], ['componentIds', 'locked']),
+    operationBranch('remove_components', ['componentIds'], ['componentIds']),
+    operationBranch('add_opening', ['opening'], ['opening']),
+    operationBranch('add_pillar', ['pillar'], ['pillar']),
+    operationBranch('add_storage_zone', ['storageZone'], ['storageZone']),
+    operationBranch(['update_opening', 'update_pillar', 'update_storage_zone'], ['id', 'patch'], ['id', 'patch']),
+    operationBranch(['remove_opening', 'remove_pillar', 'remove_storage_zone'], ['id'], ['id']),
+    operationBranch('update_architecture', ['patch'], ['patch']),
+    operationBranch('update_operational_profile', ['patch'], ['patch']),
+    operationBranch('update_workspace_settings', ['patch'], ['patch']),
+    operationBranch('update_scenario', ['scenarioId', 'patch'], ['scenarioId', 'patch']),
+    operationBranch('adopt_auto_layout_result', ['runId', 'resultId', 'newVariantId', 'name'], ['runId', 'resultId', 'newVariantId', 'name']),
+  ],
+  allOf: [{
+    if: { properties: { type: { const: 'update_component' } } },
+    then: { properties: { patch: componentPatchSchema } },
+  }, {
+    if: { properties: { type: { const: 'update_architecture' } } },
+    then: { properties: { patch: architecturePatchSchema } },
+  }, {
+    if: { properties: { type: { const: 'update_operational_profile' } } },
+    then: { properties: { patch: operationalProfilePatchSchema } },
+  }, {
+    if: { properties: { type: { const: 'update_workspace_settings' } } },
+    then: { properties: { patch: strictPatch({ displayUnit: stringSchema, snapMm: numberSchema }) } },
+  }, {
+    if: { properties: { type: { const: 'update_scenario' } } },
+    then: { properties: { patch: scenarioPatchSchema } },
+  }],
+}
+
+const operationsSchema: Schema = { type: 'array', minItems: 1, maxItems: 200, items: registeredWorkspaceOperationSchema }
+
 const operationSchemaDescription: JsonSchemaObject = {
   type: 'object',
   additionalProperties: false,
   required: ['expectedRevision', 'operations'],
   properties: {
-    expectedRevision: { type: 'number', description: 'The document revision you read via get_layout or get_workspace_guide; rejects concurrent writes.' },
+    expectedRevision: { type: 'number', description: 'Revision read from get_layout or get_workspace_guide; stale writes fail.' },
     operations: {
-      type: 'array',
-      description: 'Ordered atomic workspace batch. Call get_workspace_guide once for the complete discriminated operation JSON Schema and numeric constraints. Every item is validated strictly at execution; one failure rejects the whole batch.',
-      items: {},
+      ...operationsSchema,
+      description: 'Ordered atomic batch. See get_workspace_guide for numeric constraints. Any invalid item rejects the batch.',
     },
-    intent: { type: 'string', description: 'Optional human-readable description of the change, recorded in history.' },
+    intent: { type: 'string', description: 'Optional history label.' },
   },
 }
 
@@ -85,17 +188,19 @@ export function createWriteTools(deps: WriteToolDependencies): WebMcpToolDefinit
     name: 'preview_layout_changes',
     title: 'Preview layout changes',
     description:
-      'Validate an ordered batch of spatial operations against the current plan without mutating it. On success returns a single-use previewToken bound to this exact batch and revision, the changed component IDs, warnings, and a diagnostics delta. Pass the token to apply_layout_changes to commit.',
+      'Validate an operation batch without mutation. Returns a single-use previewToken bound to its batch and revision, with changed IDs, warnings, normalized operations, and diagnostics. Commit it with apply_layout_changes.',
     inputSchema: operationSchemaDescription,
     annotations: { readOnlyHint: true },
     execute: (input) => {
       try {
         const parsed = parseInput(deps, previewInput, input)
         if (!parsed.ok) return failure(currentRevision(deps), 'invalid-input', 'Invalid preview request. Operations must match the workspace operation schema.', parsed.issues)
+        const intent = parsed.value.intent?.trim() || 'Agent workspace update'
         const result = deps.getFacade().previewLayoutChanges({
           expectedRevision: parsed.value.expectedRevision,
           operations: parsed.value.operations,
-          ...(parsed.value.intent !== undefined ? { intent: parsed.value.intent } : {}),
+          intent,
+          source: 'agent',
         }) as PreviewResult | FacadeFailure
         if (isFacadeFailure(result)) {
           return {
@@ -124,16 +229,22 @@ export function createWriteTools(deps: WriteToolDependencies): WebMcpToolDefinit
     name: 'apply_layout_changes',
     title: 'Apply layout changes',
     description:
-      'Commit a preview token, or atomically preview and commit a direct operation batch with expectedRevision and an idempotencyKey. A repeated identical key never applies twice. Each new batch is one undo step and revision.',
+      'Commit a preview token or direct revision-guarded batch. Optional keys deduplicate retries; identical keyless retries are also deduplicated. Each batch is one undo step.',
     inputSchema: {
       type: 'object',
       additionalProperties: false,
+      ...({
+        oneOf: [
+          { required: ['previewToken'] },
+          { required: ['expectedRevision', 'operations'] },
+        ],
+      } as Record<string, unknown>),
       properties: {
-        previewToken: { type: 'string', description: 'Single-use token from preview_layout_changes. Do not combine with direct batch fields.' },
-        expectedRevision: { type: 'number', description: 'For direct apply, the latest revision read by the agent.' },
-        operations: { type: 'array', items: {}, description: 'For direct apply, 1–200 strict workspace operations committed atomically. The complete discriminated operation schema and numeric constraints are returned by get_workspace_guide.' },
-        intent: { type: 'string', description: 'Optional human-readable intent recorded with a direct batch.' },
-        idempotencyKey: { type: 'string', description: 'Required for direct apply. Reusing it with the same batch returns the original result; different content is rejected.' },
+        previewToken: { type: 'string', description: 'Single-use preview token; do not mix with direct fields.' },
+        expectedRevision: { type: 'number', description: 'Latest revision for direct apply.' },
+        operations: { ...operationsSchema, description: 'Direct operation batch.' },
+        intent: { type: 'string', description: 'Optional history label.' },
+        idempotencyKey: { type: 'string', description: 'Optional retry key.' },
       },
     },
     execute: (input, context) => {
@@ -146,13 +257,16 @@ export function createWriteTools(deps: WriteToolDependencies): WebMcpToolDefinit
         let scopedIdempotencyKey: string | undefined
         if (!previewToken) {
           const scope = `${deps.store.getState().documentId}:${deps.store.getState().project.id}`
-          scopedIdempotencyKey = `${scope}:${parsed.value.idempotencyKey!}`
+          const intent = parsed.value.intent?.trim() || 'Agent workspace update'
           signature = JSON.stringify({
             scope,
             expectedRevision: parsed.value.expectedRevision,
             operations: parsed.value.operations,
-            intent: parsed.value.intent,
+            intent,
           })
+          scopedIdempotencyKey = parsed.value.idempotencyKey === undefined
+            ? `${scope}:automatic:${signature}`
+            : `${scope}:explicit:${parsed.value.idempotencyKey}`
           const cached = directResults.get(scopedIdempotencyKey)
           if (cached) {
             if (cached.signature !== signature) return failure(currentRevision(deps), 'idempotency-conflict', 'This idempotencyKey was already used for a different batch.')
@@ -168,7 +282,7 @@ export function createWriteTools(deps: WriteToolDependencies): WebMcpToolDefinit
           const preview = deps.getFacade().previewLayoutChanges({
             expectedRevision: parsed.value.expectedRevision!,
             operations: parsed.value.operations!,
-            ...(parsed.value.intent === undefined ? {} : { intent: parsed.value.intent }),
+            intent,
             source: 'agent',
           }) as PreviewResult | FacadeFailure
           if (isFacadeFailure(preview)) return { ...preview, recovery: applyRecoveryHint(preview.code) }

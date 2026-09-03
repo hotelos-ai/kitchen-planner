@@ -85,6 +85,7 @@ export function ProjectExchange({ store = projectStore, runStore = simulationRun
         stage: appState.stage,
         view: appState.view,
         overlay: appState.overlay,
+        selectedIds: store.getState().selectedIds,
       }))
       setShowExport(false)
       setMessage({ kind: 'status', text: 'Workspace link copied. It reopens this saved project in this browser.' })

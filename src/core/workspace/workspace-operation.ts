@@ -8,6 +8,7 @@ const idSchema = z.string()
 
 const nameSchema = z.string().trim().min(1).max(160)
 const coordinateSchema = z.number().finite().min(-1_000_000).max(1_000_000)
+const architectureCoordinateSchema = z.number().finite().nonnegative().max(1_000_000)
 const dimensionSchema = z.number().finite().positive().max(100_000)
 const rotationSchema = z.number().finite().min(-1_000_000).max(1_000_000)
 
@@ -54,6 +55,44 @@ const storageZoneSchema = rectSchema.extend({
   label: nameSchema,
   adjacent: z.boolean(),
 }).strict()
+
+const granularPillarSchema = z.object({
+  id: idSchema,
+  xMm: architectureCoordinateSchema,
+  yMm: architectureCoordinateSchema,
+  widthMm: dimensionSchema,
+  depthMm: dimensionSchema,
+}).strict()
+
+const granularStorageZoneSchema = granularPillarSchema.extend({
+  label: nameSchema,
+  adjacent: z.boolean(),
+}).strict()
+
+const openingPatchSchema = z.object({
+  label: nameSchema.optional(),
+  kind: z.enum(['door', 'service-window', 'sealed-opening']).optional(),
+  wall: z.enum(['top', 'right', 'bottom', 'left']).optional(),
+  segmentIndex: z.union([z.number().int().nonnegative().max(999), z.null()]).optional(),
+  offsetMm: architectureCoordinateSchema.optional(),
+  widthMm: dimensionSchema.optional(),
+  sillHeightMm: z.union([architectureCoordinateSchema, z.null()]).optional(),
+  heightMm: z.union([dimensionSchema, z.null()]).optional(),
+  flow: z.union([z.enum(['entry', 'clean-out', 'dirty-in', 'closed']), z.null()]).optional(),
+  swingDepthMm: z.union([architectureCoordinateSchema, z.null()]).optional(),
+}).strict().refine((patch) => Object.keys(patch).length > 0, 'Opening patch cannot be empty')
+
+const pillarPatchSchema = z.object({
+  xMm: architectureCoordinateSchema.optional(),
+  yMm: architectureCoordinateSchema.optional(),
+  widthMm: dimensionSchema.optional(),
+  depthMm: dimensionSchema.optional(),
+}).strict().refine((patch) => Object.keys(patch).length > 0, 'Pillar patch cannot be empty')
+
+const storageZonePatchSchema = pillarPatchSchema.safeExtend({
+  label: nameSchema.optional(),
+  adjacent: z.boolean().optional(),
+}).strict().refine((patch) => Object.keys(patch).length > 0, 'Storage-zone patch cannot be empty')
 
 const architecturePatchSchema = z.object({
   widthMm: dimensionSchema.optional(),
@@ -185,6 +224,15 @@ export const workspaceOperationSchema = z.discriminatedUnion('type', [
   }).strict(),
   z.object({ type: z.literal('lock_components'), ...variantId, componentIds: componentIdsSchema, locked: z.boolean() }).strict(),
   z.object({ type: z.literal('remove_components'), ...variantId, componentIds: componentIdsSchema }).strict(),
+  z.object({ type: z.literal('add_opening'), ...variantId, opening: openingSchema }).strict(),
+  z.object({ type: z.literal('update_opening'), ...variantId, id: idSchema, patch: openingPatchSchema }).strict(),
+  z.object({ type: z.literal('remove_opening'), ...variantId, id: idSchema }).strict(),
+  z.object({ type: z.literal('add_pillar'), ...variantId, pillar: granularPillarSchema }).strict(),
+  z.object({ type: z.literal('update_pillar'), ...variantId, id: idSchema, patch: pillarPatchSchema }).strict(),
+  z.object({ type: z.literal('remove_pillar'), ...variantId, id: idSchema }).strict(),
+  z.object({ type: z.literal('add_storage_zone'), ...variantId, storageZone: granularStorageZoneSchema }).strict(),
+  z.object({ type: z.literal('update_storage_zone'), ...variantId, id: idSchema, patch: storageZonePatchSchema }).strict(),
+  z.object({ type: z.literal('remove_storage_zone'), ...variantId, id: idSchema }).strict(),
   z.object({ type: z.literal('update_architecture'), ...variantId, patch: architecturePatchSchema }).strict(),
   z.object({ type: z.literal('update_operational_profile'), ...variantId, patch: operationalProfilePatchSchema }).strict(),
   z.object({
@@ -224,6 +272,15 @@ export const WORKSPACE_OPERATION_TYPES: WorkspaceOperation['type'][] = [
   'duplicate_components',
   'lock_components',
   'remove_components',
+  'add_opening',
+  'update_opening',
+  'remove_opening',
+  'add_pillar',
+  'update_pillar',
+  'remove_pillar',
+  'add_storage_zone',
+  'update_storage_zone',
+  'remove_storage_zone',
   'update_architecture',
   'update_operational_profile',
   'update_workspace_settings',

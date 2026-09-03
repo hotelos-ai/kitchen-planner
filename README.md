@@ -40,7 +40,7 @@ Use it as a working example, duplicate it into variants, or import/export a vali
 - A modern browser with WebGL 2 for the 3D workspaces
 
 ```bash
-git clone git@github.com:hotelos-ai/kitchen-planner.git
+git clone https://github.com/hotelos-ai/kitchen-planner.git
 cd kitchen-planner
 npm install
 npm run dev
@@ -51,6 +51,8 @@ Open the local URL printed by Vite. Project changes autosave in browser storage;
 ## Agent tools (WebMCP)
 
 [WebMCP](https://webmachinelearning.github.io/webmcp/) turns CalmKitchen into an agent-native design surface. A compatible agent works on the same open project as the user: it can inspect exact geometry, edit a complete kitchen atomically, select its changes on the canvas, switch the visible workspace, check operational essentials, run a seeded service simulation, and hand control back at any time. Try the deployed app at [planner.kitchen.hotelos.ai](https://planner.kitchen.hotelos.ai/). The **AI tools** panel in the top bar shows browser support, every registered tool, live activity, and a copyable starter prompt.
+
+To test the site tools, open the live URL in ChatGPT's in-app browser, or use Chrome 149+ with `chrome://flags/#enable-webmcp-testing` enabled. Open **Use your AI agent**, confirm that it reports **Agent tools active** and 26 registered tools, then copy the starter prompt into your agent conversation.
 
 This is coordinate-native collaboration, not screenshot clicking. All geometry is exchanged as plain millimetre numbers: origin `(0, 0)` is the top-left of the room bounding box, `+x` runs east, `+y` runs south, positions anchor the unrotated top-left of a component, and rotation is clockwise around its centre. An attached sketch or photo stays with the user's agent; CalmKitchen never receives, uploads, stores, or interprets it. The agent translates what it sees into explicit dimensions, coordinates, component IDs, and clearly marked assumptions.
 
@@ -83,7 +85,7 @@ This is coordinate-native collaboration, not screenshot clicking. All geometry i
 | `export_project` | Returns or downloads JSON, CSV equipment schedule, self-contained HTML report, or SVG plan. |
 | `import_project` | Validates and atomically replaces the project or adds an imported active layout as a variant. |
 | `manage_checkpoints` | Lists, creates, or restores named layout checkpoints. |
-| `share_results` | Produces a scoped workspace deep link and self-contained report using only current simulation evidence. |
+| `share_results` | Produces a requested self-contained report and/or scoped workspace link for one or more layouts. Links restore the first layout, scenario, view, overlay, and current component selection; reports use only current simulation evidence. |
 
 ### Canonical agent workflow
 
@@ -155,14 +157,14 @@ The 2D editor and 3D scene consume the same canonical project. Stable component 
 - Live simulation playback in 2D, 3D overview, and first-person modes
 - Validated JSON import, export, autosave, last-known-good recovery, and schema migration
 
-## Approved expansion roadmap
+## Shipped architecture highlights
 
-The committed product design extends Kitchen Planner with:
+The current application includes:
 
 - a fullscreen canvas and Chrome-style variant tabs;
 - a comprehensive equipment, shelving, and storage-rack catalog;
 - quick configuration and appearance skins, double-click editing, and context menus;
-- one atomic workspace API shared by the UI and future AI/WebMCP agents;
+- one atomic workspace API shared by the UI and all 26 live WebMCP tools;
 - a new-room/layout wizard and operational essentials checker;
 - first/third-person switching, a refined chef avatar, and FPS-style hands/spatula;
 - deterministic constraint-first auto-layout experiments ranked by service simulation;

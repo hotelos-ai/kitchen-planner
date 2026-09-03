@@ -19,6 +19,15 @@ const acceptedOperations: unknown[] = [
   { type: 'duplicate_components', variantId: 'variant-b', components: [{ componentId: 'range-2', duplicateId: 'range-3' }], offset: { xMm: 100, yMm: 100 } },
   { type: 'lock_components', variantId: 'variant-b', componentIds: ['range-2'], locked: true },
   { type: 'remove_components', variantId: 'variant-b', componentIds: ['range-2'] },
+  { type: 'add_opening', variantId: 'variant-b', opening: { id: 'pass', label: 'Pass', kind: 'service-window', wall: 'top', segmentIndex: 0, offsetMm: 1200, widthMm: 1000, flow: 'clean-out' } },
+  { type: 'update_opening', variantId: 'variant-b', id: 'pass', patch: { sillHeightMm: 900, flow: null } },
+  { type: 'remove_opening', variantId: 'variant-b', id: 'pass' },
+  { type: 'add_pillar', variantId: 'variant-b', pillar: { id: 'column-a', xMm: 2400, yMm: 1800, widthMm: 350, depthMm: 350 } },
+  { type: 'update_pillar', variantId: 'variant-b', id: 'column-a', patch: { widthMm: 400 } },
+  { type: 'remove_pillar', variantId: 'variant-b', id: 'column-a' },
+  { type: 'add_storage_zone', variantId: 'variant-b', storageZone: { id: 'dry-store', label: 'Dry store', xMm: 4000, yMm: 1000, widthMm: 1800, depthMm: 1200, adjacent: true } },
+  { type: 'update_storage_zone', variantId: 'variant-b', id: 'dry-store', patch: { label: 'Bulk dry store', adjacent: false } },
+  { type: 'remove_storage_zone', variantId: 'variant-b', id: 'dry-store' },
   { type: 'update_architecture', variantId: 'variant-b', patch: { widthMm: 5000, roomPolygon: [{ xMm: 0, yMm: 0 }, { xMm: 5000, yMm: 0 }, { xMm: 5000, yMm: 6000 }], openings: [{ id: 'entry', label: 'Staff entry', kind: 'door', wall: 'left', segmentIndex: 2, offsetMm: 1000, widthMm: 900, flow: 'entry', swingDepthMm: 900 }], pillars: [{ id: 'pillar-1', xMm: 2200, yMm: 2000, widthMm: 400, depthMm: 400 }], storageZones: [{ id: 'dry-store', label: 'Dry store', xMm: 0, yMm: 0, widthMm: 1800, depthMm: 800, adjacent: true }] } },
   { type: 'update_operational_profile', variantId: 'variant-b', patch: { covers: 80, peakDurationMinutes: 90, arrivalPattern: 'two-waves', serviceStyle: 'table service', menuAssumptions: ['mostly cooked to order'], staff: [{ role: 'head-chef', count: 1 }, { role: 'cdp', count: 3 }], targetCapacityPerHour: 60 } },
   { type: 'update_workspace_settings', variantId: 'variant-b', patch: { displayUnit: 'cm', snapMm: 50 } },
@@ -58,6 +67,10 @@ describe('workspace operation schema', () => {
   it('rejects unknown fields inside every controlled nested patch', () => {
     expect(workspaceOperationSchema.safeParse({ ...acceptedOperations[4] as object, position: { xMm: 1, yMm: 2, zMm: 3 } }).success).toBe(false)
     expect(workspaceOperationSchema.safeParse({ ...acceptedOperations[5] as object, dimensions: { widthMm: 600, depthMm: 600, watts: 1000 } }).success).toBe(false)
+    expect(workspaceOperationSchema.safeParse({ type: 'add_opening', variantId: 'variant-b', opening: { id: 'pass', label: 'Pass', kind: 'service-window', wall: 'top', offsetMm: 100, widthMm: 900, secret: true } }).success).toBe(false)
+    expect(workspaceOperationSchema.safeParse({ type: 'update_opening', variantId: 'variant-b', id: 'pass', patch: { widthMm: 1000, secret: true } }).success).toBe(false)
+    expect(workspaceOperationSchema.safeParse({ type: 'add_pillar', variantId: 'variant-b', pillar: { id: 'column-a', xMm: 100, yMm: 100, widthMm: 300, depthMm: 300, secret: true } }).success).toBe(false)
+    expect(workspaceOperationSchema.safeParse({ type: 'update_storage_zone', variantId: 'variant-b', id: 'dry-store', patch: { adjacent: false, secret: true } }).success).toBe(false)
     expect(workspaceOperationSchema.safeParse({ type: 'update_architecture', variantId: 'variant-b', patch: { openings: [{ id: 'entry', label: 'Entry', kind: 'door', wall: 'left', offsetMm: 0, widthMm: 900, secret: true }] } }).success).toBe(false)
     expect(workspaceOperationSchema.safeParse({ type: 'update_operational_profile', variantId: 'variant-b', patch: { covers: 80, certified: true } }).success).toBe(false)
     expect(workspaceOperationSchema.safeParse({ type: 'update_scenario', variantId: 'variant-b', scenarioId: 'dinner', patch: { checks: { collisions: true, doorSwings: true, dirtyCleanCrossings: true, certify: true } } }).success).toBe(false)
@@ -68,6 +81,23 @@ describe('workspace operation schema', () => {
     expect(workspaceOperationSchema.safeParse({ type: 'update_architecture', variantId: 'variant-b', patch: {} }).success).toBe(false)
     expect(workspaceOperationSchema.safeParse({ type: 'update_operational_profile', variantId: 'variant-b', patch: {} }).success).toBe(false)
     expect(workspaceOperationSchema.safeParse({ type: 'update_scenario', variantId: 'variant-b', scenarioId: 'dinner', patch: {} }).success).toBe(false)
+    expect(workspaceOperationSchema.safeParse({ type: 'update_opening', variantId: 'variant-b', id: 'pass', patch: {} }).success).toBe(false)
+    expect(workspaceOperationSchema.safeParse({ type: 'update_pillar', variantId: 'variant-b', id: 'column-a', patch: {} }).success).toBe(false)
+    expect(workspaceOperationSchema.safeParse({ type: 'update_storage_zone', variantId: 'variant-b', id: 'dry-store', patch: {} }).success).toBe(false)
     expect(workspaceOperationSchema.safeParse({ type: 'overwrite_project', variantId: 'variant-b' }).success).toBe(false)
+  })
+
+  it('enforces edit-architecture geometry constraints on granular elements', () => {
+    expect(workspaceOperationSchema.safeParse({
+      type: 'add_pillar',
+      variantId: 'variant-b',
+      pillar: { id: 'column-a', xMm: -1, yMm: 100, widthMm: 300, depthMm: 300 },
+    }).success).toBe(false)
+    expect(workspaceOperationSchema.safeParse({
+      type: 'update_opening',
+      variantId: 'variant-b',
+      id: 'pass',
+      patch: { widthMm: 0 },
+    }).success).toBe(false)
   })
 })

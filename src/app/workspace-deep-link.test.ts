@@ -5,7 +5,7 @@ import { createProjectStore } from '../state/project-store'
 import { applyWorkspaceDeepLink, buildWorkspaceDeepLink, resolveWorkspaceDeepLink } from './workspace-deep-link'
 
 describe('workspace deep links', () => {
-  it('round-trips project, layout, scenario, stage, view, and overlay state', () => {
+  it('round-trips project, layout, scenario, stage, view, overlay, and selection state', () => {
     const project = createSeedProject()
     const secondVariant = structuredClone(project.variants[0])
     secondVariant.id = 'layout / courtyard'
@@ -20,6 +20,7 @@ describe('workspace deep links', () => {
       stage: 'simulate',
       view: 'split',
       overlay: 'compare',
+      selectedIds: ['flat-top-fryer', 'tandoor'],
     }, 'https://example.test/designer?embed=0#old')
 
     expect(url).toContain('https://example.test/designer?embed=0#workspace=v1')
@@ -29,6 +30,7 @@ describe('workspace deep links', () => {
       stage: 'simulate',
       view: 'split',
       overlay: 'compare',
+      selectedIds: ['flat-top-fryer', 'tandoor'],
     })
   })
 
@@ -66,6 +68,7 @@ describe('workspace deep links', () => {
       stage: 'equipment',
       view: 'scene',
       overlay: null,
+      selectedIds: ['flat-top-fryer'],
     })).hash
 
     expect(applyWorkspaceDeepLink(hash, projectStore, appStore)).toBe(true)
@@ -74,7 +77,23 @@ describe('workspace deep links', () => {
       project: { activeVariantId: 'courtyard', activeScenarioId: 'lunch' },
     })
     expect(appStore.getState()).toMatchObject({ stage: 'equipment', view: 'scene', overlay: null })
+    expect(projectStore.getState().selectedIds).toEqual(['flat-top-fryer'])
     expect(applyWorkspaceDeepLink(hash, projectStore, appStore)).toBe(true)
     expect(projectStore.getState().revision).toBe(1)
+  })
+
+  it('filters unknown selected IDs and keeps selection unchanged for legacy links without select', () => {
+    const project = createSeedProject()
+    const projectStore = createProjectStore(project)
+    const appStore = createAppStateStore()
+    projectStore.getState().selectItems(['tandoor'])
+
+    const legacyHash = `#workspace=v1&project=${encodeURIComponent(project.id)}&variant=${project.activeVariantId}&scenario=${project.activeScenarioId}`
+    expect(applyWorkspaceDeepLink(legacyHash, projectStore, appStore)).toBe(true)
+    expect(projectStore.getState().selectedIds).toEqual(['tandoor'])
+
+    const selectedHash = `${legacyHash}&select=flat-top-fryer&select=missing&select=flat-top-fryer`
+    expect(applyWorkspaceDeepLink(selectedHash, projectStore, appStore)).toBe(true)
+    expect(projectStore.getState().selectedIds).toEqual(['flat-top-fryer'])
   })
 })

@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import type { WorkspaceFacade } from '../core/workspace/workspace-facade'
 import type { Architecture, Opening, Pillar, StorageZone } from '../domain/project'
+import { appStateStore } from '../state/app-state-store'
 import type { WebMcpToolDefinition } from './model-context'
 import {
   currentRevision,
@@ -382,10 +383,12 @@ export function createArchitectureTools(deps: ArchitectureToolDependencies): Web
 
         const operation = { type: 'update_architecture', variantId: variant.id, patch: workspacePatch(edited.architecture) }
         const facade = deps.getFacade()
+        const intent = parsed.value.intent ?? 'Agent edited the kitchen architecture'
         const preview = facade.previewLayoutChanges({
           expectedRevision: parsed.value.expectedRevision,
           operations: [operation],
-          intent: parsed.value.intent ?? 'Edit architecture',
+          intent,
+          source: 'agent',
         }) as FacadePreview | FacadeFailure
         if (isFailure(preview)) return failure(preview.revision, preview.code, preview.message, {
           ...(preview.operationIndex === undefined ? {} : { operationIndex: preview.operationIndex }),
@@ -394,6 +397,14 @@ export function createArchitectureTools(deps: ArchitectureToolDependencies): Web
 
         const applied = facade.applyLayoutChanges({ previewToken: preview.previewToken }) as FacadeApply | FacadeFailure
         if (isFailure(applied)) return failure(applied.revision, applied.code, applied.message)
+        const committed = deps.store.getState()
+        appStateStore.getState().setLastAgentAction({
+          id: `agent-action-${committed.documentId}-${applied.revision}`,
+          documentId: committed.documentId,
+          intent,
+          changedIds: [...edited.changedIds],
+          revision: applied.revision,
+        })
         return success(applied.revision, {
           variantId: variant.id,
           changedIds: edited.changedIds,

@@ -22,9 +22,11 @@ describe('App', () => {
     expect(await within(catalog).findByRole('button', { name: /Select Tandoor/i })).toBeInTheDocument()
   })
 
-  it('keeps Plan and 3D workspace hosts mounted while switching and splitting', async () => {
+  it('defers the hidden 3D workspace until first use, then preserves both hosts while switching', async () => {
     render(<App />)
     const plan = await screen.findByLabelText('2D plan workspace')
+    expect(screen.queryByLabelText('3D kitchen workspace')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('kitchen-scene')).not.toBeInTheDocument()
 
     await userEvent.click(screen.getByRole('button', { name: '3D' }))
     const scene = await screen.findByLabelText('3D kitchen workspace')
@@ -36,6 +38,11 @@ describe('App', () => {
     expect(screen.getByLabelText('3D kitchen workspace')).toBe(scene)
     expect(plan.closest('[data-workspace-surface]')).toHaveAttribute('aria-hidden', 'false')
     expect(scene.closest('[data-workspace-surface]')).toHaveAttribute('aria-hidden', 'false')
+
+    await userEvent.click(screen.getByRole('button', { name: 'Plan' }))
+    expect(screen.getByLabelText('2D plan workspace')).toBe(plan)
+    expect(screen.getByLabelText('3D kitchen workspace')).toBe(scene)
+    expect(scene.closest('[data-workspace-surface]')).toHaveAttribute('aria-hidden', 'true')
   })
 
   it('opens the auto-layout experiment workspace from global actions', async () => {

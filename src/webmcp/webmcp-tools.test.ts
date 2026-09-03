@@ -316,6 +316,7 @@ describe('webmcp tools', () => {
     const applied = await call('apply_layout_changes', { previewToken: preview.previewToken as string })
     expect(applied).toMatchObject({ ok: true, revision: state.revision + 1, changedIds: ['tandoor'], intent: 'Agent test batch' })
     expect(store.getState().past).toHaveLength(1)
+    expect(store.getState().revisionEntries.at(-1)).toMatchObject({ author: 'agent', intent: 'Agent test batch' })
     expect(getActiveItem(store.getState(), 'tandoor')).toMatchObject({ xMm: item.xMm + 200, notes: 'agent-adjusted' })
   })
 
@@ -352,6 +353,29 @@ describe('webmcp tools', () => {
       }],
     })
     expect(conflict).toMatchObject({ ok: false, code: 'idempotency-conflict' })
+  })
+
+  it('deduplicates a keyless direct batch and records the default agent intent', async () => {
+    const { store, call } = setup()
+    const before = store.getState()
+    const input = {
+      expectedRevision: before.revision,
+      operations: [{
+        type: 'nudge_components',
+        variantId: before.project.activeVariantId,
+        componentIds: ['tandoor'],
+        delta: { xMm: 25, yMm: 0 },
+      }],
+    }
+    const first = await call('apply_layout_changes', input)
+    expect(first).toMatchObject({ ok: true, revision: before.revision + 1, replayed: false, intent: 'Agent workspace update' })
+    const xAfterFirst = getActiveItem(store.getState(), 'tandoor').xMm
+
+    const replay = await call('apply_layout_changes', input)
+    expect(replay).toMatchObject({ ok: true, originalRevision: before.revision + 1, replayed: true })
+    expect(getActiveItem(store.getState(), 'tandoor').xMm).toBe(xAfterFirst)
+    expect(store.getState().past).toHaveLength(1)
+    expect(store.getState().revisionEntries.at(-1)).toMatchObject({ author: 'agent', intent: 'Agent workspace update' })
   })
 
   it('rejects invalid operations and stale revisions with structured errors', async () => {

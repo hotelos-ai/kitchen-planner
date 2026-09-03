@@ -16,6 +16,8 @@ export type WorkspaceDeepLinkState = {
   stage: WorkflowStage
   view: ViewMode
   overlay: WorkspaceOverlay
+  /** Component IDs to restore in the linked layout. Repeated `select` params preserve multi-selection. */
+  selectedIds?: readonly string[]
 }
 
 export type ResolvedWorkspaceDeepLink = {
@@ -24,6 +26,8 @@ export type ResolvedWorkspaceDeepLink = {
   stage?: WorkflowStage
   view?: ViewMode
   overlay?: WorkspaceOverlay
+  /** Undefined means the legacy link did not specify selection; an empty array means it explicitly resolves to no valid items. */
+  selectedIds?: string[]
 }
 
 const defaultHref = (): string => {
@@ -46,6 +50,9 @@ export function buildWorkspaceDeepLink(state: WorkspaceDeepLinkState, href = def
   params.set('stage', state.stage)
   params.set('view', state.view)
   params.set('overlay', state.overlay ?? 'none')
+  state.selectedIds?.forEach((id) => {
+    if (id) params.append('select', id)
+  })
   url.hash = params.toString()
   return url.toString()
 }
@@ -61,6 +68,10 @@ export function resolveWorkspaceDeepLink(hash: string, project: KitchenProject):
   const stage = params.get('stage')
   const view = params.get('view')
   const overlay = params.get('overlay')
+  const requestedSelection = params.getAll('select')
+  const resolvedVariant = project.variants.find((candidate) => candidate.id === requestedVariant)
+    ?? project.variants.find((candidate) => candidate.id === project.activeVariantId)
+  const validComponentIds = new Set(resolvedVariant?.equipment.map((item) => item.id) ?? [])
 
   return {
     variantId: project.variants.some((candidate) => candidate.id === requestedVariant)
@@ -76,6 +87,9 @@ export function resolveWorkspaceDeepLink(hash: string, project: KitchenProject):
       : OVERLAYS.has(overlay as Exclude<WorkspaceOverlay, null>)
         ? { overlay: overlay as Exclude<WorkspaceOverlay, null> }
         : {}),
+    ...(requestedSelection.length > 0
+      ? { selectedIds: [...new Set(requestedSelection.filter((id) => validComponentIds.has(id)))] }
+      : {}),
   }
 }
 
@@ -108,5 +122,6 @@ export function applyWorkspaceDeepLink(
   if (resolved.stage !== undefined) appState.setStage(resolved.stage)
   if (resolved.view !== undefined) appStateStore.getState().setView(resolved.view)
   if (resolved.overlay !== undefined) appStateStore.getState().setOverlay(resolved.overlay)
+  if (resolved.selectedIds !== undefined) projectStore.getState().selectItems(resolved.selectedIds)
   return true
 }

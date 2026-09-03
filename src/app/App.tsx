@@ -27,12 +27,6 @@ const AutoLayoutWorkspace = lazy(() => import('../features/optimizer/AutoLayoutW
 
 export type WorkspaceView = ViewMode
 
-void Promise.all([
-  import('../features/simulation/SimulationWorkspace'),
-  import('../features/compare/CompareWorkspace'),
-  import('../features/optimizer/AutoLayoutWorkspace'),
-])
-
 export function App() {
   const stage = useStore(appStateStore, (state) => state.stage)
   const view = useStore(appStateStore, (state) => state.view)
@@ -64,7 +58,7 @@ export function App() {
   const helpOpen = dialogsOpen.includes('help')
   const aiToolsOpen = dialogsOpen.includes('agent-tools')
   const [wizardStartsAtRoom, setWizardStartsAtRoom] = useState(false)
-  const [sourceImageUrl, setSourceImageUrl] = useState('/reference/kitchen-sketch.png')
+  const [sourceImageUrl, setSourceImageUrl] = useState('/reference/kitchen-sketch.webp')
   const [closedLayout, setClosedLayout] = useState<{ name: string; revision: number; undo(): boolean } | null>(null)
   const [showStartScreen, setShowStartScreen] = useState(() => {
     if (typeof localStorage === 'undefined') return false
@@ -78,6 +72,7 @@ export function App() {
       ?? localStorage.getItem(LEGACY_LAST_GOOD_PROJECT_KEY)
     ) && !hasMatchingDeepLink
   })
+  const [activatedWorkspaceViews, setActivatedWorkspaceViews] = useState({ plan: false, scene: false })
 
   useEffect(() => () => appStateStore.getState().reset(), [])
 
@@ -99,6 +94,16 @@ export function App() {
   const dragResizeEnabled = Boolean(selectedItem && !selectedItem.dimensionsLocked)
   const canCompare = project.variants.length >= 2 || project.scenarios.length >= 2
   const showAutoLayout = stage !== 'space'
+  const planViewActive = !showStartScreen && overlay === null && stage !== 'simulate' && (view === 'plan' || view === 'split')
+  const sceneViewActive = !showStartScreen && overlay === null && stage !== 'simulate' && (view === 'scene' || view === 'split')
+  const mountPlanWorkspace = planViewActive || activatedWorkspaceViews.plan
+  const mountSceneWorkspace = sceneViewActive || activatedWorkspaceViews.scene
+  if ((planViewActive && !activatedWorkspaceViews.plan) || (sceneViewActive && !activatedWorkspaceViews.scene)) {
+    setActivatedWorkspaceViews({
+      plan: activatedWorkspaceViews.plan || planViewActive,
+      scene: activatedWorkspaceViews.scene || sceneViewActive,
+    })
+  }
 
   const essentialsCount = useMemo(() => {
     const variant = getActiveVariant(projectStore.getState())
@@ -220,47 +225,51 @@ export function App() {
                 />
               </div>
             )}
-            {overlay === null && stage !== 'simulate' && (
+            {overlay === null && stage !== 'simulate' && (mountPlanWorkspace || mountSceneWorkspace) && (
               <>
-                <div
-                  className={`workspace-surface plan-surface${view === 'plan' || view === 'split' ? ' active' : ''}`}
-                  data-workspace-surface="plan"
-                  aria-hidden={view !== 'plan' && view !== 'split'}
-                >
-                  <PlanWorkspace
-                    store={projectStore}
-                    stage={stage}
-                    compact={view === 'split'}
-                    shortcutEnabled={view === 'plan' || view === 'scene' || view === 'split'}
-                    showReference={showReference}
-                    catalogOpen={catalogOpen}
-                    inspectorOpen={inspectorOpen}
-                    essentialsOpen={essentialsOpen}
-                    revisionsOpen={revisionsOpen}
-                    sourceImageUrl={sourceImageUrl}
-                    wizardOpen={wizardOpen}
-                    wizardStartsAtRoom={wizardStartsAtRoom}
-                    closedLayout={closedLayout}
-                    onInspectComponentIn3D={() => setView('scene')}
-                    onStageChange={setStage}
-                    onCatalogOpenChange={(catalog) => setPanels({ catalog })}
-                    onInspectorOpenChange={(inspector) => setPanels({ inspector })}
-                    onEssentialsOpenChange={(essentials) => setPanels({ essentials })}
-                    onRevisionsOpenChange={(revisions) => setPanels({ revisions })}
-                    onSourceImageUrlChange={setSourceImageUrl}
-                    onWizardOpenChange={(open) => setDialogOpen('layout-wizard', open)}
-                    onWizardStartsAtRoomChange={setWizardStartsAtRoom}
-                    onClosedLayoutChange={setClosedLayout}
-                    onAddLayout={openWizard}
-                  />
-                </div>
-                <div
-                  className={`workspace-surface scene-surface${view === 'scene' || view === 'split' ? ' active' : ''}`}
-                  data-workspace-surface="scene"
-                  aria-hidden={view !== 'scene' && view !== 'split'}
-                >
-                  <SceneWorkspace compact={view === 'split'} />
-                </div>
+                {mountPlanWorkspace && (
+                  <div
+                    className={`workspace-surface plan-surface${view === 'plan' || view === 'split' ? ' active' : ''}`}
+                    data-workspace-surface="plan"
+                    aria-hidden={view !== 'plan' && view !== 'split'}
+                  >
+                    <PlanWorkspace
+                      store={projectStore}
+                      stage={stage}
+                      compact={view === 'split'}
+                      shortcutEnabled={view === 'plan' || view === 'scene' || view === 'split'}
+                      showReference={showReference}
+                      catalogOpen={catalogOpen}
+                      inspectorOpen={inspectorOpen}
+                      essentialsOpen={essentialsOpen}
+                      revisionsOpen={revisionsOpen}
+                      sourceImageUrl={sourceImageUrl}
+                      wizardOpen={wizardOpen}
+                      wizardStartsAtRoom={wizardStartsAtRoom}
+                      closedLayout={closedLayout}
+                      onInspectComponentIn3D={() => setView('scene')}
+                      onStageChange={setStage}
+                      onCatalogOpenChange={(catalog) => setPanels({ catalog })}
+                      onInspectorOpenChange={(inspector) => setPanels({ inspector })}
+                      onEssentialsOpenChange={(essentials) => setPanels({ essentials })}
+                      onRevisionsOpenChange={(revisions) => setPanels({ revisions })}
+                      onSourceImageUrlChange={setSourceImageUrl}
+                      onWizardOpenChange={(open) => setDialogOpen('layout-wizard', open)}
+                      onWizardStartsAtRoomChange={setWizardStartsAtRoom}
+                      onClosedLayoutChange={setClosedLayout}
+                      onAddLayout={openWizard}
+                    />
+                  </div>
+                )}
+                {mountSceneWorkspace && (
+                  <div
+                    className={`workspace-surface scene-surface${view === 'scene' || view === 'split' ? ' active' : ''}`}
+                    data-workspace-surface="scene"
+                    aria-hidden={view !== 'scene' && view !== 'split'}
+                  >
+                    <SceneWorkspace compact={view === 'split'} />
+                  </div>
+                )}
               </>
             )}
           </section>

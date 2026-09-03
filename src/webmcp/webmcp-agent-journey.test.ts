@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest'
-import { createSeedProject } from '../domain/seed-project'
+import { createBlankProject } from '../domain/blank-project'
 import { projectSchema } from '../domain/project-schema'
 import { appStateStore } from '../state/app-state-store'
 import { createProjectStore, getWorkspaceFacade } from '../state/project-store'
@@ -17,7 +17,7 @@ describe('canonical WebMCP agent journey', () => {
   })
 
   it('plans, evaluates, compares, and exports a kitchen in at most 15 tool calls', async () => {
-    const store = createProjectStore(createSeedProject())
+    const store = createProjectStore(createBlankProject('Canonical agent kitchen'))
     const registered = new Map<string, WebMcpToolDefinition>()
     const controller = createWebMcpController({
       store,
@@ -47,40 +47,62 @@ describe('canonical WebMCP agent journey', () => {
     const guide = await call('get_workspace_guide', {})
     expect(guide).toMatchObject({ ok: true, operationSchema: expect.any(Object), errorCodeTaxonomy: expect.any(Array) })
 
-    const catalog = await call('get_component_catalog', { category: 'preparation' })
+    const catalog = await call('get_component_catalog', {})
     const entries = catalog.entries as { catalogId: string }[]
-    expect(entries.length).toBeGreaterThanOrEqual(8)
+    const equipmentCatalogIds = [
+      'hot-six-burner-range',
+      'cold-upright-refrigerator',
+      'prep-work-table',
+      'wash-dirty-landing',
+      'wash-pre-rinse-sink',
+      'wash-undercounter-dishwasher',
+      'wash-clean-landing',
+      'sanitation-hand-sink',
+    ]
+    expect(entries.map((entry) => entry.catalogId)).toEqual(expect.arrayContaining(equipmentCatalogIds))
 
     const initial = await call('get_layout', { view: 'summary' })
     const baselineVariantId = initial.activeVariantId as string
     const scenarioId = store.getState().project.activeScenarioId
-    const equipmentOperations = entries.slice(0, 8).map((entry, index) => ({
+    const positions = [
+      { xMm: 100, yMm: 100 },
+      { xMm: 100, yMm: 100 },
+      { xMm: 2400, yMm: 100 },
+      { xMm: 100, yMm: 2500 },
+      { xMm: 1100, yMm: 2500 },
+      { xMm: 2100, yMm: 2500 },
+      { xMm: 3000, yMm: 2500 },
+      { xMm: 100, yMm: 4000 },
+    ]
+    const equipmentOperations = equipmentCatalogIds.map((catalogId, index) => ({
       type: 'add_component',
       variantId: baselineVariantId,
       componentId: `journey-item-${index + 1}`,
-      catalogId: entry.catalogId,
-      position: {
-        xMm: index === 1 ? 4_200 : 4_200 + (index % 3) * 1_900,
-        yMm: 400 + Math.floor(index / 3) * 1_800,
-      },
+      catalogId,
+      position: positions[index],
     }))
     const fitted = await call('apply_layout_changes', {
       expectedRevision: initial.revision,
       idempotencyKey: 'canonical-room-and-equipment-v1',
-      intent: 'Expand the room and place eight preparation items',
+      intent: 'Draw a four-by-six-metre room and place eight essential items',
       operations: [
         {
           type: 'update_architecture',
           variantId: baselineVariantId,
           patch: {
             locked: false,
-            widthMm: 10_000,
-            depthMm: 7_000,
+            widthMm: 4_000,
+            depthMm: 6_000,
             roomPolygon: [
               { xMm: 0, yMm: 0 },
-              { xMm: 10_000, yMm: 0 },
-              { xMm: 10_000, yMm: 7_000 },
-              { xMm: 0, yMm: 7_000 },
+              { xMm: 4_000, yMm: 0 },
+              { xMm: 4_000, yMm: 6_000 },
+              { xMm: 0, yMm: 6_000 },
+            ],
+            openings: [
+              { id: 'main-entry', label: 'Staff entrance', kind: 'door', wall: 'bottom', segmentIndex: 2, offsetMm: 1_550, widthMm: 900, flow: 'entry', swingDepthMm: 900 },
+              { id: 'clean-pass', label: 'Clean service pass', kind: 'service-window', wall: 'right', segmentIndex: 1, offsetMm: 1_000, widthMm: 900, flow: 'clean-out' },
+              { id: 'dirty-return', label: 'Dirty return', kind: 'service-window', wall: 'right', segmentIndex: 1, offsetMm: 3_500, widthMm: 900, flow: 'dirty-in' },
             ],
           },
         },
@@ -100,7 +122,7 @@ describe('canonical WebMCP agent journey', () => {
         type: 'move_components',
         variantId: baselineVariantId,
         componentIds: ['journey-item-2'],
-        anchor: { xMm: 6_100, yMm: 400 },
+        anchor: { xMm: 1_500, yMm: 100 },
       }],
     })
     expect(fixed).toMatchObject({ ok: true, revision: 2, changedIds: ['journey-item-2'] })
@@ -112,7 +134,7 @@ describe('canonical WebMCP agent journey', () => {
       ['menu-prep', 'Prepared salad', 'food-prep'],
       ['menu-range', 'Range main', 'range-cook'],
       ['menu-finish', 'Finished plate', 'finish-plate'],
-      ['menu-dessert', 'Mixed dessert', 'mix'],
+      ['menu-dessert', 'Plated dessert', 'finish-plate'],
     ].map(([id, name, capability]) => ({
       id,
       name,
@@ -140,7 +162,7 @@ describe('canonical WebMCP agent journey', () => {
       playback: 'pause',
       navigateTo: true,
     })
-    expect(simulation).toMatchObject({ ok: true, revision: 3, scenario: { id: scenarioId, seed: 4242 } })
+    expect(simulation, JSON.stringify(simulation)).toMatchObject({ ok: true, revision: 3, scenario: { id: scenarioId, seed: 4242 } })
 
     const comparison = await call('compare_layouts', {
       baselineVariantId,
@@ -163,7 +185,7 @@ describe('canonical WebMCP agent journey', () => {
     expect(parsedProject.variants).toHaveLength(2)
     expect(parsedProject.scenarios[0].menuItems).toHaveLength(5)
     expect(parsedProject.variants[0].equipment.filter((item) => item.id.startsWith('journey-item-'))).toHaveLength(8)
-    expect(parsedProject.variants[0].architecture).toMatchObject({ widthMm: 10_000, depthMm: 7_000 })
+    expect(parsedProject.variants[0].architecture).toMatchObject({ widthMm: 4_000, depthMm: 6_000 })
 
     const visibleState = await call('get_app_state', {})
     expect(visibleState).toMatchObject({ ok: true, revision: 3, stage: 'simulate', overlay: 'compare' })
