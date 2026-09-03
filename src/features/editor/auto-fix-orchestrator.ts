@@ -225,7 +225,9 @@ function planArchitectureAdditions(project: KitchenProject, active: LayoutVarian
           widthMm: spec.widthMm,
           ...(spec.kind === 'door' ? { swingDepthMm: 900 } : { sillHeightMm: 950, heightMm: 900 }),
         }
-        const safeInEveryLayout = [...plannedByVariant.values()].every((variant) =>
+        const layoutsNeedingOpening = [...plannedByVariant.values()].filter((variant) =>
+          !variant.architecture.openings.some((opening) => opening.kind === spec.kind && opening.flow === spec.flow))
+        const safeInEveryLayout = layoutsNeedingOpening.every((variant) =>
           segmentLength(variant.architecture, segmentIndex) >= offsetMm + spec.widthMm + snapMm
             && !openingOverlaps(variant.architecture, candidate)
             && openingKeepClear(variant, candidate))
