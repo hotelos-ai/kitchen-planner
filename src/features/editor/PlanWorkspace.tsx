@@ -332,6 +332,7 @@ export function PlanWorkspace({
               {essentialsVisible && (
                 <section className="essentials-dialog in-panel" role="dialog" aria-modal="true" aria-label="Validate plan">
                   <button type="button" className="workspace-modal-close" aria-label="Close essentials checker" onClick={() => setEssentialsVisible(false)}>×</button>
+                  <LayoutDiagnostics store={store} />
                   <EssentialsChecker store={store} focusItemId={checksFocusId} onEditRoom={() => {
                     setEssentialsVisible(false)
                     openLayoutWizard(true)
@@ -358,7 +359,7 @@ export function PlanWorkspace({
               ) : (
                 <EquipmentInspector store={store} />
               ))}
-              {selectedIds.length === 0 && <LayoutDiagnostics store={store} />}
+              {selectedIds.length === 0 && !essentialsVisible && <LayoutDiagnostics store={store} />}
               {selectedIds.length === 0 && <ProjectSettings store={store} stage={stage} />}
             </div>
           )}

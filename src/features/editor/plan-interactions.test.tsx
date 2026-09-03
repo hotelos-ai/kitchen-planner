@@ -1,5 +1,5 @@
 import type { ComponentProps } from 'react'
-import { act, fireEvent, render, screen } from '@testing-library/react'
+import { act, fireEvent, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createSeedProject } from '../../domain/seed-project'
@@ -157,6 +157,43 @@ describe('plan workspace', () => {
     expect(screen.getByRole('heading', { name: 'Professional review' })).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Close essentials checker' }))
     expect(screen.queryByRole('dialog', { name: 'Validate plan' })).not.toBeInTheDocument()
+  })
+
+  it('promotes auto-fix in Space and keeps layout checks first with an active selection', async () => {
+    const user = userEvent.setup()
+    const project = createSeedProject()
+    project.scenarios[0].staff = []
+    const store = createProjectStore(project)
+    store.getState().selectItems(['tandoor'])
+
+    render(workspace({ store, stage: 'space' }))
+
+    await user.click(screen.getByRole('button', { name: 'Auto-fix' }))
+    const dialog = screen.getByRole('dialog', { name: 'Validate plan' })
+    const checks = within(dialog).getByRole('region', { name: 'Layout checks' })
+    const report = within(dialog).getByRole('region', { name: 'Operational essentials' })
+
+    expect(checks.compareDocumentPosition(report) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(store.getState().selectedIds).toEqual(['tandoor'])
+  })
+
+  it('promotes auto-fix in Fit-out and does not duplicate layout checks in validation', async () => {
+    const user = userEvent.setup()
+    const project = createSeedProject()
+    project.variants[0].equipment.find((item) => item.id === 'mixer')!.xMm = -500
+    const store = createProjectStore(project)
+
+    render(workspace({ store, stage: 'equipment' }))
+
+    expect(screen.getByRole('button', { name: 'Validate Fit-Out' })).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Auto-fix' }))
+    const dialog = screen.getByRole('dialog', { name: 'Validate plan' })
+    const checks = within(dialog).getAllByRole('region', { name: 'Layout checks' })
+    const report = within(dialog).getByRole('region', { name: 'Operational essentials' })
+
+    expect(checks).toHaveLength(1)
+    expect(checks[0].compareDocumentPosition(report) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(within(checks[0]).getByRole('button', { name: 'Auto-fix…' })).toBeInTheDocument()
   })
 
   it('uses Escape to close transient workspace UI before clearing selection', async () => {

@@ -120,7 +120,9 @@ export function StageToolbar({
 }: StageToolbarProps) {
   const project = useStore(store, (state) => state.project)
   const revision = useStore(store, (state) => state.revision)
+  const workflowIssues = useWorkflowIssues(store)
   const showCatalog = stage !== 'simulate'
+  const showAutoFix = stage !== 'simulate' && workflowIssues.equipment > 0
 
   return (
     <div className="app-header-row app-header-row-2">
@@ -149,6 +151,7 @@ export function StageToolbar({
         <button type="button" onClick={onOpenEssentials}>
           {stage === 'space' ? 'Validate Plan' : 'Validate Fit-Out'}{essentialsCount > 0 ? ` · ${essentialsCount}` : ''}
         </button>
+        {showAutoFix && <button type="button" onClick={onOpenEssentials}>Auto-fix</button>}
         <button type="button" aria-label="Undo" title="Undo (⌘Z)" disabled={!canUndo} onClick={onUndo}>↺</button>
         <button type="button" aria-label="Redo" title="Redo (⌘⇧Z)" disabled={!canRedo} onClick={onRedo}>↻</button>
         {stage !== 'simulate' && (
