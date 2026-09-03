@@ -465,7 +465,7 @@ Run:
 
 ```bash
 mkdir -p public/reference
-sips -s format png -r 90 /Users/mzahir/Downloads/IMG_9599.HEIC --out public/reference/manta-raja-layout.png
+sips -s format png -r 90 /path/to/source-layout.HEIC --out public/reference/manta-raja-layout.png
 ```
 
 Expected: `file public/reference/manta-raja-layout.png` reports PNG image data. Open it once and verify the hot line is across the top, storage is left of the upright freezer, and the tandoor touches the shaded pillar. If `sips` rotation differs on the host, rotate in 90-degree increments until those three anchors match.
