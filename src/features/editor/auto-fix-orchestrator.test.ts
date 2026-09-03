@@ -214,6 +214,27 @@ describe('automatic plan fix orchestrator', () => {
       .some((issue) => issue.code === 'outside-room')).toBe(false)
   })
 
+  it('expands an editable room into negative coordinates without moving equipment', () => {
+    const project = createSeedProject()
+    const variant = project.variants[0]
+    variant.architecture.locked = false
+    project.architecture.locked = false
+    const mixer = variant.equipment.find((item) => item.id === 'mixer')!
+    mixer.xMm = -500
+    const originalPosition = { xMm: mixer.xMm, yMm: mixer.yMm }
+    const store = createProjectStore(project)
+
+    const result = applyAutomaticPlanFixes(store, { strategy: 'layout' })
+    const next = store.getState().project.variants[0]
+
+    expect(result.applied).toBe(true)
+    expect(result.architectureAdjusted).toBe(true)
+    expect(next.equipment.find((item) => item.id === mixer.id)).toMatchObject(originalPosition)
+    expect(Math.min(...next.architecture.roomPolygon.map((point) => point.x))).toBeLessThanOrEqual(-500)
+    expect(analyzeLayout(next.architecture, next.equipment, { layoutConstraints: next.layoutConstraints })
+      .some((issue) => issue.id === 'outside-mixer')).toBe(false)
+  })
+
   it('reports partial completion when the chosen strategy cannot move locked conflicts', () => {
     const project = createSeedProject()
     const variant = project.variants[0]
