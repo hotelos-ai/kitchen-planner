@@ -9,7 +9,7 @@ const MANUAL_STEPS = [
 
 const AGENT_STEPS = [
   { title: 'What it is', body: 'CalmKitchen Designer exposes its workspace over WebMCP, so an AI agent you trust can read and edit the plan alongside you — the same atomic operations the UI uses, nothing more.' },
-  { title: 'Connect an agent', body: 'Open the AI tools panel from the top bar, or point an MCP-capable client at this page. The agent discovers tools like reading the layout, moving equipment, running simulations, and exporting the project.' },
+  { title: 'Connect an agent', body: 'Open "Use your AI agent" from the top bar, or point an MCP-capable client at this page. The agent discovers tools like reading the layout, moving equipment, running simulations, and exporting the project.' },
   { title: 'Work together', body: 'Every agent edit goes through the same history as yours — undo (⌘Z) reverts agent changes too. Review findings in Compare before adopting anything. You stay the chef de cuisine; the agent is the commis.' },
 ]
 

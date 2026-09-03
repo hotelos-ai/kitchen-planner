@@ -1,7 +1,9 @@
-import { useEffect, useRef, useState, type ChangeEvent } from 'react'
+import { Suspense, lazy, useEffect, useRef, useState, type ChangeEvent } from 'react'
 import { importProject } from '../state/persistence'
 import { RoomStartForm } from './RoomStartForm'
 import type { Architecture, KitchenProject } from '../domain/project'
+
+const SceneWorkspace = lazy(() => import('../features/scene/SceneWorkspace').then((module) => ({ default: module.SceneWorkspace })))
 
 type StartChoice = 'home' | 'scratch' | 'dimensions' | 'trace' | 'draw'
 
@@ -38,6 +40,7 @@ type Props = {
 
 export function ProjectStartScreen({ onCreateRoom, onDrawManually, onOpenProject, onTraceImage, onScratch, onStarterKitchen }: Props) {
   const [choice, setChoice] = useState<StartChoice>('home')
+  const [walkPreview, setWalkPreview] = useState(false)
   const [error, setError] = useState('')
   const fileRef = useRef<HTMLInputElement>(null)
 
@@ -118,21 +121,16 @@ export function ProjectStartScreen({ onCreateRoom, onDrawManually, onOpenProject
 
   return (
     <section className="start-screen landing" aria-label="Create your kitchen space">
-      <svg className="landing-backdrop" viewBox="0 0 1600 900" aria-hidden="true" preserveAspectRatio="xMidYMid slice">
-        <polygon points="500,190 1180,190 1180,430 1060,430 1060,750 500,750 500,685 425,685 425,265 500,265" fill="none" stroke="rgba(27,58,54,0.09)" strokeWidth="3" />
-        <rect x="530" y="225" width="150" height="80" fill="none" stroke="rgba(202,78,142,0.12)" strokeWidth="2.5" />
-        <rect x="700" y="225" width="120" height="80" fill="none" stroke="rgba(27,58,54,0.08)" strokeWidth="2.5" />
-        <rect x="530" y="560" width="140" height="80" fill="none" stroke="rgba(194,147,79,0.13)" strokeWidth="2.5" />
-        <rect x="690" y="560" width="200" height="80" fill="none" stroke="rgba(45,124,111,0.12)" strokeWidth="2.5" />
-        <line x1="500" y1="785" x2="1180" y2="785" stroke="rgba(27,58,54,0.07)" strokeWidth="1.5" />
-        <text x="840" y="812" textAnchor="middle" fontFamily="JetBrains Mono, monospace" fontSize="20" fill="rgba(94,107,90,0.35)">6 650 mm</text>
-        <circle cx="1370" cy="200" r="70" fill="none" stroke="rgba(177,209,91,0.30)" strokeWidth="2.5" />
-        <circle cx="1370" cy="200" r="22" fill="rgba(177,209,91,0.22)" />
-        <circle cx="240" cy="710" r="9" fill="rgba(202,78,142,0.25)" />
-        <circle cx="285" cy="710" r="9" fill="rgba(202,78,142,0.14)" />
-        <line x1="130" y1="130" x2="290" y2="130" stroke="rgba(177,209,91,0.30)" strokeWidth="2" />
-        <line x1="130" y1="140" x2="220" y2="140" stroke="rgba(177,209,91,0.16)" strokeWidth="2" />
-      </svg>
+      <div className="landing-3d" aria-label="Example kitchen in 3D">
+        <Suspense fallback={<div className="landing-3d-placeholder">Loading the example kitchen…</div>}>
+          <SceneWorkspace readOnly walkMode={walkPreview} />
+        </Suspense>
+        <div className="landing-3d-toggle" role="group" aria-label="Preview mode">
+          <button type="button" className={walkPreview ? '' : 'active'} onClick={() => setWalkPreview(false)}>3D view</button>
+          <button type="button" className={walkPreview ? 'active' : ''} onClick={() => setWalkPreview(true)}>Walk mode</button>
+        </div>
+        <p className="landing-3d-hint">{walkPreview ? 'W A S D to move · drag to look · Esc to release' : 'Drag to orbit · scroll to zoom'}</p>
+      </div>
       <div className="landing-hero">
         <p className="eyebrow">CalmKitchen Designer · by HotelOS</p>
         <h1>Design commercial kitchens.</h1>
@@ -143,14 +141,14 @@ export function ProjectStartScreen({ onCreateRoom, onDrawManually, onOpenProject
             Start designing
             <span aria-hidden="true">→</span>
           </button>
-          <button type="button" className="landing-ghost" onClick={() => { onScratch?.(); setChoice('scratch') }}>
-            Design from scratch
-          </button>
-          <button type="button" className="landing-quiet" onClick={() => fileRef.current?.click()}>
+          <button type="button" className="landing-upload" aria-label="Upload a file" onClick={() => fileRef.current?.click()}>
+            <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 11V2m0 0L4.5 5.5M8 2l3.5 3.5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" /><path d="M2.5 11v1.5a1.5 1.5 0 0 0 1.5 1.5h8a1.5 1.5 0 0 0 1.5-1.5V11" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" /></svg>
             Upload a file
           </button>
+          <button type="button" className="landing-quiet" onClick={() => { onScratch?.(); setChoice('scratch') }}>
+            Design from scratch
+          </button>
         </div>
-        <h2 className="landing-kicker">Create your kitchen space</h2>
         <div className="landing-features" aria-label="What you get">
           <span className="chip"><i style={{ background: 'var(--cat-cooking)' }} />2D drafting</span>
           <span className="chip"><i style={{ background: 'var(--cat-cold)' }} />3D walkthrough</span>
@@ -162,6 +160,18 @@ export function ProjectStartScreen({ onCreateRoom, onDrawManually, onOpenProject
           <span className="footer-sep" aria-hidden="true"></span>
           <a href="https://hotelos.ai/kitchen" target="_blank" rel="noreferrer">Explore HotelOS ↗</a>
         </p>
+        <aside className="landing-agent" aria-label="Bring your own agent">
+          <div className="landing-agent-head">
+            <span className="landing-agent-pulse" aria-hidden="true"></span>
+            <strong>Bring your own agent</strong>
+            <span className="landing-agent-tag">WebMCP</span>
+          </div>
+          <pre><code><span className="agent-user">you ›</span> read the current layout
+<span className="agent-user">you ›</span> move the fry line 300&nbsp;mm off the pass
+<span className="agent-user">you ›</span> run the dinner-peak simulation
+<span className="agent-model">designer ›</span> done — P90 wait 12:41, fry station clearing. want the diff?</code></pre>
+          <p>Agents drive the same atomic workspace ops you do — every edit lands in your undo history. Hit <em>Use your AI agent</em> in the top bar to connect.</p>
+        </aside>
       </div>
       <input ref={fileRef} type="file" accept="application/json,.json" aria-label="Open saved project" hidden onChange={onOpenFile} />
       {error && <p role="alert">{error}</p>}

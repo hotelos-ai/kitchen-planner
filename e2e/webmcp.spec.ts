@@ -65,7 +65,7 @@ test('agents discover tools, edit the plan, run simulations, and export — with
       return entry.execute(toolInput) as Promise<Envelope>
     }, [name, input])
 
-  await page.getByRole('button', { name: 'AI tools' }).click()
+  await page.getByRole('button', { name: 'Use your AI agent' }).click()
   await expect(page.getByRole('dialog', { name: 'AI agent tools' })).toBeVisible()
   await expect(page.getByText('Agent tools active')).toBeVisible()
 
@@ -123,7 +123,7 @@ test('agents discover tools, edit the plan, run simulations, and export — with
 test('browsers without WebMCP keep the full interface with setup guidance', async ({ page }) => {
   await openApp(page)
   await expect(page.getByRole('heading', { name: /CalmKitchen Designer/i })).toBeVisible()
-  await page.getByRole('button', { name: 'AI tools' }).click()
+  await page.getByRole('button', { name: 'Use your AI agent' }).click()
   await expect(page.getByRole('dialog', { name: 'AI agent tools' })).toBeVisible()
   await expect(page.getByText('Agent tools unavailable in this browser')).toBeVisible()
   await expect(page.getByText(/stays fully usable without it/i)).toBeVisible()

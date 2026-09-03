@@ -55,6 +55,7 @@ type AppHeaderProps = {
   onNewProject(): void
   onOpenSettings(): void
   onTourFocus?(step: number): void
+  minimal?: boolean
 }
 
 const HOTElOS_SYMBOL_PATH = 'M190.1,0l-27.9,45.9c-3.5,5.7-9.8,9.4-16.6,9.4h-76.8c-6.8,0-13.3-3.7-16.8-9.4L24.4,0H0v214.2h24.4l27.7-45.6c3.5-5.9,10-9.4,16.8-9.4h76.8c6.8,0,13.1,3.5,16.6,9.4l27.9,45.6h24.2V0h-24.2ZM133,133.2h-51.9v-51.8h51.9v51.8Z'
@@ -194,6 +195,7 @@ export function AppHeader({
   onNewProject,
   onOpenSettings,
   onTourFocus,
+  minimal = false,
 }: AppHeaderProps) {
   const issues = useWorkflowIssues(store)
   const activeEntry = WORKFLOW_STAGES.find((entry) => entry.id === stage)
@@ -220,7 +222,7 @@ export function AppHeader({
         </svg>
         <h1>CalmKitchen <em>Designer</em></h1>
       </a>
-      <ProjectMenu store={store} onNewProject={onNewProject} onOpenSettings={onOpenSettings} />
+      {!minimal && <ProjectMenu store={store} onNewProject={onNewProject} onOpenSettings={onOpenSettings} />}
       <nav className="topbar-nav" aria-label="HotelOS">
         <a href="https://hotelos.ai/kitchen" target="_blank" rel="noreferrer" className="topbar-nav-brand" title="HotelOS">
           <svg viewBox="0 0 214.2 214.2" aria-hidden="true"><path fill="#b1d15b" d={HOTElOS_SYMBOL_PATH} /></svg>
@@ -232,9 +234,9 @@ export function AppHeader({
         <a href="https://hotelos.ai/pricing" target="_blank" rel="noreferrer">Pricing</a>
         <a href="https://hotelos.ai/trust" target="_blank" rel="noreferrer">Trust</a>
         <a href="https://hotelos.ai/contact" target="_blank" rel="noreferrer">Contact</a>
-        <a href="https://auth.hotelos.ai/login" target="_blank" rel="noreferrer" className="topbar-nav-login">Log in</a>
       </nav>
-      <nav aria-label="Workflow stages" className="workflow-navigator">
+      {!
+minimal && <nav aria-label="Workflow stages" className="workflow-navigator">
         {WORKFLOW_STAGES.map((entry) => {
           const active = stage === entry.id && overlay === null
           const issueCount = issues[entry.id]
@@ -254,7 +256,7 @@ export function AppHeader({
             </button>
           )
         })}
-      </nav>
+      </nav>}
       {stage !== 'simulate' && overlay === null && (
         <nav aria-label="View mode" className="seg view-switcher">
           {VIEW_MODES.map((entry) => (
@@ -269,8 +271,9 @@ export function AppHeader({
           ))}
         </nav>
       )}
+      {!minimal && (
       <div className="global-actions">
-        <button type="button" aria-pressed={aiToolsOpen} onClick={onOpenAiTools}>AI tools</button>
+        <button type="button" aria-pressed={aiToolsOpen} title="Drive the workspace with your own AI agent over WebMCP" onClick={onOpenAiTools}>Use your AI agent</button>
         {canCompare && (
           <button type="button" aria-pressed={overlay === 'compare'} onClick={onOpenCompare}>Compare</button>
         )}
@@ -279,6 +282,7 @@ export function AppHeader({
         )}
         <ProjectExchange store={store} onTourFocus={onTourFocus} />
       </div>
+      )}
     </header>
   )
 }

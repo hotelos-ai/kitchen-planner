@@ -114,6 +114,7 @@ export function App() {
     <WebMcpProvider>
       <main className="app-shell" data-app="calmkitchen-designer" data-app-stage={stage} data-app-view={view} data-app-overlay={overlay ?? 'none'}>
         <AppHeader
+          minimal={showStartScreen}
           store={projectStore}
           view={view}
           stage={stage}
