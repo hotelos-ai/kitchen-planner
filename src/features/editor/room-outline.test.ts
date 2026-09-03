@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { Architecture, PointMm } from '../../domain/project'
-import { edgeMidpoint, insertVertexOnSegment, moveOpening, moveVertex, nearestSegment, openingCenter, polygonCentroid, slideEdge } from './room-outline'
+import { constrainToAxes, createOpeningAt, createRectItemAt, edgeMidpoint, insertVertexOnSegment, moveOpening, moveVertex, nearestSegment, openingCenter, polygonCentroid, removeVertex, resizeOpening, resizePillarRect, slideEdge, squarePointAround } from './room-outline'
 
 const polygon: PointMm[] = [
   { x: 0, y: 0 },
@@ -131,5 +131,87 @@ describe('cross-wall opening movement', () => {
     const next = moveOpening(narrow, 0, { x: 900, y: 100 }, 100)
     expect(next.openings[0].widthMm).toBeLessThanOrEqual(1000)
     expect(next.openings[0].offsetMm).toBeGreaterThanOrEqual(0)
+  })
+})
+
+describe('vertex removal', () => {
+  it('removes a middle vertex and remaps later opening segments', () => {
+    const next = removeVertex(architecture, 1)
+    expect(next.roomPolygon).toHaveLength(3)
+    expect(next.roomPolygon[0]).toEqual({ x: 0, y: 0 })
+    expect(next.roomPolygon[1]).toEqual({ x: 3000, y: 2000 })
+    const windowB = next.openings.find((opening) => opening.id === 'window-b')
+    expect(windowB?.segmentIndex).toBe(0)
+  })
+
+  it('merges the wrap-around segments when removing vertex zero', () => {
+    const next = removeVertex(architecture, 0)
+    expect(next.roomPolygon).toHaveLength(3)
+    const doorA = next.openings.find((opening) => opening.id === 'door-a')
+    expect(doorA?.segmentIndex).toBe(2)
+  })
+
+  it('refuses to drop below three vertices', () => {
+    const triangle: Architecture = { ...architecture, roomPolygon: [{ x: 0, y: 0 }, { x: 1000, y: 0 }, { x: 0, y: 1000 }] }
+    expect(removeVertex(triangle, 1)).toBe(triangle)
+  })
+})
+
+describe('shift constraints and canvas creation', () => {
+  it('constrains a drag to the nearest 45-degree axis', () => {
+    const horizontal = constrainToAxes({ x: 0, y: 0 }, { x: 1010, y: 90 })
+    expect(horizontal.y).toBe(0)
+    expect(horizontal.x).toBeCloseTo(1014, 0)
+    const diagonal = constrainToAxes({ x: 0, y: 0 }, { x: 1000, y: 990 })
+    expect(diagonal.x).toBeCloseTo(diagonal.y, 6)
+    const vertical = constrainToAxes({ x: 1000, y: 1000 }, { x: 1010, y: 1300 })
+    expect(vertical.x).toBe(1000)
+    expect(vertical.y).toBeCloseTo(1300.17, 1)
+  })
+
+  it('expands a square point around the opposite corner', () => {
+    expect(squarePointAround({ x: 0, y: 0 }, { x: 800, y: 300 })).toEqual({ x: 800, y: 800 })
+    expect(squarePointAround({ x: 1000, y: 1000 }, { x: 400, y: 900 })).toEqual({ x: 400, y: 400 })
+  })
+
+  it('creates a pillar by drag with snapped bounds', () => {
+    const next = createRectItemAt(architecture, { id: 'architecture-pillar', label: 'Pillar', kind: 'pillar', widthMm: 400, depthMm: 400 }, { x: 500, y: 500 }, { x: 1300, y: 900 }, 100)
+    const created = next.pillars[next.pillars.length - 1]
+    expect(created.xMm).toBe(500)
+    expect(created.yMm).toBe(500)
+    expect(created.widthMm).toBe(800)
+    expect(created.depthMm).toBe(400)
+  })
+
+  it('creates a pillar by click with typical size centered', () => {
+    const next = createRectItemAt(architecture, { id: 'architecture-pillar', label: 'Pillar', kind: 'pillar', widthMm: 400, depthMm: 400 }, { x: 1500, y: 1000 }, null, 100)
+    const created = next.pillars[next.pillars.length - 1]
+    expect(created.xMm).toBe(1300)
+    expect(created.yMm).toBe(800)
+    expect(created.widthMm).toBe(400)
+  })
+
+  it('creates an opening on the nearest wall with drag length as width', () => {
+    const next = createOpeningAt(architecture, { label: 'Door', kind: 'door', widthMm: 900 }, { x: 500, y: 0 }, { x: 1400, y: 0 }, 100)
+    const created = next.openings[next.openings.length - 1]
+    expect(created.kind).toBe('door')
+    expect(created.segmentIndex).toBe(0)
+    expect(created.offsetMm).toBe(500)
+    expect(created.widthMm).toBe(900)
+  })
+
+  it('resizes a pillar from a corner handle', () => {
+    const withPillar: Architecture = { ...architecture, pillars: [{ id: 'p1', xMm: 500, yMm: 500, widthMm: 400, depthMm: 400 }] }
+    const next = resizePillarRect(withPillar, 0, 'br', { x: 1400, y: 900 }, 100)
+    expect(next.pillars[0].widthMm).toBe(900)
+    expect(next.pillars[0].depthMm).toBe(400)
+  })
+
+  it('resizes an opening end handle with a minimum width', () => {
+    const withOpening: Architecture = { ...architecture, openings: [{ id: 'd1', label: 'D', kind: 'door', wall: 'top', segmentIndex: 0, offsetMm: 500, widthMm: 900, flow: 'entry' as const, swingDepthMm: 900 }] }
+    const grown = resizeOpening(withOpening, 0, 'end', { x: 2000, y: 0 }, 100)
+    expect(grown.openings[0].widthMm).toBe(1500)
+    const shrunk = resizeOpening(withOpening, 0, 'end', { x: 0, y: 0 }, 100)
+    expect(shrunk.openings[0].widthMm).toBeGreaterThanOrEqual(200)
   })
 })

@@ -14,6 +14,7 @@ import { RevisionHistory } from './RevisionHistory'
 import { SpaceImpactDialog } from './SpaceImpactDialog'
 import { StageOverview } from './StageOverview'
 import { RoomEditorPanel } from './RoomEditorPanel'
+import type { PlacementSpec } from './room-outline'
 import { useWorkspaceShortcuts } from './useWorkspaceShortcuts'
 import { WorkflowCatalog } from './WorkflowCatalog'
 
@@ -149,6 +150,7 @@ export function PlanWorkspace({
   const selectedItem = useStore(store, (state) => getActiveVariant(state).equipment.find((item) => item.id === state.selectedIds[0]))
   const dragResizeEnabled = Boolean(selectedItem && !selectedItem.dimensionsLocked)
   const [localReference, setLocalReference] = useState(showReference)
+  const [placement, setPlacement] = useState<PlacementSpec | null>(null)
   const [localCatalogOpen, setLocalCatalogOpen] = useState(includeToolbar ? drawersInitiallyOpen() : catalogOpen)
   const [localInspectorOpen, setLocalInspectorOpen] = useState(includeToolbar ? drawersInitiallyOpen() : inspectorOpen)
 
@@ -231,7 +233,7 @@ export function PlanWorkspace({
         <div className={`editor-layout${compact ? ' split-pane' : ''}${!compact && catalogVisible ? '' : ' catalog-collapsed'}${!compact && inspectorVisible ? '' : ' inspector-collapsed'}`}>
           {!compact && (
             <div className="editor-drawer catalog-drawer" data-editor-drawer="catalog" aria-hidden={!catalogVisible}>
-              <WorkflowCatalog store={store} stage={stage} />
+              <WorkflowCatalog store={store} stage={stage} onBeginPlacement={setPlacement} />
             </div>
           )}
           <div className="canvas-column">
@@ -239,6 +241,8 @@ export function PlanWorkspace({
               <PlanCanvas
                 store={store}
                 mode={stage === 'space' ? 'space' : 'layout'}
+                placement={stage === 'space' ? placement : null}
+                onPlacementDone={() => setPlacement(null)}
                 showReference={compact ? false : referenceVisible}
                 sourceImageUrl={localSourceUrl}
                 sourceOpacity={sourceOpacity}
@@ -300,7 +304,9 @@ export function PlanWorkspace({
                 </section>
               )}
               {revisionsVisible && <RevisionHistory store={store} />}
-              {!essentialsVisible && !revisionsVisible && (stage === 'space' ? (
+              {!essentialsVisible && !revisionsVisible && (selectedIds.length > 0 ? (
+                <EquipmentInspector store={store} />
+              ) : stage === 'space' ? (
                 <RoomEditorPanel store={store} onContinueToEquipment={continueToEquipment} />
               ) : showInspectorContent ? (
                 <StageOverview
@@ -314,8 +320,8 @@ export function PlanWorkspace({
               ) : (
                 <EquipmentInspector store={store} />
               ))}
-              <LayoutDiagnostics store={store} />
-              <ProjectSettings store={store} stage={stage} />
+              {selectedIds.length === 0 && <LayoutDiagnostics store={store} />}
+              {selectedIds.length === 0 && <ProjectSettings store={store} stage={stage} />}
             </div>
           )}
         </div>

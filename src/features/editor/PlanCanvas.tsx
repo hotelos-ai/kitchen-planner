@@ -13,6 +13,7 @@ import { EquipmentLayer } from './EquipmentNode'
 import { GridLayer } from './GridLayer'
 import { OpeningOverlayLayer } from './OpeningOverlayLayer'
 import { RoomOutlineLayer } from './RoomOutlineLayer'
+import type { PlacementSpec } from './room-outline'
 import { ComponentContextMenu, type ComponentContextAction, type OverlayPosition } from './ComponentContextMenu'
 import { QuickConfigurationPopover, type QuickConfigurationMode } from './QuickConfigurationPopover'
 
@@ -28,12 +29,14 @@ type Props = {
   onComponentLockChange?(itemId: string, locked: boolean): void
   onSkinChange?(itemId: string, skinId: string): void
   onWarningBadgeClick?(itemId: string): void
+  placement?: PlacementSpec | null
+  onPlacementDone?(): void
 }
 
 type ContextRequest = { itemId: string; position: OverlayPosition }
 type QuickRequest = ContextRequest & { mode: QuickConfigurationMode }
 
-export function PlanCanvas({ store, showReference, sourceImageUrl = '/reference/kitchen-sketch.png', sourceOpacity = 22, mode = 'layout', variantOverride, readOnly = false, onInspectComponentIn3D, onComponentLockChange, onSkinChange, onWarningBadgeClick }: Props) {
+export function PlanCanvas({ store, showReference, sourceImageUrl = '/reference/kitchen-sketch.png', sourceOpacity = 22, mode = 'layout', variantOverride, readOnly = false, onInspectComponentIn3D, onComponentLockChange, onSkinChange, onWarningBadgeClick, placement = null, onPlacementDone }: Props) {
   const containerRef = useRef<HTMLDivElement>(null)
   const [size, setSize] = useState({ width: 740, height: 720 })
   const [contextRequest, setContextRequest] = useState<ContextRequest>()
@@ -171,7 +174,9 @@ export function PlanCanvas({ store, showReference, sourceImageUrl = '/reference/
             originX={originX}
             originY={originY}
             snapMm={project.snapMm}
+            placement={placement}
             onCommit={(next) => { store.getState().applySharedArchitecture(next) }}
+            onPlacementDone={() => onPlacementDone?.()}
           />
         )}
       </Stage>

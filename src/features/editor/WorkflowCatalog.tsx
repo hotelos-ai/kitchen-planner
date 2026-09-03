@@ -14,7 +14,7 @@ import type { ProjectStore } from '../../state/project-store'
 import { getActiveVariant } from '../../state/project-store'
 import { EquipmentLibrary } from './EquipmentLibrary'
 
-type Props = { store: ProjectStore; stage: WorkflowStage }
+type Props = { store: ProjectStore; stage: WorkflowStage; onBeginPlacement?(spec: import('./room-outline').PlacementSpec): void }
 
 type SpaceTab = 'openings' | 'structure' | 'zones'
 
@@ -52,7 +52,7 @@ function CatalogCard({ entry, displayUnit, onAdd }: { entry: CatalogEntry; displ
   )
 }
 
-function SpaceCatalog({ store }: { store: ProjectStore }) {
+function SpaceCatalog({ store, onBeginPlacement }: { store: ProjectStore; onBeginPlacement?(spec: import('./room-outline').PlacementSpec): void }) {
   const project = useStore(store, (state) => state.project)
   const variant = useStore(store, getActiveVariant)
   const [query, setQuery] = useState('')
@@ -79,6 +79,18 @@ function SpaceCatalog({ store }: { store: ProjectStore }) {
   const addCatalogEntry = (entry: CatalogEntry) => {
     setPlacementError('')
     const isArchitecture = entry.category === 'architecture'
+    if (isArchitecture && onBeginPlacement) {
+      onBeginPlacement({
+        catalogId: entry.catalogId,
+        label: entry.displayName,
+        kind: entry.tags.includes('opening')
+          ? (entry.catalogId === 'architecture-service-window' ? 'service-window' : 'door')
+          : entry.tags.includes('zone') ? 'zone' : 'pillar',
+        widthMm: entry.typicalDimensions.widthMm,
+        depthMm: entry.typicalDimensions.depthMm,
+      })
+      return
+    }
     const position = isArchitecture ? defaultPosition(entry) : suggestCatalogPlacement({
       architecture: variant.architecture,
       equipment: variant.equipment,

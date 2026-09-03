@@ -85,6 +85,8 @@ const stationCapabilitySchema = z.enum([
 
 const componentPatchSchema = z.object({
   label: nameSchema.optional(),
+  xMm: coordinateSchema.optional(),
+  yMm: coordinateSchema.optional(),
   category: z.enum(['cooking', 'cold', 'prep', 'washing', 'landing', 'storage', 'hood', 'custom']).optional(),
   heightMm: dimensionSchema.optional(),
   capabilities: z.array(stationCapabilitySchema).max(100).optional(),

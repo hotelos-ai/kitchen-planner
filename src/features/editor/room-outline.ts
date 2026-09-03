@@ -49,6 +49,21 @@ export function insertVertexOnSegment(architecture: Architecture, segmentIndex: 
   return { ...withPolygon(architecture, roomPolygon), openings }
 }
 
+export function removeVertex(architecture: Architecture, index: number): Architecture {
+  const polygon = architecture.roomPolygon
+  if (polygon.length <= 3 || index < 0 || index >= polygon.length) return architecture
+  const count = polygon.length
+  const roomPolygon = polygon.filter((_, position) => position !== index)
+  const remap = (segmentIndex: number): number => {
+    if (index === 0) return segmentIndex === 0 || segmentIndex === count - 1 ? count - 2 : segmentIndex - 1
+    return segmentIndex === index - 1 || segmentIndex === index ? index - 1 : segmentIndex > index ? segmentIndex - 1 : segmentIndex
+  }
+  const openings = architecture.openings.map((opening) => (
+    opening.segmentIndex !== undefined ? { ...opening, segmentIndex: remap(opening.segmentIndex) } : opening
+  ))
+  return { ...withPolygon(architecture, roomPolygon), openings }
+}
+
 export function nearestSegment(polygon: PointMm[], point: PointMm): SegmentHit {
   let best: SegmentHit = { segmentIndex: 0, point: polygon[0], distanceMm: Number.POSITIVE_INFINITY }
   polygon.forEach((start, segmentIndex) => {
@@ -146,4 +161,191 @@ export function movePillar(architecture: Architecture, index: number, point: Poi
   const snapped = snapPoint(point, snapMm)
   const pillars = architecture.pillars.map((candidate, position) => position === index ? { ...candidate, xMm: snapped.x, yMm: snapped.y } : candidate)
   return { ...architecture, pillars }
+}
+
+const makeId = (prefix: string) => `${prefix}-${globalThis.crypto?.randomUUID?.() ?? Math.random().toString(36).slice(2)}`
+
+export type RectHandle = 'tl' | 'tr' | 'bl' | 'br' | 't' | 'b' | 'l' | 'r'
+
+export type RectMm = { xMm: number; yMm: number; widthMm: number; depthMm: number }
+
+const MIN_RECT_MM = 100
+
+export function resizeRect(rect: RectMm, handle: RectHandle, point: PointMm, snapMm: number): RectMm {
+  const snap = (value: number) => Math.max(0, Math.round(value / snapMm) * snapMm)
+  const left = snap(handle.includes('l') ? point.x : rect.xMm)
+  const right = snap(handle.includes('r') ? point.x : rect.xMm + rect.widthMm)
+  const top = snap(handle.includes('t') ? point.y : rect.yMm)
+  const bottom = snap(handle.includes('b') ? point.y : rect.yMm + rect.depthMm)
+  const xMm = Math.min(left, right - MIN_RECT_MM)
+  const yMm = Math.min(top, bottom - MIN_RECT_MM)
+  return {
+    xMm: Math.max(0, xMm),
+    yMm: Math.max(0, yMm),
+    widthMm: Math.max(MIN_RECT_MM, Math.abs(right - left)),
+    depthMm: Math.max(MIN_RECT_MM, Math.abs(bottom - top)),
+  }
+}
+
+export function rectHandles(rect: RectMm): { handle: RectHandle; at: PointMm }[] {
+  const { xMm, yMm, widthMm, depthMm } = rect
+  return [
+    { handle: 'tl', at: { x: xMm, y: yMm } },
+    { handle: 'tr', at: { x: xMm + widthMm, y: yMm } },
+    { handle: 'bl', at: { x: xMm, y: yMm + depthMm } },
+    { handle: 'br', at: { x: xMm + widthMm, y: yMm + depthMm } },
+    { handle: 't', at: { x: xMm + widthMm / 2, y: yMm } },
+    { handle: 'b', at: { x: xMm + widthMm / 2, y: yMm + depthMm } },
+    { handle: 'l', at: { x: xMm, y: yMm + depthMm / 2 } },
+    { handle: 'r', at: { x: xMm + widthMm, y: yMm + depthMm / 2 } },
+  ]
+}
+
+export function resizePillarRect(architecture: Architecture, index: number, handle: RectHandle, point: PointMm, snapMm: number): Architecture {
+  if (index < 0 || index >= architecture.pillars.length) return architecture
+  const pillars = architecture.pillars.map((pillar, position) => {
+    if (position !== index) return pillar
+    const next = resizeRect({ xMm: pillar.xMm, yMm: pillar.yMm, widthMm: pillar.widthMm, depthMm: pillar.depthMm }, handle, point, snapMm)
+    return { ...pillar, xMm: next.xMm, yMm: next.yMm, widthMm: next.widthMm, depthMm: next.depthMm }
+  })
+  return { ...architecture, pillars }
+}
+
+export function resizeZoneRect(architecture: Architecture, index: number, handle: RectHandle, point: PointMm, snapMm: number): Architecture {
+  if (index < 0 || index >= architecture.storageZones.length) return architecture
+  const storageZones = architecture.storageZones.map((zone, position) => {
+    if (position !== index) return zone
+    const next = resizeRect({ xMm: zone.xMm, yMm: zone.yMm, widthMm: zone.widthMm, depthMm: zone.depthMm }, handle, point, snapMm)
+    return { ...zone, xMm: next.xMm, yMm: next.yMm, widthMm: next.widthMm, depthMm: next.depthMm }
+  })
+  return { ...architecture, storageZones }
+}
+
+export function moveZoneRect(architecture: Architecture, index: number, point: PointMm, snapMm: number): Architecture {
+  if (index < 0 || index >= architecture.storageZones.length) return architecture
+  const snapped = snapPoint(point, snapMm)
+  const storageZones = architecture.storageZones.map((zone, position) => position === index
+    ? { ...zone, xMm: snapped.x, yMm: snapped.y }
+    : zone)
+  return { ...architecture, storageZones }
+}
+
+const MIN_OPENING_MM = 200
+
+export function openingEnds(architecture: Architecture, opening: { wall?: string; segmentIndex?: number; offsetMm: number; widthMm: number }): { start: PointMm; end: PointMm } {
+  const segment = segmentOf(architecture, opening)
+  if (!segment) return { start: { x: 0, y: 0 }, end: { x: 0, y: 0 } }
+  const dx = segment.end.x - segment.start.x
+  const dy = segment.end.y - segment.start.y
+  const length = Math.hypot(dx, dy) || 1
+  const at = (along: number) => ({ x: segment.start.x + (dx / length) * along, y: segment.start.y + (dy / length) * along })
+  return { start: at(opening.offsetMm), end: at(opening.offsetMm + opening.widthMm) }
+}
+
+export function resizeOpening(architecture: Architecture, index: number, end: 'start' | 'end', point: PointMm, snapMm: number): Architecture {
+  if (index < 0 || index >= architecture.openings.length) return architecture
+  const opening = architecture.openings[index]
+  const segment = segmentOf(architecture, opening)
+  if (!segment) return architecture
+  const dx = segment.end.x - segment.start.x
+  const dy = segment.end.y - segment.start.y
+  const length = Math.hypot(dx, dy) || 1
+  const projected = ((point.x - segment.start.x) * dx + (point.y - segment.start.y) * dy) / length
+  const snapped = Math.max(0, Math.min(length, Math.round(projected / snapMm) * snapMm))
+  const openings = architecture.openings.map((candidate, position) => {
+    if (position !== index) return candidate
+    if (end === 'start') {
+      const newOffset = Math.min(snapped, candidate.offsetMm + candidate.widthMm - MIN_OPENING_MM)
+      return { ...candidate, offsetMm: Math.max(0, newOffset), widthMm: candidate.offsetMm + candidate.widthMm - Math.max(0, newOffset) }
+    }
+    const newEnd = Math.max(snapped, candidate.offsetMm + MIN_OPENING_MM)
+    return { ...candidate, widthMm: Math.min(length - candidate.offsetMm, newEnd - candidate.offsetMm) }
+  })
+  return { ...architecture, openings }
+}
+
+export function createOpeningAt(architecture: Architecture, entry: { label: string; kind: 'door' | 'service-window'; widthMm: number }, point: PointMm, dragTo: PointMm | null, snapMm: number): Architecture {
+  const from = dragTo ?? point
+  const segment = segmentOf(architecture, { segmentIndex: nearestSegment(architecture.roomPolygon, from).segmentIndex })
+  const polygon = architecture.roomPolygon
+  const nearest = nearestSegment(polygon, from)
+  const start = polygon[nearest.segmentIndex]
+  const end = polygon[(nearest.segmentIndex + 1) % polygon.length]
+  const dx = end.x - start.x
+  const dy = end.y - start.y
+  const length = Math.hypot(dx, dy) || 1
+  const project = (p: PointMm) => ((p.x - start.x) * dx + (p.y - start.y) * dy) / length
+  const a = Math.max(0, Math.min(length, Math.round(project(point) / snapMm) * snapMm))
+  const b = dragTo ? Math.max(0, Math.min(length, Math.round(project(dragTo) / snapMm) * snapMm)) : null
+  const widthMm = b === null ? Math.min(entry.widthMm, length) : Math.max(MIN_OPENING_MM, Math.abs(b - a))
+  const offsetMm = b === null ? Math.max(0, Math.min(length - widthMm, a - widthMm / 2)) : Math.max(0, Math.min(length - widthMm, Math.min(a, b)))
+  const midpoint = { x: (start.x + end.x) / 2, y: (start.y + end.y) / 2 }
+  const wallCandidates: { wall: 'top' | 'right' | 'bottom' | 'left'; distance: number }[] = [
+    { wall: 'top', distance: midpoint.y },
+    { wall: 'right', distance: architecture.widthMm - midpoint.x },
+    { wall: 'bottom', distance: architecture.depthMm - midpoint.y },
+    { wall: 'left', distance: midpoint.x },
+  ]
+  const wall = wallCandidates.sort((left, right) => left.distance - right.distance)[0].wall
+  const serviceWindow = entry.kind === 'service-window'
+  return {
+    ...architecture,
+    openings: [...architecture.openings, {
+      id: makeId(serviceWindow ? 'service-window' : 'door'),
+      label: entry.label,
+      kind: entry.kind,
+      wall,
+      segmentIndex: nearest.segmentIndex,
+      offsetMm,
+      widthMm,
+      ...(serviceWindow ? { sillHeightMm: 900, heightMm: 900, flow: 'clean-out' as const } : { flow: 'entry' as const, swingDepthMm: widthMm }),
+    }],
+  }
+}
+
+export function createRectItemAt(architecture: Architecture, entry: { id: string; label: string; kind: 'pillar' | 'zone'; widthMm: number; depthMm: number }, from: PointMm, to: PointMm | null, snapMm: number): Architecture {
+  const snap = (value: number) => Math.max(0, Math.round(value / snapMm) * snapMm)
+  const x1 = snap(from.x)
+  const y1 = snap(from.y)
+  if (!to) {
+    const xMm = Math.max(0, x1 - entry.widthMm / 2)
+    const yMm = Math.max(0, y1 - entry.depthMm / 2)
+    return appendRectItem(architecture, entry, { xMm, yMm, widthMm: entry.widthMm, depthMm: entry.depthMm })
+  }
+  const x2 = snap(to.x)
+  const y2 = snap(to.y)
+  const rect = {
+    xMm: Math.max(0, Math.min(x1, x2)),
+    yMm: Math.max(0, Math.min(y1, y2)),
+    widthMm: Math.max(MIN_RECT_MM, Math.abs(x2 - x1)),
+    depthMm: Math.max(MIN_RECT_MM, Math.abs(y2 - y1)),
+  }
+  return appendRectItem(architecture, entry, rect)
+}
+
+function appendRectItem(architecture: Architecture, entry: { id: string; label: string; kind: 'pillar' | 'zone' }, rect: RectMm): Architecture {
+  if (entry.kind === 'pillar') {
+    return { ...architecture, pillars: [...architecture.pillars, { id: makeId('pillar'), xMm: rect.xMm, yMm: rect.yMm, widthMm: rect.widthMm, depthMm: rect.depthMm }] }
+  }
+  return { ...architecture, storageZones: [...architecture.storageZones, { id: makeId('storage-zone'), label: entry.label, xMm: rect.xMm, yMm: rect.yMm, widthMm: rect.widthMm, depthMm: rect.depthMm, adjacent: false }] }
+}
+
+export type PlacementSpec = { catalogId: string; label: string; kind: 'pillar' | 'partition' | 'zone' | 'door' | 'service-window'; widthMm: number; depthMm: number }
+
+export function constrainToAxes(from: PointMm, to: PointMm): PointMm {
+  const dx = to.x - from.x
+  const dy = to.y - from.y
+  if (dx === 0 && dy === 0) return to
+  const angle = Math.atan2(dy, dx)
+  const step = Math.PI / 4
+  const snapped = Math.round(angle / step) * step
+  const length = Math.hypot(dx, dy)
+  return { x: from.x + Math.cos(snapped) * length, y: from.y + Math.sin(snapped) * length }
+}
+
+export function squarePointAround(anchor: PointMm, point: PointMm): PointMm {
+  const dx = point.x - anchor.x
+  const dy = point.y - anchor.y
+  const size = Math.max(Math.abs(dx), Math.abs(dy))
+  return { x: anchor.x + Math.sign(dx || 1) * size, y: anchor.y + Math.sign(dy || 1) * size }
 }

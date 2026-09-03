@@ -86,6 +86,7 @@ export interface ProjectState {
   checkpointAllLayouts(label: string): void
   restoreCheckpoint(checkpointId: string): boolean
   applySharedArchitecture(architecture: Architecture): ReturnType<WorkspaceFacade['applyOperations']>
+  applyEquipmentMoves(moves: { id: string; xMm: number; yMm: number }[]): boolean
   undo(): void
   redo(): void
 }
@@ -370,6 +371,16 @@ export function createProjectStore(initialProject: KitchenProject): ProjectStore
           target.checkpoints = [...(target.checkpoints ?? []), current]
           if (project.activeVariantId === target.id) project.architecture = structuredClone(restored.architecture)
         })
+        return result.ok
+      },
+      applyEquipmentMoves: (moves) => {
+        if (moves.length === 0) return true
+        const variant = getActiveVariant(get())
+        const operations = moves
+          .filter((move) => variant.equipment.some((item) => item.id === move.id && !variant.layoutConstraints?.lockedComponentIds?.includes(move.id)))
+          .map((move) => ({ type: 'update_component' as const, variantId: activeVariantId(), componentId: move.id, patch: { xMm: move.xMm, yMm: move.yMm } }))
+        if (operations.length === 0) return false
+        const result = applyOperations(operations, 'Auto-fix equipment positions')
         return result.ok
       },
       applySharedArchitecture: (architecture) => {
