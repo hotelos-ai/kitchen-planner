@@ -3,8 +3,10 @@ import { useStore } from 'zustand'
 import type { AutoLayoutPermissions, LayoutVariant, RectMm, SimulationScenario, StaffAssignment, StaffRole } from '../../domain/project'
 import { canonicalLayoutHash } from '../../optimizer/canonical-layout'
 import { layoutDiff } from '../../optimizer/feasibility'
+import { quantifyLayoutImprovement, spatialFromDiff } from '../../optimizer/layout-improvement'
 import type { AnytimeSearchResult, EvaluatedCandidate, OptimizerManifest } from '../../optimizer/types'
 import { getActiveVariant, projectStore, type ProjectStore } from '../../state/project-store'
+import { LayoutInspectViewer } from './LayoutInspectViewer'
 
 export type AutoLayoutProgress = {
   phase: 'feasibility' | 'pruning' | 'simulation' | 'confirmation' | 'complete'
@@ -84,6 +86,8 @@ function FinalistCard({
   name,
   candidate,
   baseline,
+  currentName,
+  selected,
   manifest,
   onInspect,
   onCompare,
@@ -92,6 +96,8 @@ function FinalistCard({
   name: string
   candidate: AutoLayoutCandidate
   baseline?: AutoLayoutCandidate
+  currentName: string
+  selected: boolean
   manifest: OptimizerManifest
   onInspect(): void
   onCompare(): void
@@ -103,9 +109,21 @@ function FinalistCard({
   const delta = (key: 'unfinishedOrders' | 'p90WaitSeconds' | 'peakBacklog' | 'totalTravelMm' | 'congestionEvents' | 'changeCost') =>
     candidate.score[key] - (baselineScore?.[key] ?? candidate.score[key])
   const diff = candidate.diff
+  const improvement = quantifyLayoutImprovement({
+    currentName,
+    currentScore: baselineScore,
+    candidateScore: { ...candidate.score, ...(candidate.serviceMetrics ?? {}) },
+    spatial: spatialFromDiff(diff, candidate.score.changeCost),
+  })
   return (
-    <article className="auto-layout-finalist" data-testid={`finalist-${objectiveId(name)}`}>
+    <article
+      className={`auto-layout-finalist${selected ? ' selected' : ''}`}
+      data-testid={`finalist-${objectiveId(name)}`}
+      aria-pressed={selected}
+      onClick={onInspect}
+    >
       <header><h3>{name}</h3><strong>Hard feasible</strong></header>
+      {improvement.hasBaselineScore && <p className={`auto-layout-gain${improvement.metrics.some((entry) => entry.improved) ? ' improved' : ''}`}>{improvement.headline}</p>}
       <dl>
         <dt>Completion / SLA</dt><dd>{completion === undefined ? `${candidate.score.unfinishedOrders} unfinished` : `${completion}%`} · {candidate.score.p90WaitSeconds <= (manifest.targetP90WaitSeconds ?? Infinity) ? 'met' : 'missed'}</dd>
         <dt>P90 wait</dt><dd>{minutes(candidate.score.p90WaitSeconds)} ({signed(delta('p90WaitSeconds'), ' s')})</dd>
@@ -116,8 +134,8 @@ function FinalistCard({
       </dl>
       <p>Seeds: {candidate.evaluatedSeeds.join(', ')} · confirmation {candidate.confirmationSeeds.join(', ')}</p>
       <p>Diff: {diff.moved.length} moved · {diff.rotated.length} rotated · {diff.resized.length} resized · {diff.added.length} added · {diff.removed.length} removed · change cost {candidate.score.changeCost}</p>
-      <details><summary>Exact experiment manifest</summary><pre>{JSON.stringify(manifest, null, 2)}</pre></details>
-      <div>
+      <details onClick={(event) => event.stopPropagation()}><summary>Exact experiment manifest</summary><pre>{JSON.stringify(manifest, null, 2)}</pre></details>
+      <div onClick={(event) => event.stopPropagation()}>
         <button type="button" onClick={onInspect}>Inspect {name}</button>
         <button type="button" onClick={onCompare}>Compare {name}</button>
         <button type="button" onClick={onSave}>Save {name} as new layout</button>
@@ -149,7 +167,7 @@ export function AutoLayoutWorkspace({ store = projectStore, runner, now = () => 
   const [result, setResult] = useState<AutoLayoutRunResult | null>(null)
   const [running, setRunning] = useState(false)
   const [message, setMessage] = useState('')
-  const [inspected, setInspected] = useState<AutoLayoutCandidate | null>(null)
+  const [inspected, setInspected] = useState<{ name: string; candidate: AutoLayoutCandidate } | null>(null)
   const [compared, setCompared] = useState<AutoLayoutCandidate | null>(null)
 
   const architectureElements = useMemo(() => [
@@ -193,6 +211,10 @@ export function AutoLayoutWorkspace({ store = projectStore, runner, now = () => 
     try {
       const next = await runner.run({ baseline: structuredClone(baseline), scenario, manifest: buildManifest() }, setProgress)
       setResult(next)
+      const first = next.finalists.length
+        ? bestBy(next.finalists, (value) => value.score.p90WaitSeconds)
+        : undefined
+      setInspected(first ? { name: 'Fastest service', candidate: first } : null)
       setProgress((current) => {
         const stats = next.searchStats
         return {
@@ -222,6 +244,12 @@ export function AutoLayoutWorkspace({ store = projectStore, runner, now = () => 
     ]
   }, [result])
   const baselineResult = result?.candidates.find((candidate) => candidate.hash === canonicalLayoutHash(baseline))
+  const inspectedImprovement = inspected ? quantifyLayoutImprovement({
+    currentName: baseline.name,
+    currentScore: baselineResult?.score,
+    candidateScore: { ...inspected.candidate.score, ...(inspected.candidate.serviceMetrics ?? {}) },
+    spatial: spatialFromDiff(inspected.candidate.diff, inspected.candidate.score.changeCost),
+  }) : null
 
   const adopt = (name: string, candidate: AutoLayoutCandidate) => {
     if (!result) return
@@ -332,11 +360,49 @@ export function AutoLayoutWorkspace({ store = projectStore, runner, now = () => 
               </>}
             </section>}
             <div className="auto-layout-finalists">
-              {namedFinalists.slice(0, alternativeCount === 1 ? 1 : namedFinalists.length).map(({ name, candidate }) => <FinalistCard key={name} name={name} candidate={candidate} baseline={baselineResult} manifest={result.manifest} onInspect={() => setInspected(candidate)} onCompare={() => setCompared(candidate)} onSave={() => adopt(name, candidate)} />)}
+              {namedFinalists.slice(0, alternativeCount === 1 ? 1 : namedFinalists.length).map(({ name, candidate }) => (
+                <FinalistCard
+                  key={name}
+                  name={name}
+                  candidate={candidate}
+                  baseline={baselineResult}
+                  currentName={baseline.name}
+                  selected={inspected?.candidate.id === candidate.id}
+                  manifest={result.manifest}
+                  onInspect={() => setInspected({ name, candidate })}
+                  onCompare={() => { setInspected({ name, candidate }); setCompared(candidate) }}
+                  onSave={() => adopt(name, candidate)}
+                />
+              ))}
             </div>
             {namedFinalists.length > 0 && <button type="button" onClick={() => namedFinalists.slice(0, alternativeCount).forEach(({ name, candidate }) => adopt(name, candidate))}>Save alternatives as new layouts</button>}
           </>}
-          {inspected && <section role="region" aria-label="Inspected finalist"><h3>Inspected finalist</h3><p>{inspected.id} · {inspected.variant.equipment.length} components · read-only spatial preview</p><LayoutThumbnail variant={inspected.variant} baseline={baseline} label="Inspected finalist plan" /></section>}
+          {inspected && (
+            <section className="auto-layout-inspect" role="region" aria-label="Inspected finalist">
+              <header>
+                <span className="eyebrow">Inspect before choosing</span>
+                <h3>{inspected.name}</h3>
+                <p>{inspected.candidate.id} · {inspected.candidate.variant.equipment.length} components · read-only spatial preview vs {baseline.name}</p>
+              </header>
+              {inspectedImprovement && (
+                <div className={`auto-layout-improvement${inspectedImprovement.hasBaselineScore ? ' scored' : ''}`} aria-label="Improvement versus current layout">
+                  <strong>{inspectedImprovement.headline}</strong>
+                  {inspectedImprovement.hasBaselineScore && (
+                    <dl>
+                      {inspectedImprovement.metrics.map((entry) => (
+                        <div key={entry.key} className={entry.improved ? 'improved' : entry.unchanged ? 'unchanged' : 'worse'}>
+                          <dt>{entry.label}</dt>
+                          <dd>{entry.candidate} <span>({entry.deltaLabel} from {entry.baseline})</span></dd>
+                        </div>
+                      ))}
+                    </dl>
+                  )}
+                  <p>{inspectedImprovement.spatial.moved} moved · {inspectedImprovement.spatial.rotated} rotated · {inspectedImprovement.spatial.resized} resized · {inspectedImprovement.spatial.added} added · {inspectedImprovement.spatial.removed} removed · change cost {inspectedImprovement.spatial.changeCost}</p>
+                </div>
+              )}
+              <LayoutInspectViewer store={store} variant={inspected.candidate.variant} />
+            </section>
+          )}
           {compared && <section role="region" aria-label="Finalist comparison"><h3>Finalist comparison</h3><p>{compared.id} against {baseline.id} · read-only spatial comparison</p><div className="auto-layout-comparison"><div><strong>Baseline</strong><LayoutThumbnail variant={baseline} label="Baseline comparison plan" /></div><div><strong>Finalist</strong><LayoutThumbnail variant={compared.variant} baseline={baseline} label="Finalist comparison plan" /></div></div></section>}
         </div>
       </div>

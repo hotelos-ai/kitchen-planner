@@ -1,4 +1,4 @@
-import { useState, type ComponentType } from 'react'
+import { useEffect, useState, type ComponentType } from 'react'
 import { useStore } from 'zustand'
 import type { EquipmentItem, KitchenProject, LayoutVariant } from '../../domain/project'
 import { getActiveVariant, projectStore, type ProjectStore } from '../../state/project-store'
@@ -44,6 +44,9 @@ type Props = {
   renderer?: ComponentType<SceneRendererProps>
   compact?: boolean
   webglSupported?: boolean
+  variantOverride?: LayoutVariant
+  readOnly?: boolean
+  walkMode?: boolean
 }
 
 function WebGLKitchenRenderer({ project, variant, selectedIds, showClearances, wallsTransparent, showLabels, walkMode, walkView, reducedMotion, playerPosition, cameraMode, fitSignal, walkRetrySignal, onSelect, onClearSelection, onContextLost, onContextRestored, onWalkAvailabilityChange, onWalkLockedChange, onWalkNearbyChange, onPlayerPositionChange }: SceneRendererProps) {
@@ -58,14 +61,17 @@ const browserSupportsWebGL = () => typeof window === 'undefined'
   || typeof window.WebGL2RenderingContext === 'function'
   || typeof window.WebGLRenderingContext === 'function'
 
-export function SceneWorkspace({ store = projectStore, renderer: Renderer, compact = false, webglSupported }: Props) {
+export function SceneWorkspace({ store = projectStore, renderer: Renderer, compact = false, webglSupported, variantOverride, readOnly = false, walkMode: walkModeProp }: Props) {
   const project = useStore(store, (state) => state.project)
-  const selectedIds = useStore(store, (state) => state.selectedIds)
-  const variant = useStore(store, getActiveVariant)
+  const storeSelectedIds = useStore(store, (state) => state.selectedIds)
+  const storeVariant = useStore(store, getActiveVariant)
+  const variant = variantOverride ?? storeVariant
+  const [previewSelectedIds, setPreviewSelectedIds] = useState<string[]>([])
+  const selectedIds = readOnly ? previewSelectedIds : storeSelectedIds
   const [showClearances, setShowClearances] = useState(false)
   const [wallsTransparent, setWallsTransparent] = useState(false)
   const [showLabels, setShowLabels] = useState(true)
-  const [walkMode, setWalkMode] = useState(false)
+  const [walkMode, setWalkMode] = useState(Boolean(walkModeProp))
   const [walkView, setWalkView] = useState<WalkViewMode>('first-person')
   const [walkAvailability, setWalkAvailability] = useState<WalkAvailability>({ status: 'idle' })
   const [walkRetrySignal, setWalkRetrySignal] = useState(0)
@@ -76,12 +82,34 @@ export function SceneWorkspace({ store = projectStore, renderer: Renderer, compa
   const [fitSignal, setFitSignal] = useState(0)
   const [rendererKey, setRendererKey] = useState(0)
   const [contextLost, setContextLost] = useState(false)
-  const select = (id: string) => store.getState().selectItems([id])
+  const select = (id: string) => {
+    if (readOnly) setPreviewSelectedIds([id])
+    else store.getState().selectItems([id])
+  }
+  const clearSelection = () => {
+    if (readOnly) setPreviewSelectedIds([])
+    else store.getState().clearSelection()
+  }
   const SceneRenderer = Renderer ?? WebGLKitchenRenderer
   const supportsWebGL = webglSupported ?? (Boolean(Renderer) || browserSupportsWebGL())
   const supportStatus = supportsWebGL ? 'ready' : 'unsupported'
   const reducedMotion = typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
-  const exitWalk = () => { setWalkMode(false); setWalkAvailability({ status: 'idle' }); setWalkLocked(false); setWalkNearby(false) }
+  useEffect(() => {
+    if (walkModeProp === undefined) return
+    setWalkMode(walkModeProp)
+    if (!walkModeProp) {
+      setWalkAvailability({ status: 'idle' })
+      setWalkLocked(false)
+      setWalkNearby(false)
+    }
+  }, [walkModeProp])
+  const exitWalk = () => {
+    if (walkModeProp) return
+    setWalkMode(false)
+    setWalkAvailability({ status: 'idle' })
+    setWalkLocked(false)
+    setWalkNearby(false)
+  }
   const activateCamera = (mode: CameraMode) => { exitWalk(); setCameraMode(mode); setFitSignal((value) => value + 1) }
   const restartRenderer = () => { setContextLost(false); setRendererKey((value) => value + 1); setFitSignal((value) => value + 1) }
 
@@ -111,7 +139,7 @@ export function SceneWorkspace({ store = projectStore, renderer: Renderer, compa
         data-walk-view={walkMode ? walkView : undefined}
       >
         <ResilientSceneBoundary status={supportStatus} resetKey={rendererKey} onRetry={restartRenderer}>
-          <SceneRenderer key={rendererKey} items={variant.equipment} project={project} variant={variant} selectedIds={selectedIds} showClearances={showClearances} wallsTransparent={wallsTransparent} showLabels={showLabels} walkMode={walkMode} walkView={walkView} reducedMotion={Boolean(reducedMotion)} playerPosition={playerPosition} cameraMode={cameraMode} fitSignal={fitSignal} walkRetrySignal={walkRetrySignal} rendererGeneration={rendererKey} onSelect={select} onClearSelection={() => store.getState().clearSelection()} onContextLost={() => setContextLost(true)} onContextRestored={() => setContextLost(false)} onWalkAvailabilityChange={setWalkAvailability} onWalkLockedChange={setWalkLocked} onWalkNearbyChange={setWalkNearby} onPlayerPositionChange={setPlayerPosition} />
+          <SceneRenderer key={rendererKey} items={variant.equipment} project={project} variant={variant} selectedIds={selectedIds} showClearances={showClearances} wallsTransparent={wallsTransparent} showLabels={showLabels} walkMode={walkMode} walkView={walkView} reducedMotion={Boolean(reducedMotion)} playerPosition={playerPosition} cameraMode={cameraMode} fitSignal={fitSignal} walkRetrySignal={walkRetrySignal} rendererGeneration={rendererKey} onSelect={select} onClearSelection={clearSelection} onContextLost={() => setContextLost(true)} onContextRestored={() => setContextLost(false)} onWalkAvailabilityChange={setWalkAvailability} onWalkLockedChange={setWalkLocked} onWalkNearbyChange={setWalkNearby} onPlayerPositionChange={setPlayerPosition} />
         </ResilientSceneBoundary>
         {contextLost && <div role="alert" className="scene-context-message"><strong>3D rendering paused</strong><p>The browser interrupted the graphics context. It may restore automatically, or restart the renderer without changing the plan.</p><button type="button" onClick={restartRenderer}>Restart 3D renderer</button></div>}
         {walkMode && walkAvailability.status === 'unavailable' ? <WalkUnavailableNotice availability={walkAvailability} onRetry={() => setWalkRetrySignal((value) => value + 1)} onExit={exitWalk} /> : walkMode && <><div className="walk-reticle" aria-hidden="true" /><div role="group" aria-label="Walk view"><button type="button" aria-pressed={walkView === 'first-person'} onClick={() => setWalkView('first-person')}>First-person view</button><button type="button" aria-pressed={walkView === 'third-person'} onClick={() => setWalkView('third-person')}>Third-person view</button></div><WalkControlsGuide view={walkView} locked={walkLocked} nearby={walkNearby} onExit={exitWalk} /></>}

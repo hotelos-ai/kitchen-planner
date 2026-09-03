@@ -22,7 +22,7 @@ export function KitchenScene({ project, variant, selectedIds, showClearances, wa
   const architecture = resolveSceneArchitecture(variant)
   return (
     <>
-      <color attach="background" args={['#e8e4da']} />
+      <color attach="background" args={['#eceade']} />
       <hemisphereLight args={['#fffaf0', '#69736e', .86]} />
       <ambientLight intensity={.34} />
       <directionalLight position={[3, 8, 4]} color="#fff1d4" intensity={2.45} castShadow shadow-mapSize={[1024, 1024]} shadow-camera-near={1} shadow-camera-far={18} shadow-camera-left={-7} shadow-camera-right={7} shadow-camera-top={7} shadow-camera-bottom={-7} />

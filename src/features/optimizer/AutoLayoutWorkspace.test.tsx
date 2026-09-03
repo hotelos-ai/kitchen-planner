@@ -137,7 +137,12 @@ describe('auto-layout workspace', () => {
     expect(screen.getAllByText(/"baselineVariantId": "baseline-trace"/i).length).toBeGreaterThan(0)
 
     await userEvent.click(screen.getByRole('button', { name: 'Inspect Fastest service' }))
-    expect(screen.getByRole('img', { name: 'Inspected finalist plan' })).toBeInTheDocument()
+    expect(screen.getByLabelText('Layout preview viewer')).toBeInTheDocument()
+    expect(within(screen.getByLabelText('Preview view')).getByRole('button', { name: 'Plan' })).toHaveAttribute('aria-pressed', 'true')
+    await userEvent.click(within(screen.getByLabelText('Preview view')).getByRole('button', { name: '3D' }))
+    expect(screen.getByLabelText('3D kitchen workspace')).toBeInTheDocument()
+    await userEvent.click(within(screen.getByLabelText('Preview view')).getByRole('button', { name: 'Walk' }))
+    expect(screen.getByRole('button', { name: 'Walk kitchen' })).toHaveAttribute('aria-pressed', 'true')
     await userEvent.click(screen.getByRole('button', { name: 'Compare Least travel' }))
     expect(screen.getByRole('img', { name: 'Baseline comparison plan' })).toBeInTheDocument()
     expect(screen.getByRole('img', { name: 'Finalist comparison plan' })).toBeInTheDocument()
@@ -215,6 +220,8 @@ describe('auto-layout workspace', () => {
 
     const fastest = await screen.findByTestId('finalist-fastest-service')
     expect(within(fastest).getByText(/10 min \(-300 s\)/i)).toBeInTheDocument()
+    expect(screen.getByLabelText('Improvement versus current layout')).toHaveTextContent(/better p90 wait/i)
+    expect(screen.getByLabelText('Improvement versus current layout')).toHaveTextContent(/Layout A/i)
   })
 
   it('keeps inspect and compare non-mutating', async () => {
@@ -226,6 +233,8 @@ describe('auto-layout workspace', () => {
 
     await user.click(await screen.findByRole('button', { name: 'Inspect Fastest service' }))
     expect(screen.getByRole('region', { name: 'Inspected finalist' })).toHaveTextContent('candidate-fastest')
+    await user.click(screen.getByRole('button', { name: 'Inspect Least travel' }))
+    expect(screen.getByRole('region', { name: 'Inspected finalist' })).toHaveTextContent('candidate-travel')
     await user.click(screen.getByRole('button', { name: 'Compare Least travel' }))
     expect(screen.getByRole('region', { name: 'Finalist comparison' })).toHaveTextContent('candidate-travel')
     expect(store.getState().project).toEqual(before)
