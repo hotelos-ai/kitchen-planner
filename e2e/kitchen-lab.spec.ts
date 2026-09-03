@@ -126,8 +126,10 @@ test('creates an advanced room and recommended essentials through the novice wiz
 test('offers a compact two-choice auto-fix in Fit-out, Space, and Sim', async ({ page }) => {
   const project = createSeedProject()
   const variant = project.variants.find((candidate) => candidate.id === project.activeVariantId)!
+  variant.architecture.locked = false
+  project.architecture.locked = false
   variant.equipment = variant.equipment.filter((item) => !item.capabilities.includes('hand-wash'))
-  variant.equipment.find((item) => item.id === 'mixer')!.xMm = -500
+  variant.equipment.find((item) => item.id === 'working-table')!.xMm = 4200
   await page.addInitScript(({ json }) => {
     localStorage.setItem('manta-raja:project:v1', json)
   }, { json: JSON.stringify(project) })

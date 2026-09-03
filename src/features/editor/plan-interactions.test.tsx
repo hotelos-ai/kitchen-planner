@@ -14,7 +14,9 @@ const workspace = (props: Partial<ComponentProps<typeof PlanWorkspace>> = {}) =>
 const geometryInvalidProject = () => {
   const project = createSeedProject()
   const variant = project.variants[0]
-  variant.equipment.find((item) => item.id === 'mixer')!.xMm = -500
+  variant.architecture.locked = false
+  project.architecture.locked = false
+  variant.equipment.find((item) => item.id === 'working-table')!.xMm = 4200
   return project
 }
 

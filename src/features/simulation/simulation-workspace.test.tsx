@@ -117,7 +117,7 @@ describe('simulation workspace', () => {
     const project = createSeedProject()
     const variant = project.variants.find((candidate) => candidate.id === project.activeVariantId)!
     variant.equipment = variant.equipment.filter((item) => !item.capabilities.includes('hand-wash'))
-    variant.equipment.find((item) => item.id === 'mixer')!.xMm = -500
+    variant.equipment.find((item) => item.id === 'working-table')!.xMm = 4200
     const store = createProjectStore(project)
     const run = vi.fn(runSimulation)
     const architectureBefore = structuredClone(variant.architecture)
