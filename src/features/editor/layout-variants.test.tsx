@@ -122,7 +122,7 @@ describe('layout variant tabs', () => {
     expect(store.getState().project.variants.find((variant) => variant.id === 'layout-c')?.name).toBe('Edited after close')
   })
 
-  it('protects the last layout and delegates the plus action when supplied', async () => {
+  it('protects the last layout and delegates the wizard action from the tab menu', async () => {
     const user = userEvent.setup()
     const project = projectWithLayouts('layout-a')
     project.variants = [project.variants[0]]
@@ -131,13 +131,13 @@ describe('layout variant tabs', () => {
     render(<LayoutVariants store={store} onAdd={onAdd} />)
 
     expect(screen.getByRole('button', { name: 'Close Layout A' })).toBeDisabled()
-    await user.click(screen.getByRole('button', { name: 'New layout' }))
-    await user.click(screen.getByRole('menuitem', { name: 'Duplicate current layout' }))
+    await user.click(screen.getByRole('button', { name: 'Layout A actions' }))
+    await user.click(screen.getByRole('menuitem', { name: 'New layout from wizard' }))
     expect(onAdd).toHaveBeenCalledOnce()
     expect(store.getState().project.variants).toHaveLength(1)
   })
 
-  it('creates and activates a temporary variant when no plus callback is supplied', async () => {
+  it('creates and activates a blank layout directly from the plus button', async () => {
     const user = userEvent.setup()
     const project = projectWithLayouts('layout-a')
     project.variants = [project.variants[0]]
@@ -145,27 +145,25 @@ describe('layout variant tabs', () => {
     render(<LayoutVariants store={store} />)
 
     await user.click(screen.getByRole('button', { name: 'New layout' }))
-    await user.click(screen.getByRole('menuitem', { name: 'Duplicate current layout' }))
 
     expect(store.getState().project.variants).toHaveLength(2)
     expect(store.getState().project.activeVariantId).not.toBe('layout-a')
-    expect(screen.getByRole('tab', { name: 'Layout option 2' })).toHaveAttribute('aria-selected', 'true')
-    expect(screen.getByRole('tab', { name: 'Layout option 2' })).toHaveFocus()
-  })
-
-  it('creates an empty layout from the plus menu', async () => {
-    const user = userEvent.setup()
-    const project = projectWithLayouts('layout-a')
-    project.variants = [project.variants[0]]
-    const store = createProjectStore(project)
-    render(<LayoutVariants store={store} />)
-
-    await user.click(screen.getByRole('button', { name: 'New layout' }))
-    await user.click(screen.getByRole('menuitem', { name: 'Create empty layout' }))
-
     const created = store.getState().project.variants.find((variant) => variant.id !== 'layout-a')
     expect(created?.equipment).toEqual([])
-    expect(created?.name).toMatch(/Empty layout/)
+    expect(created?.name).toBe('Layout B')
+    expect(screen.getByRole('tab', { name: /Layout B/ })).toHaveAttribute('aria-selected', 'true')
+  })
+
+  it('clones the active layout from the clone button next to the tabs', async () => {
+    const user = userEvent.setup()
+    const store = createProjectStore(projectWithLayouts('layout-a'))
+    render(<LayoutVariants store={store} />)
+
+    await user.click(screen.getByRole('button', { name: 'Clone Layout A as new layout' }))
+    const created = store.getState().project.variants.find((variant) => /copy/i.test(variant.name))
+    expect(created).toBeDefined()
+    expect(created?.equipment.length).toBeGreaterThan(0)
+    expect(store.getState().project.activeVariantId).toBe(created?.id)
   })
 
   it('creates a named checkpoint from the layout actions menu', async () => {

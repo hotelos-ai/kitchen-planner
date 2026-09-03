@@ -104,8 +104,8 @@ describe('plan workspace', () => {
   it('opens the layout wizard and atomically switches to its new variant', async () => {
     const user = userEvent.setup()
     render(workspace())
-    await user.click(screen.getByRole('button', { name: /New layout/i }))
-    await user.click(screen.getByRole('menuitem', { name: 'Duplicate current layout' }))
+    await user.click(screen.getByRole('button', { name: /^Layout A actions$/i }))
+    await user.click(screen.getByRole('menuitem', { name: 'New layout from wizard' }))
     expect(screen.getByRole('dialog', { name: 'Starting point' })).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Next' }))
     await user.click(screen.getByRole('button', { name: 'Next' }))

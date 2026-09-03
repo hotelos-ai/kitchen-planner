@@ -43,7 +43,6 @@ export function LayoutVariants({ store, formatTabLabel, onAdd, onClosed, onOpenR
   const project = useStore(store, (state) => state.project)
   const [rename, setRename] = useState<RenameState | null>(null)
   const [menuId, setMenuId] = useState<string | null>(null)
-  const [addMenuOpen, setAddMenuOpen] = useState(false)
   const tabs = useRef(new Map<string, HTMLButtonElement>())
   const pendingFocusId = useRef<string | null>(null)
 
@@ -121,12 +120,17 @@ export function LayoutVariants({ store, formatTabLabel, onAdd, onClosed, onOpenR
     })
   }
 
-  const add = () => {
-    if (onAdd) {
-      onAdd()
-      return
+  const nextBlankName = () => {
+    const taken = new Set(project.variants.map((variant) => variant.name))
+    for (let letter = 0; letter < 26; letter += 1) {
+      const name = `Layout ${String.fromCharCode(65 + letter)}`
+      if (!taken.has(name)) return name
     }
-    const id = store.getState().createVariant(`Layout option ${project.variants.length + 1}`)
+    return `Layout ${project.variants.length + 1}`
+  }
+
+  const add = () => {
+    const id = store.getState().createEmptyVariant(nextBlankName())
     pendingFocusId.current = id
     store.getState().activateVariant(id)
   }
@@ -139,12 +143,7 @@ export function LayoutVariants({ store, formatTabLabel, onAdd, onClosed, onOpenR
     setMenuId(null)
   }
 
-  const emptyLayout = () => {
-    const id = store.getState().createEmptyVariant(`Empty layout ${project.variants.length + 1}`)
-    pendingFocusId.current = id
-    store.getState().activateVariant(id)
-    setAddMenuOpen(false)
-  }
+  const activeVariant = project.variants.find((variant) => variant.id === project.activeVariantId)
 
   return (
     <div className="variant-controls">
@@ -197,6 +196,8 @@ export function LayoutVariants({ store, formatTabLabel, onAdd, onClosed, onOpenR
                 <div className="layout-tab-popover" role="menu" aria-label={`${variant.name} actions`}>
                   <button type="button" role="menuitem" onClick={() => { setRename({ id: variant.id, draft: variant.name }); setMenuId(null) }}>Rename</button>
                   <button type="button" role="menuitem" onClick={() => duplicateLayout(variant)}>Duplicate</button>
+                  {onAdd && <button type="button" role="menuitem" onClick={() => { setMenuId(null); onAdd() }}>New layout from wizard</button>}
+                  {onGenerateAlternatives && <button type="button" role="menuitem" onClick={() => { store.getState().activateVariant(variant.id); setMenuId(null); onGenerateAlternatives() }}>Generate alternatives</button>}
                   <button type="button" role="menuitem" onClick={() => { store.getState().activateVariant(variant.id); store.getState().addNamedCheckpoint(`Named: ${variant.name}`); setMenuId(null) }}>Create named checkpoint</button>
                   <button type="button" role="menuitem" onClick={() => { store.getState().activateVariant(variant.id); setMenuId(null); onOpenRevisions?.() }}>Revision history</button>
                   <button type="button" role="menuitem" onClick={() => { store.getState().activateVariant(variant.id); setMenuId(null); onCompare?.() }}>Compare</button>
@@ -219,15 +220,10 @@ export function LayoutVariants({ store, formatTabLabel, onAdd, onClosed, onOpenR
         })}
       </div>
       <div className="layout-add-wrap">
-        <button type="button" className="layout-tab-add" aria-label="New layout" aria-expanded={addMenuOpen} title="Add a layout alternative" onClick={() => setAddMenuOpen((open) => !open)}>＋</button>
-        {addMenuOpen && (
-          <div className="layout-tab-popover layout-add-popover" role="menu" aria-label="New layout">
-            <button type="button" role="menuitem" onClick={() => { setAddMenuOpen(false); add() }}>Duplicate current layout</button>
-            <button type="button" role="menuitem" onClick={emptyLayout}>Create empty layout</button>
-            <button type="button" role="menuitem" onClick={() => { setAddMenuOpen(false); onGenerateAlternatives?.() }} disabled={!onGenerateAlternatives}>Generate alternatives</button>
-            <button type="button" role="menuitem" onClick={() => { setAddMenuOpen(false); add() }}>Import layout from another project</button>
-          </div>
+        {activeVariant && (
+          <button type="button" className="layout-tab-clone" aria-label={`Clone ${activeVariant.name} as new layout`} title={`Clone ${activeVariant.name}`} onClick={() => duplicateLayout(activeVariant)}>⧉</button>
         )}
+        <button type="button" className="layout-tab-add" aria-label="New layout" title="Add a blank layout" onClick={add}>＋</button>
       </div>
       <select
         hidden
