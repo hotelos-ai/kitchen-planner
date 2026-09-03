@@ -113,7 +113,7 @@ const defaultScenario = (): SimulationScenario => ({
   checks: { collisions: true, doorSwings: true, dirtyCleanCrossings: true },
 })
 
-export function createBlankProject(name = 'Untitled kitchen'): KitchenProject {
+export function createBlankProject(name = 'Kitchen 1'): KitchenProject {
   const architecture = rectangularArchitecture(6200, 4800)
   const variant: LayoutVariant = {
     id: 'layout-a',

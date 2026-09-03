@@ -66,7 +66,7 @@ export function ProjectStartScreen({ onCreateRoom, onDrawManually, onOpenProject
   return (
     <section className="start-screen" aria-label="Create your kitchen space">
       <header>
-        <p className="eyebrow">Kitchen Planner</p>
+        <p className="eyebrow">CalmKitchen Designer</p>
         <h2>Create your kitchen space</h2>
         <p>How would you like to start?</p>
       </header>
@@ -85,7 +85,7 @@ export function ProjectStartScreen({ onCreateRoom, onDrawManually, onOpenProject
         </button>
         <button type="button" onClick={() => fileRef.current?.click()}>
           <strong>Open a saved project</strong>
-          <span>Restore a Kitchen Planner file</span>
+          <span>Restore a CalmKitchen Designer file</span>
         </button>
       </div>
       <input ref={fileRef} type="file" accept="application/json,.json" aria-label="Open saved project" hidden onChange={onOpenFile} />

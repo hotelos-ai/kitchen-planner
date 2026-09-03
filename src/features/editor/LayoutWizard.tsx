@@ -296,7 +296,7 @@ export function LayoutWizard({ store, onClose, initialStep = 0, initialMode = 'd
               </ul>
               : <p>No modeled placement warnings.</p>}</section>
             <section><h3>Professional review</h3><p>{draftRequirements.filter((requirement) => requirement.severity === 'professional-review').length} unmodeled professional matters remain for qualified review.</p></section>
-            <p>Planning checks describe modeled operational assumptions. Kitchen Planner does not certify regulatory compliance; engage qualified professionals for local requirements.</p>
+            <p>Planning checks describe modeled operational assumptions. CalmKitchen Designer does not certify regulatory compliance; engage qualified professionals for local requirements.</p>
           </div>
         )}
 

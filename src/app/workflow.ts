@@ -6,7 +6,7 @@ export type WorkspaceOverlay = 'compare' | 'auto-layout' | null
 
 export const WORKFLOW_STAGES: { id: WorkflowStage; step: number; label: string }[] = [
   { id: 'space', step: 1, label: 'Space' },
-  { id: 'equipment', step: 2, label: 'Equipment' },
+  { id: 'equipment', step: 2, label: 'Fit-out' },
   { id: 'simulate', step: 3, label: 'Simulate' },
 ]
 
@@ -18,4 +18,8 @@ export const VIEW_MODES: { id: ViewMode; label: string }[] = [
 
 export function workflowStageLabel(stage: WorkflowStage): string {
   return WORKFLOW_STAGES.find((entry) => entry.id === stage)?.label ?? stage
+}
+
+export function workflowStageFromDigit(key: string): WorkflowStage | undefined {
+  return WORKFLOW_STAGES.find((entry) => String(entry.step) === key)?.id
 }

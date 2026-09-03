@@ -41,7 +41,7 @@ export function SimulationSetup({ scenario, store: _store, onRun, onChange }: Pr
   const summary = useMemo(() => (
     <p>
       {menu.length} representative menu items · {staffCount} staff · {scenario.covers} covers in {scenario.durationMinutes} minutes.
-      {estimatedCount} values estimated by Kitchen Planner.
+      {estimatedCount} values estimated by CalmKitchen Designer.
     </p>
   ), [estimatedCount, menu.length, scenario.covers, scenario.durationMinutes, staffCount])
 
