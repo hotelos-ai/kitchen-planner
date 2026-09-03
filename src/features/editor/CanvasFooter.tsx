@@ -34,7 +34,7 @@ export function CanvasFooter({ store, stage, selectedCount, onEditSpace }: Props
         <span className="scale-hint">1 metre = {Math.round(1000 / project.snapMm)} squares</span>
         {stage !== 'space' && (
           <span className="space-lock-indicator">
-            🔒 Space locked
+            ⚿ Space locked
             {onEditSpace && (
               <button type="button" className="link-button" onClick={onEditSpace}>Edit in Space</button>
             )}

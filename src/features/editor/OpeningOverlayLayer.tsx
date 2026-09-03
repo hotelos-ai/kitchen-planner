@@ -8,7 +8,7 @@ export function OpeningOverlayLayer({ architecture, pixelsPerMm: scale, originX,
     const x = opening.wall === 'left' ? originX : opening.wall === 'right' ? originX + px(architecture.widthMm) : originX + px(opening.offsetMm)
     const y = opening.wall === 'top' ? originY : opening.wall === 'bottom' ? originY + px(architecture.depthMm) : originY + px(opening.offsetMm)
     const length = px(opening.widthMm)
-    const color = opening.flow === 'clean-out' ? '#187984' : opening.flow === 'dirty-in' ? '#a87922' : opening.flow === 'closed' ? '#b64e3b' : '#3f665e'
+    const color = opening.flow === 'clean-out' ? '#4b7ce1' : opening.flow === 'dirty-in' ? '#a47932' : opening.flow === 'closed' ? '#a32f1d' : '#5e6b5a'
     const labelWidth = vertical ? 104 : Math.max(90, length)
     const labelX = vertical ? (opening.wall === 'right' ? x - labelWidth - 5 : x + 5) : x + (length - labelWidth) / 2
     const labelY = vertical ? y + length / 2 - 10 : y - 20

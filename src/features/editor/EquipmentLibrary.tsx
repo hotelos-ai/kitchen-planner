@@ -186,17 +186,6 @@ export function EquipmentLibrary({ store, stage = 'equipment' }: Props) {
         {entries.map((entry) => <CatalogCard key={entry.catalogId} entry={entry} displayUnit={project.displayUnit} onAdd={() => addCatalogEntry(entry)} />)}
         {entries.length === 0 && <p role="status">No catalog components match these filters.</p>}
       </div>
-      <button type="button" className="add-custom-button" onClick={() => setShowCustom((value) => !value)}>＋ Add custom item</button>
-      {showCustom && (
-        <form className="custom-item-form" onSubmit={(event) => { event.preventDefault(); addCustom() }}>
-          <label>New item label<input aria-label="New item label" value={label} onChange={(event) => setLabel(event.target.value)} /></label>
-          <div className="field-pair">
-            <label>Width (mm)<input type="number" min="100" step="50" value={widthMm} onChange={(event) => setWidthMm(Number(event.target.value))} /></label>
-            <label>Depth (mm)<input type="number" min="100" step="50" value={depthMm} onChange={(event) => setDepthMm(Number(event.target.value))} /></label>
-          </div>
-          <button type="submit" className="primary-button">Add to plan</button>
-        </form>
-      )}
       </> : catalogTab === 'templates' ? (
         <div className="station-templates">
           <p>Add a suggested group as an editable cluster. Nothing is locked in place.</p>
@@ -232,6 +221,17 @@ export function EquipmentLibrary({ store, stage = 'equipment' }: Props) {
             </details>
           ))}
         </div>
+      )}
+      <button type="button" className="add-custom-button" onClick={() => setShowCustom((value) => !value)}>＋ Add custom item</button>
+      {showCustom && (
+        <form className="custom-item-form" onSubmit={(event) => { event.preventDefault(); addCustom() }}>
+          <label>New item label<input aria-label="New item label" value={label} onChange={(event) => setLabel(event.target.value)} /></label>
+          <div className="field-pair">
+            <label>Width (mm)<input type="number" min="100" step="50" value={widthMm} onChange={(event) => setWidthMm(Number(event.target.value))} /></label>
+            <label>Depth (mm)<input type="number" min="100" step="50" value={depthMm} onChange={(event) => setDepthMm(Number(event.target.value))} /></label>
+          </div>
+          <button type="submit" className="primary-button">Add to plan</button>
+        </form>
       )}
     </aside>
   )

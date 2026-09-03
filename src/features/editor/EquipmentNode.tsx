@@ -8,14 +8,14 @@ import type { OverlayPosition } from './ComponentContextMenu'
 import { equipmentTransformPatch } from './equipment-transform'
 
 const COLORS: Record<EquipmentItem['category'], { fill: string; stroke: string; text: string }> = {
-  cooking: { fill: '#efd3ca', stroke: '#a35643', text: '#612c22' },
-  cold: { fill: '#d9e8e9', stroke: '#4d7b80', text: '#294e52' },
-  prep: { fill: '#dfe6d7', stroke: '#718368', text: '#40503a' },
-  washing: { fill: '#e9e0c6', stroke: '#8f7538', text: '#5b4920' },
-  landing: { fill: '#eee7d3', stroke: '#9b844e', text: '#5b4b28' },
-  storage: { fill: '#e5dfd2', stroke: '#807568', text: '#4d463e' },
+  cooking: { fill: '#f2ddd5', stroke: '#b5614b', text: '#743c2d' },
+  cold: { fill: '#dee6f3', stroke: '#5d88d6', text: '#2e4d8f' },
+  prep: { fill: '#dde7e2', stroke: '#4a8578', text: '#2c554c' },
+  washing: { fill: '#f0e6cf', stroke: '#a07c41', text: '#5f4a22' },
+  landing: { fill: '#f2ecdc', stroke: '#a9884b', text: '#5f4e26' },
+  storage: { fill: '#e8e7e0', stroke: '#6f7a68', text: '#454d40' },
   hood: { fill: 'rgba(184, 194, 190, .26)', stroke: '#68726f', text: '#3b4542' },
-  custom: { fill: '#e5dcee', stroke: '#79648c', text: '#493a58' },
+  custom: { fill: '#f0dcea', stroke: '#a8547f', text: '#6e3355' },
 }
 
 type NodeFeedback = { kind: 'move' | 'resize'; xMm: number; yMm: number; widthMm: number; depthMm: number }
@@ -133,7 +133,7 @@ export function EquipmentNode({ item, selected, warning = false, displayUnit, pi
         width={width}
         height={height}
         fill={colors.fill}
-        stroke={selected ? '#d46847' : warning ? '#d29122' : colors.stroke}
+        stroke={selected ? '#ca4e8e' : warning ? '#a47932' : colors.stroke}
         strokeWidth={selected ? 3 : 1.5}
         dash={item.category === 'hood' || warning ? [7, 4] : undefined}
         shadowColor="#101513"
@@ -154,9 +154,9 @@ export function EquipmentNode({ item, selected, warning = false, displayUnit, pi
       rotateEnabled={false}
       enabledAnchors={['top-left', 'top-center', 'top-right', 'middle-left', 'middle-right', 'bottom-left', 'bottom-center', 'bottom-right']}
       anchorFill="#fffaf0"
-      anchorStroke="#d46847"
+      anchorStroke="#ca4e8e"
       anchorCornerRadius={2}
-      borderStroke="#d46847"
+      borderStroke="#ca4e8e"
       anchorSize={9}
       padding={3}
       flipEnabled={false}
