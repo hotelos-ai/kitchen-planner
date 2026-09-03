@@ -123,7 +123,7 @@ test('creates an advanced room and recommended essentials through the novice wiz
   await expect(page.getByRole('dialog', { name: 'Validate plan' })).toContainText(/operational guidance, not regulatory certification/i)
 })
 
-test('repairs an automatable invalid model with one click in Fit-out, Space, and Sim', async ({ page }) => {
+test('offers a compact two-choice auto-fix in Fit-out, Space, and Sim', async ({ page }) => {
   const project = createSeedProject()
   const variant = project.variants.find((candidate) => candidate.id === project.activeVariantId)!
   variant.equipment = variant.equipment.filter((item) => !item.capabilities.includes('hand-wash'))
@@ -137,6 +137,10 @@ test('repairs an automatable invalid model with one click in Fit-out, Space, and
   const fitOutAutoFix = page.getByRole('button', { name: 'Auto-fix', exact: true })
   await expect(fitOutAutoFix).toBeVisible()
   await fitOutAutoFix.click()
+  let choice = page.getByRole('dialog', { name: 'Choose an auto-fix strategy' })
+  await expect(choice.getByRole('button', { name: /^(Adjust the layout|Move equipment)$/ })).toHaveCount(2)
+  await expect(choice.getByRole('list')).toHaveCount(0)
+  await choice.getByRole('button', { name: 'Move equipment' }).click()
   await expect(fitOutAutoFix).toHaveCount(0)
 
   await page.getByRole('button', { name: 'Undo' }).click()
@@ -145,6 +149,10 @@ test('repairs an automatable invalid model with one click in Fit-out, Space, and
   const spaceAutoFix = page.getByRole('button', { name: 'Auto-fix', exact: true })
   await expect(spaceAutoFix).toBeVisible()
   await spaceAutoFix.click()
+  choice = page.getByRole('dialog', { name: 'Choose an auto-fix strategy' })
+  await expect(choice.getByRole('button', { name: /^(Adjust the layout|Move equipment)$/ })).toHaveCount(2)
+  await expect(choice.getByRole('list')).toHaveCount(0)
+  await choice.getByRole('button', { name: 'Adjust the layout' }).click()
   await expect(spaceAutoFix).toHaveCount(0)
 
   await page.getByRole('button', { name: 'Undo' }).click()
@@ -152,6 +160,10 @@ test('repairs an automatable invalid model with one click in Fit-out, Space, and
   const run = page.getByRole('button', { name: /Run 60-minute service/i })
   await expect(run).toBeDisabled()
   await page.getByRole('button', { name: 'Auto-fix plan' }).click()
+  choice = page.getByRole('dialog', { name: 'Choose an auto-fix strategy' })
+  await expect(choice.getByRole('button', { name: /^(Adjust the layout|Move equipment)$/ })).toHaveCount(2)
+  await expect(choice.getByRole('list')).toHaveCount(0)
+  await choice.getByRole('button', { name: 'Move equipment' }).click()
 
   await expect(run).toBeEnabled()
   await expect(page.getByRole('dialog', { name: 'Auto-fix simulation plan' })).toHaveCount(0)

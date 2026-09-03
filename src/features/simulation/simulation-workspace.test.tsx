@@ -113,20 +113,30 @@ describe('simulation workspace', () => {
     expect(screen.getAllByLabelText(/live queue/i).length).toBeGreaterThan(0)
   })
 
-  it('repairs geometry and missing essentials from the first Auto-fix click and enables Run', async () => {
+  it('opens the compact strategy prompt and moves equipment without changing architecture', async () => {
     const project = createSeedProject()
     const variant = project.variants.find((candidate) => candidate.id === project.activeVariantId)!
     variant.equipment = variant.equipment.filter((item) => !item.capabilities.includes('hand-wash'))
     variant.equipment.find((item) => item.id === 'mixer')!.xMm = -500
     const store = createProjectStore(project)
     const run = vi.fn(runSimulation)
+    const architectureBefore = structuredClone(variant.architecture)
     render(<SimulationWorkspace store={store} run={run} />)
 
     const runButton = screen.getByRole('button', { name: /Run 60-minute service/i })
     expect(runButton).toBeDisabled()
-    const beforeRevision = store.getState().revision
 
     await userEvent.click(screen.getByRole('button', { name: 'Auto-fix plan' }))
+
+    const dialog = screen.getByRole('dialog', { name: 'Choose an auto-fix strategy' })
+    expect(within(dialog).getByRole('button', { name: 'Adjust the layout' })).toBeInTheDocument()
+    expect(within(dialog).getByRole('button', { name: 'Move equipment' })).toBeInTheDocument()
+    expect(within(dialog).getAllByRole('button', { name: /^(Adjust the layout|Move equipment)$/ })).toHaveLength(2)
+    expect(within(dialog).queryByRole('list')).not.toBeInTheDocument()
+    expect(within(dialog).queryByRole('region', { name: 'Layout checks' })).not.toBeInTheDocument()
+    expect(within(dialog).queryByRole('region', { name: 'Operational essentials' })).not.toBeInTheDocument()
+
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Move equipment' }))
 
     await waitFor(() => expect(runButton).toBeEnabled())
     const next = store.getState()
@@ -138,8 +148,8 @@ describe('simulation workspace', () => {
       scenario,
       layoutConstraints: fixedVariant.layoutConstraints,
     })).toHaveLength(0)
-    expect(fixedVariant.equipment.some((item) => item.capabilities.includes('hand-wash'))).toBe(true)
-    expect(next.revision).toBe(beforeRevision + 1)
+    expect(fixedVariant.architecture).toEqual(architectureBefore)
+    expect(screen.queryByRole('dialog', { name: 'Choose an auto-fix strategy' })).not.toBeInTheDocument()
     expect(screen.queryByRole('dialog', { name: 'Auto-fix simulation plan' })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Auto-fix plan' })).not.toBeInTheDocument()
 
@@ -158,8 +168,10 @@ describe('simulation workspace', () => {
     appStateStore.getState().setOverlay('compare')
     render(<SimulationWorkspace store={store} run={runSimulation} />)
 
-    await userEvent.click(screen.getByRole('button', { name: 'Auto-fix plan' }))
-    await userEvent.click(within(screen.getByRole('dialog', { name: 'Auto-fix simulation plan' })).getByRole('button', { name: 'Fix room setup' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Review issues' }))
+    const review = screen.getByRole('dialog', { name: 'Auto-fix simulation plan' })
+    await userEvent.click(within(review).getByText('Review details'))
+    await userEvent.click(within(review).getByRole('button', { name: 'Fix room setup' }))
 
     expect(screen.queryByRole('dialog', { name: 'Auto-fix simulation plan' })).not.toBeInTheDocument()
     expect(appStateStore.getState()).toMatchObject({ stage: 'space', view: 'plan', overlay: null })
