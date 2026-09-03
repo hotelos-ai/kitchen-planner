@@ -63,7 +63,7 @@ select.input, .select, .scenario-editor select { border: 1px solid var(--rule-2)
 select:hover:not(:disabled) { border-color: rgba(17, 34, 28, 0.35); }
 button { cursor: pointer; }
 
-.app-shell { width: 100dvw; height: 100dvh; min-height: 100dvh; display: grid; grid-template-rows: auto minmax(0, 1fr) auto; overflow: hidden; background: var(--paper); }
+.app-shell { width: 100dvw; height: 100dvh; min-height: 100dvh; display: grid; grid-template-rows: auto minmax(0, 1fr) auto; grid-template-columns: minmax(0, 1fr); overflow: hidden; background: var(--paper); }
 .app-footer { display: flex; align-items: center; gap: 12px; min-height: 34px; padding: 5px 16px; border-top: 1px solid var(--rule); background: linear-gradient(180deg, var(--paper) 0%, #edeae1 100%); color: var(--ink-3); font-size: 11.5px; }
 .app-footer .footer-brand { display: flex; align-items: center; gap: 7px; color: var(--ink); font-weight: 600; }
 .app-footer .footer-brand svg { width: 14px; height: 14px; }
@@ -235,11 +235,13 @@ button { cursor: pointer; }
 
 /* ---------- simulation ---------- */
 .simulation-workspace { min-width: 0; min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr) 340px; overflow: hidden; background: var(--paper); }
-.simulation-main { min-width: 0; min-height: 0; display: grid; grid-template-rows: auto auto 1fr auto; }
+.simulation-main { min-width: 0; min-height: 0; display: grid; grid-template-rows: auto auto minmax(0, 1fr) auto; }
 .simulation-toolbar { min-height: 52px; display: flex; align-items: center; justify-content: space-between; gap: 10px; row-gap: 6px; flex-wrap: wrap; padding: 8px 14px; border-bottom: 1px solid var(--rule); background: var(--paper-hi); }
+.simulation-toolbar > * { min-width: 0; max-width: 100%; }
 .simulation-toolbar > div:first-child { min-width: 0; display: grid; gap: 2px; }
-.simulation-toolbar strong { font-size: 12.5px; font-weight: 510; }
-.layer-toggles { display: flex; gap: 5px; overflow-x: auto; }
+.simulation-toolbar strong { overflow-wrap: anywhere; font-size: 12.5px; font-weight: 510; }
+.layer-toggles { min-width: 0; max-width: 100%; display: flex; gap: 5px; overflow-x: auto; }
+.layer-toggles button { flex: 0 0 auto; }
 .layer-toggles button, .run-simulation { min-height: 28px; border: 1px solid var(--rule); border-radius: var(--control-radius); padding: 0 10px; background: var(--paper-hi); color: var(--ink-2); font-size: 11.5px; font-weight: 510; }
 .layer-toggles button:hover { color: var(--ink); border-color: rgba(17, 34, 28, 0.35); }
 .layer-toggles button[aria-pressed="true"] { color: var(--accent); border-color: rgba(202, 78, 142, 0.35); background: var(--accent-soft); }
@@ -845,10 +847,11 @@ button { cursor: pointer; }
 /* simulation three-panel */
 .simulation-workspace.three-panel { grid-template-columns: 320px minmax(0, 1fr) 360px; }
 .simulation-workspace.three-panel.scenario-collapsed { grid-template-columns: 52px minmax(0, 1fr) 360px; }
-.simulation-scenario-panel { min-width: 280px; min-height: 0; overflow-y: auto; border-right: 1px solid var(--rule); background: var(--paper-hi); }
-.simulation-scenario-content { min-width: 280px; }
+.simulation-scenario-panel { min-width: 280px; min-height: 0; overflow: hidden; border-right: 1px solid var(--rule); background: var(--paper-hi); }
+.simulation-scenario-content { min-width: 280px; height: 100%; overflow-x: hidden; overflow-y: auto; }
 .simulation-scenario-content[hidden] { display: none; }
-.simulation-scenario-content > .panel-heading { margin: 0; border-bottom: 1px solid var(--rule); padding: 14px; }
+.simulation-scenario-content > .panel-heading { position: sticky; z-index: 3; top: 0; margin: 0; border-bottom: 1px solid var(--rule); padding: 14px; background: var(--paper-hi); }
+.simulation-scenario-content > .panel-heading label, .simulation-scenario-content > .panel-heading select { min-width: 0; width: 100%; }
 .scenario-panel-title-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
 .scenario-collapse-button { width: 28px; height: 28px; display: grid; place-items: center; flex: 0 0 auto; border: 1px solid var(--rule); border-radius: var(--control-radius); color: var(--ink-3); background: var(--paper-hi); font-size: 20px; line-height: 1; }
 .scenario-collapse-button:hover, .scenario-expand-button:hover { color: var(--accent); border-color: rgba(202, 78, 142, 0.4); background: var(--accent-soft); }
@@ -922,6 +925,28 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px s
   .inspector-collapsed .inspector-drawer { transform: translateX(100%); }
 }
 
+@media (min-width: 761px) and (max-width: 1100px) {
+  .simulation-workspace.three-panel {
+    grid-template-columns: 280px minmax(0, 1fr);
+    grid-template-rows: minmax(560px, 1fr) auto;
+    overflow-y: auto;
+  }
+  .simulation-workspace.three-panel.scenario-collapsed { grid-template-columns: 52px minmax(0, 1fr); }
+  .simulation-scenario-panel { grid-column: 1; grid-row: 1; }
+  .simulation-main { grid-column: 2; grid-row: 1; }
+  .simulation-sidebar { grid-column: 1 / -1; grid-row: 2; min-height: 320px; height: max-content; overflow: visible; border-top: 1px solid var(--rule); border-left: 0; }
+  .simulation-empty, .simulation-three-scene, .simulation-three-scene .scene-context-message, .simulation-three-scene .scene-fallback { min-height: 0; }
+}
+
+@media (min-width: 761px) and (max-width: 900px) {
+  .app-header { flex-wrap: wrap; gap: 8px; padding: 8px 12px; }
+  .workflow-navigator { order: 3; width: 100%; margin-left: 0; }
+}
+
+@media (max-height: 700px) {
+  .simulation-empty, .simulation-three-scene, .simulation-three-scene .scene-context-message, .simulation-three-scene .scene-fallback { min-height: 0; }
+}
+
 @media (max-width: 760px) {
   .app-header { flex-wrap: wrap; gap: 8px; padding: 10px 12px; }
   .workflow-navigator { order: 3; width: 100%; }
@@ -943,20 +968,24 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px s
   .scene-actions { width: 100%; overflow-x: auto; }
   .scene-legend { overflow-x: auto; white-space: nowrap; }
   .simulation-workspace { grid-template-columns: 1fr; overflow-y: auto; }
-  .simulation-workspace.three-panel, .simulation-workspace.three-panel.scenario-collapsed { grid-template-columns: 1fr; }
-  .simulation-scenario-panel, .simulation-scenario-content { min-width: 0; }
-  .scenario-collapsed .simulation-scenario-panel { width: auto; min-width: 0; min-height: 48px; border-right: 0; border-bottom: 1px solid var(--rule); }
+  .simulation-workspace.three-panel, .simulation-workspace.three-panel.scenario-collapsed { display: block; }
+  .simulation-scenario-panel { width: auto; min-width: 0; height: min(60dvh, 520px); border-right: 0; border-bottom: 1px solid var(--rule); }
+  .simulation-scenario-content { min-width: 0; height: 100%; }
+  .scenario-collapsed .simulation-scenario-panel { width: auto; min-width: 0; height: 48px; min-height: 48px; border-right: 0; border-bottom: 1px solid var(--rule); }
   .scenario-expand-button { min-height: 48px; flex-direction: row; justify-content: center; padding: 8px 14px; }
   .scenario-expand-label { writing-mode: horizontal-tb; transform: none; }
-  .simulation-main { min-height: 660px; }
-  .simulation-sidebar { border-left: 0; border-top: 1px solid var(--rule); }
-  .simulation-toolbar { align-items: stretch; flex-direction: column; }
+  .simulation-main { width: 100%; height: max(560px, calc(100dvh - 120px)); min-height: 560px; }
+  .simulation-sidebar { min-height: 0; overflow: visible; border-left: 0; border-top: 1px solid var(--rule); }
+  .simulation-toolbar { align-items: stretch; flex-direction: column; flex-wrap: nowrap; }
+  .simulation-toolbar > * { width: 100%; }
+  .follow-control select { min-width: 0; flex: 1 1 auto; }
   .run-simulation { width: 100%; margin: 0; }
   .live-service-hud { grid-template-columns: repeat(3, minmax(100px, 1fr)); }
   .live-service-hud article:nth-child(3) { border-right: 0; }
   .live-ticket-rail { width: 152px; max-height: 220px; }
   .live-station-strip { right: 10px; left: 10px; max-width: none; bottom: 36px; }
-  .simulation-scene svg { min-height: 500px; }
+  .simulation-empty, .simulation-three-scene, .simulation-three-scene .scene-context-message, .simulation-three-scene .scene-fallback { min-height: 0; }
+  .simulation-scene svg { min-height: 0; }
   .role-legend { max-width: calc(100% - 20px); overflow-x: auto; }
   .playback-controls { grid-template-columns: auto auto 1fr auto; }
   .playback-time { display: none; }
