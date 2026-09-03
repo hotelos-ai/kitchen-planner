@@ -90,6 +90,16 @@ Older schema-valid projects that predate equipment 3D presets are enriched on lo
 
 Keep exported checkpoints before major alternatives. JSON is the supported exchange format; this release does not import BIM, DWG, DXF, or IFC. Exported plans and simulation results are planning artifacts, not regulatory certification or approval. Qualified local professionals and authorities must review fire, ventilation, hygiene, accessibility, structure, services, and code compliance.
 
+## Driving the planner with an AI agent (WebMCP)
+
+In a browser that supports the experimental WebMCP API, the planner registers site tools that a compatible AI agent (browser assistant sidebar or built-in agent) can call directly on the open page. Open **AI tools** in the top bar to see availability, the registered tools, and a copyable starter prompt for your agent.
+
+Your agent can then do everything you can: read the coordinate system and catalog, read and draw the plan (add, move, rotate, resize, relabel, duplicate, remove components; edit walls, openings, pillars, zones), manage layout variants, edit service-simulation scenarios, run simulations and read their metrics, undo/redo, and export the project JSON to save or download. All geometry travels as exact millimetre coordinates — the agent works from the structured layout, so it never has to interpret screenshots of the canvas.
+
+Every change is revision-guarded and atomic: the agent previews a complete operation batch against the revision it read, then applies it with a single-use token. If you edited the plan in the meantime, the apply fails with a stale-revision error and the agent must re-read and recompute. Each applied batch is one undo step for you, and tool-driven edits update the live 2D, 3D, walk, and simulation views without a reload.
+
+You stay in control of reference material: attached images and instructions go to your chosen agent, never to this page. The agent marks uncertain dimensions as approximate and should ask you when scale cannot be inferred. Browsers without WebMCP keep the full human interface; the panel simply shows setup guidance.
+
 ## Planning limitations
 
 The model compares circulation and simplified station queues. It does not simulate heat, smoke, exhaust capture, make-up air, fire, gas, electrical load, drainage, grease, structural capacity, acoustics, accessibility, or regulatory compliance. Confirm hood coverage and exhaust, tandoor/fire separation, food-safety zoning, worker clearances, accessibility, building constraints, and all equipment services with qualified local professionals before ordering equipment or constructing the kitchen.

@@ -48,16 +48,35 @@ npm run dev
 
 Open the local URL printed by Vite. Project changes autosave in browser storage; **Export project** creates a human-readable, versioned JSON checkpoint.
 
+## Agent tools (WebMCP)
+
+In browsers that support the experimental [WebMCP](https://webmachinelearning.github.io/webmcp/) API, the app registers site tools so a compatible AI agent can drive the entire workspace on the open page: reading the coordinate system and component catalog, drawing and editing the plan, managing layout variants, editing and running service simulations, undoing/redoing, and exporting the project. The **AI tools** panel in the top bar shows availability, the registered tools, live agent activity, and a copyable starter prompt.
+
+Agents work coordinate-native: all geometry is exchanged as exact millimetres (origin at the room's top-left, +x east, +y south), so an agent never needs to interpret canvas screenshots. Every mutation is a revision-guarded, atomically previewed, single-undo-step batch (`preview_layout_changes` → `apply_layout_changes`), and tool-driven edits update the live 2D/3D/simulation views without a reload. Reference images stay with the user's agent — this app never receives or processes them. See the [WebMCP spatial agent design](docs/superpowers/specs/2026-09-01-webmcp-spatial-agent-tools-design.md) and the [user guide](docs/user-guide.md) for the agent workflow.
+
 ## Commands
 
 ```bash
-npm run dev          # Start the Vite development server
-npm test             # Run the Vitest unit and component suite
-npm run test:watch   # Run tests interactively
-npm run lint         # Run ESLint
-npm run build        # Type-check and create a production build
-npm run e2e          # Run Playwright browser acceptance tests
+npm run dev            # Start the Vite development server
+npm test               # Run the Vitest unit and component suite
+npm run test:watch     # Run tests interactively
+npm run lint           # Run ESLint
+npm run build          # Type-check and create a production build
+npm run e2e            # Run Playwright browser acceptance tests
+npm run preview:worker # Build and serve the production bundle on a local Cloudflare Worker
+npm run deploy         # Build and deploy to Cloudflare Workers
+npm run deploy:dry     # Build and validate a deployment without uploading
 ```
+
+## Deploying to Cloudflare Workers
+
+The app is a fully client-side SPA (browser storage persistence, no server API), so it deploys as a Cloudflare Worker backed by [static assets](https://developers.cloudflare.com/workers/static-assets/) with single-page-application routing.
+
+```bash
+npm run deploy
+```
+
+Configuration lives in [`wrangler.jsonc`](wrangler.jsonc): asset directory `dist`, unknown routes fall back to `index.html`, HTML trailing-slash handling is automatic. No bindings, secrets, or server-side code are required. `npm run preview:worker` runs the same asset pipeline locally through `wrangler dev` for a production-faithful smoke test.
 
 ## How it is built
 

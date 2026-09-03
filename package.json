@@ -15,7 +15,10 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "lint": "eslint .",
-    "e2e": "playwright test"
+    "e2e": "playwright test",
+    "preview:worker": "npm run build && wrangler dev",
+    "deploy": "npm run build && wrangler deploy",
+    "deploy:dry": "npm run build && wrangler deploy --dry-run"
   },
   "dependencies": {
     "@react-three/drei": "^10.7.8",
@@ -46,6 +49,7 @@
     "typescript": "^6.0.3",
     "typescript-eslint": "^8.68.0",
     "vite": "^8.2.2",
-    "vitest": "^4.1.11"
+    "vitest": "^4.1.11",
+    "wrangler": "^4.128.0"
   }
 }
