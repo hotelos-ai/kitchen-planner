@@ -4,6 +4,7 @@ import { useStore } from 'zustand'
 import { CATALOG_DRAG_MIME, parseCatalogDragPayload } from '../../domain/catalog/catalog-drag'
 import { getCatalogEntry } from '../../domain/catalog/kitchen-catalog'
 import { suggestCatalogPlacement } from '../../domain/catalog/suggest-placement'
+import type { LayoutVariant } from '../../domain/project'
 import type { ProjectStore } from '../../state/project-store'
 import { getActiveVariant } from '../../state/project-store'
 import { analyzeLayout } from '../../domain/layout-diagnostics'
@@ -19,7 +20,9 @@ type Props = {
   showReference: boolean
   sourceImageUrl?: string
   sourceOpacity?: number
-  architectureLocked?: boolean
+  mode?: 'layout' | 'space'
+  variantOverride?: LayoutVariant
+  readOnly?: boolean
   onInspectComponentIn3D?(itemId: string): void
   onComponentLockChange?(itemId: string, locked: boolean): void
   onSkinChange?(itemId: string, skinId: string): void
@@ -29,14 +32,18 @@ type Props = {
 type ContextRequest = { itemId: string; position: OverlayPosition }
 type QuickRequest = ContextRequest & { mode: QuickConfigurationMode }
 
-export function PlanCanvas({ store, showReference, sourceImageUrl = '/reference/manta-raja-layout.png', sourceOpacity = 22, architectureLocked: _architectureLocked = true, onInspectComponentIn3D, onComponentLockChange, onSkinChange, onWarningBadgeClick }: Props) {
+export function PlanCanvas({ store, showReference, sourceImageUrl = '/reference/kitchen-sketch.png', sourceOpacity = 22, mode = 'layout', variantOverride, readOnly = false, onInspectComponentIn3D, onComponentLockChange, onSkinChange, onWarningBadgeClick }: Props) {
   const containerRef = useRef<HTMLDivElement>(null)
   const [size, setSize] = useState({ width: 740, height: 720 })
   const [contextRequest, setContextRequest] = useState<ContextRequest>()
   const [quickRequest, setQuickRequest] = useState<QuickRequest>()
+  const [previewSelectedIds, setPreviewSelectedIds] = useState<string[]>([])
   const project = useStore(store, (state) => state.project)
-  const selectedIds = useStore(store, (state) => state.selectedIds)
-  const variant = useStore(store, getActiveVariant)
+  const storeSelectedIds = useStore(store, (state) => state.selectedIds)
+  const storeVariant = useStore(store, getActiveVariant)
+  const variant = variantOverride ?? storeVariant
+  const selectedIds = readOnly ? previewSelectedIds : storeSelectedIds
+  const showEquipment = mode !== 'space'
   const issues = analyzeLayout(variant.architecture, variant.equipment, { layoutConstraints: variant.layoutConstraints })
   const warningCounts = issues.reduce((counts, issue) => {
     issue.itemIds.forEach((id) => counts.set(id, (counts.get(id) ?? 0) + 1))
@@ -83,10 +90,15 @@ export function PlanCanvas({ store, showReference, sourceImageUrl = '/reference/
         yMm: (event.clientY - bounds.top - originY) / pixelsPerMm,
       },
     })
-    if (placement) store.getState().addCatalogItem(entry.catalogId, { xMm: placement.xMm, yMm: placement.yMm })
+    if (readOnly || !placement) return
+    store.getState().addCatalogItem(entry.catalogId, { xMm: placement.xMm, yMm: placement.yMm })
   }
 
-  const selectForOverlay = (itemId: string) => store.getState().selectItems([itemId])
+  const selectItems = (ids: string[]) => {
+    if (readOnly) setPreviewSelectedIds(ids)
+    else store.getState().selectItems(ids)
+  }
+  const selectForOverlay = (itemId: string) => selectItems([itemId])
   const openQuick = (itemId: string, position: OverlayPosition, mode: QuickConfigurationMode = 'configure') => {
     selectForOverlay(itemId)
     setContextRequest(undefined)
@@ -101,7 +113,7 @@ export function PlanCanvas({ store, showReference, sourceImageUrl = '/reference/
     !contextItem.movable || variant.layoutConstraints?.lockedComponentIds?.includes(contextItem.id)
   ))
   const performContextAction = (action: ComponentContextAction) => {
-    if (!contextItem || !contextRequest) return
+    if (readOnly || !contextItem || !contextRequest) return
     const id = contextItem.id
     if (action === 'configure') openQuick(id, contextRequest.position, 'configure')
     else if (action === 'skin') openQuick(id, contextRequest.position, 'skin')
@@ -117,32 +129,39 @@ export function PlanCanvas({ store, showReference, sourceImageUrl = '/reference/
   }
 
   return (
-    <div ref={containerRef} className="plan-canvas" data-testid="plan-canvas" onDragOver={(event) => event.preventDefault()} onDrop={addDroppedCatalogItem}>
+    <div ref={containerRef} className="plan-canvas" data-testid="plan-canvas" onDragOver={(event) => { if (!readOnly) event.preventDefault() }} onDrop={readOnly ? undefined : addDroppedCatalogItem}>
       {showReference && <img className="source-reference" src={sourceImageUrl} alt="Source drawing overlay" style={{ opacity: sourceOpacity / 100 }} />}
       <Stage width={size.width} height={size.height} onMouseDown={(event) => {
         if (event.target === event.target.getStage()) {
-          store.getState().clearSelection()
+          if (readOnly) setPreviewSelectedIds([])
+          else store.getState().clearSelection()
           setContextRequest(undefined)
           setQuickRequest(undefined)
         }
       }}>
         <ArchitectureLayer architecture={variant.architecture} pixelsPerMm={pixelsPerMm} originX={originX} originY={originY} />
         <GridLayer width={size.width} height={size.height} pixelsPerMm={pixelsPerMm} originX={originX} originY={originY} snapMm={project.snapMm} />
-        <EquipmentLayer
-          items={variant.equipment}
-          selectedIds={selectedIds}
-          warningIds={warningIds}
-          displayUnit={project.displayUnit}
-          pixelsPerMm={pixelsPerMm}
-          originX={originX}
-          originY={originY}
-          snapMm={project.snapMm}
-          onSelect={(id, additive) => additive ? store.getState().toggleItemSelection(id) : store.getState().selectItems([id])}
-          onQuickConfigure={(id, position) => openQuick(id, position)}
-          onOpenContextMenu={openContextMenu}
-          onMove={(id, point) => store.getState().moveItems([id], point)}
-          onTransform={(id, patch) => store.getState().updateItem(id, patch)}
-        />
+        {showEquipment && (
+          <EquipmentLayer
+            items={variant.equipment}
+            selectedIds={selectedIds}
+            warningIds={warningIds}
+            displayUnit={project.displayUnit}
+            pixelsPerMm={pixelsPerMm}
+            originX={originX}
+            originY={originY}
+            snapMm={project.snapMm}
+            onSelect={(id, additive) => {
+              if (readOnly) setPreviewSelectedIds(additive && previewSelectedIds.includes(id) ? previewSelectedIds.filter((value) => value !== id) : additive ? [...previewSelectedIds, id] : [id])
+              else if (additive) store.getState().toggleItemSelection(id)
+              else store.getState().selectItems([id])
+            }}
+            onQuickConfigure={(id, position) => { if (!readOnly) openQuick(id, position) }}
+            onOpenContextMenu={(id, position) => { if (!readOnly) openContextMenu(id, position) }}
+            onMove={(id, point) => { if (!readOnly) store.getState().moveItems([id], point) }}
+            onTransform={(id, patch) => { if (!readOnly) store.getState().updateItem(id, patch) }}
+          />
+        )}
         <OpeningOverlayLayer architecture={variant.architecture} pixelsPerMm={pixelsPerMm} originX={originX} originY={originY} />
       </Stage>
       {contextRequest && contextItem && <ComponentContextMenu
@@ -162,30 +181,32 @@ export function PlanCanvas({ store, showReference, sourceImageUrl = '/reference/
         onSkinChange={onSkinChange ?? ((itemId, skinId) => store.getState().setAppearanceSkin(itemId, skinId))}
       />}
       <div className="canvas-scale"><span />1 metre · 10 squares</div>
-      <div className="plan-warning-badges">
-        {variant.equipment.map((item) => {
-          const count = warningCounts.get(item.id)
-          if (!count) return null
-          return (
-            <button
-              key={item.id}
-              type="button"
-              className="plan-warning-badge"
-              style={{
-                left: originX + (item.xMm + item.widthMm) * pixelsPerMm - 8,
-                top: originY + item.yMm * pixelsPerMm - 8,
-              }}
-              aria-label={`${count} checks for ${item.label}`}
-              onClick={() => {
-                store.getState().selectItems([item.id])
-                onWarningBadgeClick?.(item.id)
-              }}
-            >
-              ⚠{count}
-            </button>
-          )
-        })}
-      </div>
+      {showEquipment && (
+        <div className="plan-warning-badges">
+          {variant.equipment.map((item) => {
+            const count = warningCounts.get(item.id)
+            if (!count) return null
+            return (
+              <button
+                key={item.id}
+                type="button"
+                className="plan-warning-badge"
+                style={{
+                  left: originX + (item.xMm + item.widthMm) * pixelsPerMm - 8,
+                  top: originY + item.yMm * pixelsPerMm - 8,
+                }}
+                aria-label={`${count} checks for ${item.label}`}
+                onClick={() => {
+                  selectItems([item.id])
+                  if (!readOnly) onWarningBadgeClick?.(item.id)
+                }}
+              >
+                ⚠{count}
+              </button>
+            )
+          })}
+        </div>
+      )}
     </div>
   )
 }

@@ -13,6 +13,7 @@ import { ProjectSettings } from './ProjectSettings'
 import { RevisionHistory } from './RevisionHistory'
 import { SpaceImpactDialog } from './SpaceImpactDialog'
 import { StageOverview } from './StageOverview'
+import { RoomEditorPanel } from './RoomEditorPanel'
 import { useWorkspaceShortcuts } from './useWorkspaceShortcuts'
 import { WorkflowCatalog } from './WorkflowCatalog'
 
@@ -86,7 +87,7 @@ export function PlanWorkspace({
   const [sourcePopover, setSourcePopover] = useState(false)
   const [sourceOpacity, setSourceOpacity] = useState(35)
   const [sourceLocked, setSourceLocked] = useState(false)
-  const [localSourceUrl, setLocalSourceUrl] = useState(sourceImageUrl ?? '/reference/manta-raja-layout.png')
+  const [localSourceUrl, setLocalSourceUrl] = useState(sourceImageUrl ?? '/reference/kitchen-sketch.png')
   const [equipmentPromptOpen, setEquipmentPromptOpen] = useState(true)
   const [checksFocusId, setChecksFocusId] = useState<string | undefined>()
   const activeClosedLayout = closedLayout ?? internalClosedLayout
@@ -146,7 +147,6 @@ export function PlanWorkspace({
   const canUndo = useStore(store, (state) => state.past.length > 0)
   const canRedo = useStore(store, (state) => state.future.length > 0)
   const selectedItem = useStore(store, (state) => getActiveVariant(state).equipment.find((item) => item.id === state.selectedIds[0]))
-  const architectureLocked = stage !== 'space'
   const dragResizeEnabled = Boolean(selectedItem && !selectedItem.dimensionsLocked)
   const [localReference, setLocalReference] = useState(showReference)
   const [localCatalogOpen, setLocalCatalogOpen] = useState(includeToolbar ? drawersInitiallyOpen() : catalogOpen)
@@ -228,7 +228,7 @@ export function PlanWorkspace({
             }}
           />
         )}
-        <div className={`editor-layout${catalogVisible ? '' : ' catalog-collapsed'}${inspectorVisible ? '' : ' inspector-collapsed'}`}>
+        <div className={`editor-layout${compact ? ' split-pane' : ''}${!compact && catalogVisible ? '' : ' catalog-collapsed'}${!compact && inspectorVisible ? '' : ' inspector-collapsed'}`}>
           {!compact && (
             <div className="editor-drawer catalog-drawer" data-editor-drawer="catalog" aria-hidden={!catalogVisible}>
               <WorkflowCatalog store={store} stage={stage} />
@@ -238,10 +238,10 @@ export function PlanWorkspace({
             {showCanvas ? (
               <PlanCanvas
                 store={store}
+                mode={stage === 'space' ? 'space' : 'layout'}
                 showReference={compact ? false : referenceVisible}
                 sourceImageUrl={localSourceUrl}
                 sourceOpacity={sourceOpacity}
-                architectureLocked={architectureLocked}
                 onInspectComponentIn3D={onInspectComponentIn3D}
                 onWarningBadgeClick={openChecksForItem}
               />
@@ -268,7 +268,7 @@ export function PlanWorkspace({
                     }}
                   />
                 </label>
-                <button type="button" onClick={() => { setLocalSourceUrl('/reference/manta-raja-layout.png'); onSourceImageUrlChange?.('/reference/manta-raja-layout.png') }}>Remove</button>
+                <button type="button" onClick={() => { setLocalSourceUrl('/reference/kitchen-sketch.png'); onSourceImageUrlChange?.('/reference/kitchen-sketch.png') }}>Remove</button>
                 <button type="button" onClick={() => setSourcePopover(false)}>Close</button>
               </div>
             )}
@@ -300,7 +300,9 @@ export function PlanWorkspace({
                 </section>
               )}
               {revisionsVisible && <RevisionHistory store={store} />}
-              {!essentialsVisible && !revisionsVisible && (showInspectorContent ? (
+              {!essentialsVisible && !revisionsVisible && (stage === 'space' ? (
+                <RoomEditorPanel store={store} onContinueToEquipment={continueToEquipment} />
+              ) : showInspectorContent ? (
                 <StageOverview
                   store={store}
                   stage={stage}
