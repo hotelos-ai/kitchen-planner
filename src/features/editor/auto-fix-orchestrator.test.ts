@@ -170,4 +170,67 @@ describe('automatic plan fix orchestrator', () => {
     expect(scenario.stationCapacities?.['six-burner']).toBeLessThan(99)
     expect(store.getState().past).toHaveLength(1)
   })
+
+  it('moves equipment without changing architecture when that strategy is selected', () => {
+    const project = createSeedProject()
+    const variant = project.variants[0]
+    const table = variant.equipment.find((item) => item.id === 'working-table')!
+    table.xMm = 4200
+    const originalArchitecture = structuredClone(variant.architecture)
+    const store = createProjectStore(project)
+
+    const result = applyAutomaticPlanFixes(store, { strategy: 'equipment' })
+    const next = store.getState().project.variants[0]
+
+    expect(result.strategy).toBe('equipment')
+    expect(result.movedCount).toBeGreaterThan(0)
+    expect(result.architectureAdjusted).toBe(false)
+    expect(next.architecture).toEqual(originalArchitecture)
+    expect(next.equipment.find((item) => item.id === table.id)?.xMm).not.toBe(4200)
+    expect(analyzeLayout(next.architecture, next.equipment, { layoutConstraints: next.layoutConstraints })
+      .some((issue) => issue.code === 'outside-room')).toBe(false)
+  })
+
+  it('adjusts editable architecture without moving existing equipment when layout strategy is selected', () => {
+    const project = createSeedProject()
+    const variant = project.variants[0]
+    variant.architecture.locked = false
+    project.architecture.locked = false
+    const table = variant.equipment.find((item) => item.id === 'working-table')!
+    table.xMm = 4200
+    const originalPositions = Object.fromEntries(variant.equipment.map((item) => [item.id, { xMm: item.xMm, yMm: item.yMm }]))
+    const originalWidth = variant.architecture.widthMm
+    const store = createProjectStore(project)
+
+    const result = applyAutomaticPlanFixes(store, 'layout')
+    const next = store.getState().project.variants[0]
+
+    expect(result.strategy).toBe('layout')
+    expect(result.movedCount).toBe(0)
+    expect(result.architectureAdjusted).toBe(true)
+    expect(next.architecture.widthMm).toBeGreaterThan(originalWidth)
+    expect(Object.fromEntries(next.equipment.map((item) => [item.id, { xMm: item.xMm, yMm: item.yMm }]))).toEqual(originalPositions)
+    expect(analyzeLayout(next.architecture, next.equipment, { layoutConstraints: next.layoutConstraints })
+      .some((issue) => issue.code === 'outside-room')).toBe(false)
+  })
+
+  it('reports partial completion when the chosen strategy cannot move locked conflicts', () => {
+    const project = createSeedProject()
+    const variant = project.variants[0]
+    const table = variant.equipment.find((item) => item.id === 'working-table')!
+    const range = variant.equipment.find((item) => item.id === 'six-burner')!
+    table.xMm = range.xMm
+    table.yMm = range.yMm
+    variant.equipment = variant.equipment.filter((item) => !item.capabilities.includes('hand-wash'))
+    variant.layoutConstraints = { lockedComponentIds: [table.id, range.id] }
+    const store = createProjectStore(project)
+
+    const result = applyAutomaticPlanFixes(store, { strategy: 'equipment' })
+
+    expect(result.status).toBe('partial')
+    expect(result.applied).toBe(true)
+    expect(result.addedCount).toBe(1)
+    expect(result.after.layoutErrors).toBeGreaterThan(0)
+    expect(result.message).toMatch(/still need a decision/i)
+  })
 })

@@ -38,6 +38,8 @@ type AddOpeningOperation = {
 }
 
 export type AutomaticPlanFixStatus = 'success' | 'partial' | 'failure'
+export type AutomaticPlanFixStrategy = 'automatic' | 'equipment' | 'layout'
+export type AutomaticPlanFixOptions = { strategy?: AutomaticPlanFixStrategy }
 
 export type AutomaticPlanFixSummary = {
   blockers: number
@@ -46,6 +48,7 @@ export type AutomaticPlanFixSummary = {
 }
 
 export type AutomaticPlanFixResult = {
+  strategy: AutomaticPlanFixStrategy
   status: AutomaticPlanFixStatus
   applied: boolean
   message: string
@@ -193,17 +196,73 @@ const OPENING_SPECS: readonly Pick<Opening, 'label' | 'kind' | 'flow' | 'widthMm
   { label: 'Dirty return window', kind: 'service-window', flow: 'dirty-in', widthMm: 900 },
 ]
 
+const canEditSharedArchitecture = (project: KitchenProject) => project.variants.every((variant) =>
+  !variant.architecture.locked && variant.layoutConstraints?.permissions?.architecture !== false)
+
+type ArchitectureOperation = {
+  type: 'update_architecture'
+  variantId: string
+  patch: Pick<Architecture, 'widthMm' | 'depthMm'> & { roomPolygon: { xMm: number; yMm: number }[] }
+}
+
+const snapDown = (value: number, snapMm: number) => Math.floor(value / snapMm) * snapMm
+const snapUp = (value: number, snapMm: number) => Math.ceil(value / snapMm) * snapMm
+
+function planBoundaryAdjustment(project: KitchenProject, active: LayoutVariant, snapMm: number) {
+  const noChange = { operations: [] as ArchitectureOperation[], architecture: active.architecture, adjusted: false }
+  if (!canEditSharedArchitecture(project)) return noChange
+  const outsideIds = new Set(analyzeLayout(active.architecture, active.equipment, { layoutConstraints: active.layoutConstraints })
+    .filter((issue) => issue.code === 'outside-room')
+    .flatMap((issue) => issue.itemIds))
+  if (outsideIds.size === 0) return noChange
+
+  const room = active.architecture.roomPolygon
+  const roomMinX = Math.min(...room.map((point) => point.x))
+  const roomMaxX = Math.max(...room.map((point) => point.x))
+  const roomMinY = Math.min(...room.map((point) => point.y))
+  const roomMaxY = Math.max(...room.map((point) => point.y))
+  const footprints = active.equipment.filter((item) => outsideIds.has(item.id)).flatMap(rotatedFootprint)
+  const margin = Math.max(100, snapMm)
+  const footprintMinX = Math.min(...footprints.map((point) => point.x))
+  const footprintMaxX = Math.max(...footprints.map((point) => point.x))
+  const footprintMinY = Math.min(...footprints.map((point) => point.y))
+  const footprintMaxY = Math.max(...footprints.map((point) => point.y))
+  const neededMinX = footprintMinX < roomMinX ? snapDown(footprintMinX - margin, snapMm) : roomMinX
+  const neededMaxX = footprintMaxX > roomMaxX ? snapUp(footprintMaxX + margin, snapMm) : roomMaxX
+  const neededMinY = footprintMinY < roomMinY ? snapDown(footprintMinY - margin, snapMm) : roomMinY
+  const neededMaxY = footprintMaxY > roomMaxY ? snapUp(footprintMaxY + margin, snapMm) : roomMaxY
+  if (neededMinX === roomMinX && neededMaxX === roomMaxX && neededMinY === roomMinY && neededMaxY === roomMaxY) return noChange
+  const roomPolygon = room.map((point) => ({
+    x: point.x === roomMinX && neededMinX < roomMinX ? neededMinX : point.x === roomMaxX && neededMaxX > roomMaxX ? neededMaxX : point.x,
+    y: point.y === roomMinY && neededMinY < roomMinY ? neededMinY : point.y === roomMaxY && neededMaxY > roomMaxY ? neededMaxY : point.y,
+  }))
+  const architecture: Architecture = {
+    ...active.architecture,
+    roomPolygon,
+    widthMm: Math.max(active.architecture.widthMm, neededMaxX - Math.min(0, neededMinX)),
+    depthMm: Math.max(active.architecture.depthMm, neededMaxY - Math.min(0, neededMinY)),
+  }
+  const patch = {
+    widthMm: architecture.widthMm,
+    depthMm: architecture.depthMm,
+    roomPolygon: roomPolygon.map((point) => ({ xMm: point.x, yMm: point.y })),
+  }
+  return {
+    operations: project.variants.map((variant) => ({ type: 'update_architecture' as const, variantId: variant.id, patch })),
+    architecture,
+    adjusted: true,
+  }
+}
+
 function planArchitectureAdditions(project: KitchenProject, active: LayoutVariant, snapMm: number) {
   const missing = OPENING_SPECS.filter((spec) => !active.architecture.openings.some((opening) =>
     opening.kind === spec.kind && opening.flow === spec.flow))
   if (missing.length === 0) return { operations: [] as AddOpeningOperation[], architecture: active.architecture, adjusted: false }
-  const architectureEditable = project.variants.every((variant) =>
-    !variant.architecture.locked && variant.layoutConstraints?.permissions?.architecture !== false)
-  if (!architectureEditable) return { operations: [] as AddOpeningOperation[], architecture: active.architecture, adjusted: false }
+  if (!canEditSharedArchitecture(project)) return { operations: [] as AddOpeningOperation[], architecture: active.architecture, adjusted: false }
 
   const plannedByVariant = new Map(project.variants.map((variant) => [variant.id, {
     ...variant,
-    architecture: { ...variant.architecture, openings: [...variant.architecture.openings] },
+    architecture: { ...active.architecture, openings: [...active.architecture.openings] },
   }]))
   const operations: AddOpeningOperation[] = []
   let adjusted = false
@@ -398,23 +457,39 @@ const resultMessage = (status: AutomaticPlanFixStatus, result: Pick<AutomaticPla
   return 'No safe automatic fix could be applied. Review the remaining item that needs a decision.'
 }
 
+const selectedStrategy = (options: AutomaticPlanFixOptions | AutomaticPlanFixStrategy | undefined): AutomaticPlanFixStrategy =>
+  typeof options === 'string' ? options : options?.strategy ?? 'automatic'
+
 /** Applies every safe automatic repair as one undoable workspace operation. */
-export function applyAutomaticPlanFixes(store: ProjectStore): AutomaticPlanFixResult {
+export function applyAutomaticPlanFixes(
+  store: ProjectStore,
+  options?: AutomaticPlanFixOptions | AutomaticPlanFixStrategy,
+): AutomaticPlanFixResult {
+  const strategy = selectedStrategy(options)
   const state = store.getState()
   const variant = getActiveVariant(state)
   const scenario = scenarioFor(store)
   const before = summarize(variant, scenario)
-  const architecture = planArchitectureAdditions(state.project, variant, state.project.snapMm)
-  const variantWithArchitecture = { ...variant, architecture: architecture.architecture }
+  const boundary = strategy === 'layout'
+    ? planBoundaryAdjustment(state.project, variant, state.project.snapMm)
+    : { operations: [] as ArchitectureOperation[], architecture: variant.architecture, adjusted: false }
+  const boundaryVariant = { ...variant, architecture: boundary.architecture }
+  const openings = strategy === 'equipment'
+    ? { operations: [] as AddOpeningOperation[], architecture: boundary.architecture, adjusted: false }
+    : planArchitectureAdditions(state.project, boundaryVariant, state.project.snapMm)
+  const variantWithArchitecture = { ...boundaryVariant, architecture: openings.architecture }
   const additions = planEssentialAdditions(variantWithArchitecture, scenario, state.project.snapMm)
-  const moves = planSafeMoves(variantWithArchitecture, additions.equipment, state.project.snapMm, scenario)
+  const moves = strategy === 'layout'
+    ? { moves: [] as MoveOperation[], equipment: additions.equipment }
+    : planSafeMoves(variantWithArchitecture, additions.equipment, state.project.snapMm, scenario)
   const plannedVariant = { ...variantWithArchitecture, equipment: moves.equipment }
   const scenarioAdjustment = planScenarioAdjustment(plannedVariant, scenario)
-  const operations = [...architecture.operations, ...additions.operations, ...moves.moves, ...(scenarioAdjustment.operation ? [scenarioAdjustment.operation] : [])]
+  const operations = [...boundary.operations, ...openings.operations, ...additions.operations, ...moves.moves, ...(scenarioAdjustment.operation ? [scenarioAdjustment.operation] : [])]
 
   if (operations.length === 0) {
     const status: AutomaticPlanFixStatus = before.blockers === 0 && before.layoutErrors === 0 ? 'success' : 'failure'
     const result = {
+      strategy,
       status,
       applied: false,
       addedCount: 0,
@@ -430,6 +505,7 @@ export function applyAutomaticPlanFixes(store: ProjectStore): AutomaticPlanFixRe
 
   const applied = store.getState().applyWorkspaceOperations(operations, 'Fix plan automatically')
   if (!applied.ok) return {
+    strategy,
     status: 'failure',
     applied: false,
     message: `Automatic fix was not applied: ${applied.message}`,
@@ -448,11 +524,12 @@ export function applyAutomaticPlanFixes(store: ProjectStore): AutomaticPlanFixRe
   const after = summarize(nextVariant, nextScenario)
   const status: AutomaticPlanFixStatus = after.blockers === 0 && after.layoutErrors === 0 ? 'success' : 'partial'
   const result = {
+    strategy,
     status,
     applied: true,
     addedCount: additions.operations.length,
     movedCount: moves.moves.length,
-    architectureAdjusted: architecture.adjusted,
+    architectureAdjusted: boundary.adjusted || openings.adjusted,
     scenarioAdjusted: Boolean(scenarioAdjustment.operation),
     before,
     after,
