@@ -1,4 +1,18 @@
-import { expect, test } from '@playwright/test'
+import { expect, test, type Page } from '@playwright/test'
+
+async function openApp(page: Page) {
+  await page.goto('/')
+  const starter = page.getByRole('button', { name: /Simple starter kitchen/i })
+  try {
+    await starter.waitFor({ state: 'visible', timeout: 3000 })
+    await starter.click()
+  } catch {
+    // returning session: workspace already loaded
+  }
+  await expect(page.getByRole('heading', { name: /CalmKitchen Designer/i })).toBeVisible()
+  await page.getByRole('button', { name: '2 Fit-out' }).click()
+}
+
 
 type ShimmedTool = {
   name: string
@@ -40,7 +54,7 @@ test.beforeEach(async ({ page }) => {
 
 test('agents discover tools, edit the plan, run simulations, and export — without a reload', async ({ page }) => {
   await page.addInitScript(installWebMcpShim)
-  await page.goto('/')
+  await openApp(page)
   await expect(page.getByRole('heading', { name: /CalmKitchen Designer/i })).toBeVisible()
 
   await page.waitForFunction(() => Object.keys((window as unknown as ShimWindow).__webmcpTools ?? {}).length >= 11)
@@ -107,7 +121,7 @@ test('agents discover tools, edit the plan, run simulations, and export — with
 })
 
 test('browsers without WebMCP keep the full interface with setup guidance', async ({ page }) => {
-  await page.goto('/')
+  await openApp(page)
   await expect(page.getByRole('heading', { name: /CalmKitchen Designer/i })).toBeVisible()
   await page.getByRole('button', { name: 'AI tools' }).click()
   await expect(page.getByRole('dialog', { name: 'AI agent tools' })).toBeVisible()

@@ -1,12 +1,26 @@
-import { expect, test } from '@playwright/test'
+import { expect, test, type Page } from '@playwright/test'
 import { createSeedProject } from '../src/domain/seed-project'
+
+async function openApp(page: Page) {
+  await page.goto('/')
+  const starter = page.getByRole('button', { name: /Simple starter kitchen/i })
+  try {
+    await starter.waitFor({ state: 'visible', timeout: 3000 })
+    await starter.click()
+  } catch {
+    // returning session: workspace already loaded
+  }
+  await expect(page.getByRole('heading', { name: /CalmKitchen Designer/i })).toBeVisible()
+  await page.getByRole('button', { name: '2 Fit-out' }).click()
+}
+
 
 test.beforeEach(async ({ page }) => {
   await page.addInitScript(() => localStorage.clear())
 })
 
 test('edits, simulates, compares, exports, and restores the example kitchen', async ({ page }) => {
-  await page.goto('/')
+  await openApp(page)
   await expect(page.getByRole('heading', { name: /CalmKitchen Designer/i })).toBeVisible()
 
   await page.getByRole('tab', { name: /Placed/i }).click()
@@ -34,8 +48,8 @@ test('edits, simulates, compares, exports, and restores the example kitchen', as
   await page.getByRole('button', { name: /Plan/i }).click()
   await expect(page.getByLabel(/Equipment label/i)).toHaveValue('Tandoor')
 
-  await page.getByRole('button', { name: /New layout/i }).click()
-  await page.getByRole('menuitem', { name: 'Duplicate current layout' }).click()
+  await page.getByRole('button', { name: 'Layout A actions' }).click()
+  await page.getByRole('menuitem', { name: 'New layout from wizard' }).click()
   await page.getByRole('button', { name: 'Next' }).click()
   await page.getByRole('button', { name: 'Next' }).click()
   await page.getByRole('button', { name: 'Next' }).click()
@@ -73,9 +87,9 @@ test('edits, simulates, compares, exports, and restores the example kitchen', as
 })
 
 test('creates an advanced room and recommended essentials through the novice wizard', async ({ page }) => {
-  await page.goto('/')
-  await page.getByRole('button', { name: /New layout/i }).click()
-  await page.getByRole('menuitem', { name: 'Duplicate current layout' }).click()
+  await openApp(page)
+  await page.getByRole('button', { name: 'Layout A actions' }).click()
+  await page.getByRole('menuitem', { name: 'New layout from wizard' }).click()
   const wizard = page.getByRole('dialog')
 
   await wizard.getByLabel('Layout name').fill('Jagged service concept')
@@ -109,7 +123,7 @@ test('creates an advanced room and recommended essentials through the novice wiz
 test('runs, inspects, compares, and atomically adopts an auto-layout finalist', async ({ page }) => {
   const pageErrors: string[] = []
   page.on('pageerror', (error) => pageErrors.push(error.message))
-  await page.goto('/')
+  await openApp(page)
   await page.getByRole('button', { name: 'Auto-layout' }).click()
   await expect(page.getByRole('heading', { name: 'Auto-layout' })).toBeVisible()
   await page.getByLabel('Maximum evaluations').fill('8')
@@ -135,7 +149,7 @@ test('runs, inspects, compares, and atomically adopts an auto-layout finalist', 
 
 test('keeps the full simulation readable at phone width', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 })
-  await page.goto('/')
+  await openApp(page)
   await page.getByRole('button', { name: /Simulate/i }).click()
   await page.getByRole('button', { name: /Run 60-minute service/i }).click()
 
@@ -151,7 +165,7 @@ test('keeps the full simulation readable at phone width', async ({ page }) => {
 
 test('keeps Plan controls and canvas in the phone viewport', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 })
-  await page.goto('/')
+  await openApp(page)
 
   const workspace = page.getByRole('region', { name: '2D plan workspace' })
   const toolbarBox = await page.locator('.app-header-row-2').boundingBox()
@@ -167,7 +181,7 @@ test('keeps Plan controls and canvas in the phone viewport', async ({ page }) =>
 
 test('resizes the desktop Plan canvas without remounting it when drawers collapse', async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 })
-  await page.goto('/')
+  await openApp(page)
   const canvas = page.getByTestId('plan-canvas')
   const before = await canvas.boundingBox()
   const nodeIdentity = await canvas.evaluate((node) => { (window as unknown as { planCanvasNode?: Element }).planCanvasNode = node; return true })
@@ -185,7 +199,7 @@ test('resizes the desktop Plan canvas without remounting it when drawers collaps
 test('keeps every 3D control usable and recovers a lost WebGL context', async ({ page }) => {
   const pageErrors: string[] = []
   page.on('pageerror', (error) => pageErrors.push(error.message))
-  await page.goto('/')
+  await openApp(page)
   await page.getByRole('button', { name: '3D', exact: true }).click()
   await expect(page.getByTestId('kitchen-scene').locator('canvas')).toBeVisible()
 
@@ -240,7 +254,7 @@ test('keeps overview 3D mounted when no safe Walk spawn exists', async ({ page }
     localStorage.setItem('manta-raja:project:v1', json)
   }, { json: JSON.stringify(project) })
 
-  await page.goto('/')
+  await openApp(page)
   await page.getByRole('button', { name: '3D', exact: true }).click()
   const scene = page.getByTestId('kitchen-scene')
   const canvas = scene.locator('canvas')
@@ -260,7 +274,7 @@ test('keeps overview 3D mounted when no safe Walk spawn exists', async ({ page }
 test('applies a typical equipment configuration and reflects it in 3D', async ({ page }) => {
   const pageErrors: string[] = []
   page.on('pageerror', (error) => pageErrors.push(error.message))
-  await page.goto('/')
+  await openApp(page)
   await page.getByRole('tab', { name: /Placed/i }).click()
 
   await page.getByRole('button', { name: /Select 2-door fridge, 1400 mm by 850 mm/i }).click()
@@ -283,7 +297,7 @@ test('applies a typical equipment configuration and reflects it in 3D', async ({
 test('switches live walk cameras while preserving movement and adaptive jump state', async ({ page }) => {
   const pageErrors: string[] = []
   page.on('pageerror', (error) => pageErrors.push(error.message))
-  await page.goto('/')
+  await openApp(page)
   await page.getByRole('button', { name: '3D', exact: true }).click()
   await page.getByRole('button', { name: 'Walk kitchen', exact: true }).click()
 
@@ -335,7 +349,7 @@ test('shares live service state across 2D, 3D, and first-person views', async ({
   const consoleErrors: string[] = []
   page.on('pageerror', (error) => pageErrors.push(error.message))
   page.on('console', (message) => { if (message.type() === 'error') consoleErrors.push(message.text()) })
-  await page.goto('/')
+  await openApp(page)
   await page.getByRole('button', { name: /Simulate/i }).click()
   await page.getByRole('button', { name: /Run 60-minute service/i }).click()
   await page.getByRole('button', { name: 'Pause' }).click()
