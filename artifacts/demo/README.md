@@ -2,6 +2,13 @@
 
 `calmkitchen-webmcp-demo.mp4` is an 83-second, narrated 1440×900 walkthrough recorded against the production app. It shows real WebMCP registration and calls for discovery, preview/apply, shared 2D/3D selection, simulation, comparison, and sharing.
 
+Devpost-ready stills are included alongside it:
+
+- `01-agent-tools.jpg` — live 26-tool WebMCP registry
+- `02-agent-revision.jpg` — shared selected component in Plan and 3D
+- `03-simulation.jpg` — retained deterministic service playback
+- `04-comparison.jpg` — same-scenario layout comparison and handoff
+
 ## Suggested YouTube metadata
 
 **Title:** CalmKitchen Designer — Human + AI commercial kitchen design with WebMCP
