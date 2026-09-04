@@ -199,13 +199,14 @@ describe('simulation workspace', () => {
 
   it('switches among operations, 3D, and Walk without rerunning or resetting time', async () => {
     const run = vi.fn(runSimulation)
-    const FakeThreeScene = ({ view }: { view: string }) => <div data-testid="simulation-3d-scene">{view}</div>
+    const FakeThreeScene = ({ view, layers }: { view: string; layers: { labels: boolean } }) => <div data-testid="simulation-3d-scene">{view}:{String(layers.labels)}</div>
     render(<SimulationWorkspace run={run} threeRenderer={FakeThreeScene} />)
+    expect(screen.getByRole('button', { name: 'Labels' })).toHaveAttribute('aria-pressed', 'false')
     await userEvent.click(screen.getByRole('button', { name: /Run 60-minute service/i }))
     await userEvent.click(screen.getByRole('button', { name: 'Pause' }))
     fireEvent.change(screen.getByLabelText(/Simulation time/i), { target: { value: '900' } })
     await userEvent.click(screen.getByRole('button', { name: '3D Overview' }))
-    expect(screen.getByTestId('simulation-3d-scene')).toHaveTextContent('overview-3d')
+    expect(screen.getByTestId('simulation-3d-scene')).toHaveTextContent('overview-3d:false')
     await userEvent.click(screen.getByRole('button', { name: 'Walk Kitchen' }))
     expect(screen.getByTestId('simulation-3d-scene')).toHaveTextContent('walk')
     await userEvent.click(screen.getByRole('button', { name: '2D Operations' }))

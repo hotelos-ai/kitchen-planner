@@ -55,7 +55,7 @@ export function SimulationWorkspace({
     ?? project.scenarios.find((value) => value.id === project.activeScenarioId)
     ?? project.scenarios[0]
   const requestedRun = useStore(appStateStore, (state) => state.requestedSimulationRun)
-  const [layers, setLayers] = useState<Layers>({ heatmap: true, trails: true, queues: true, clearances: false, flows: true, labels: true })
+  const [layers, setLayers] = useState<Layers>({ heatmap: true, trails: true, queues: true, clearances: false, flows: true, labels: false })
   const [followRole, setFollowRole] = useState<StaffRole | 'overview'>('overview')
   const view = useStore(appStateStore, (state) => state.simulationView)
   const setView = useStore(appStateStore, (state) => state.setSimulationView)
