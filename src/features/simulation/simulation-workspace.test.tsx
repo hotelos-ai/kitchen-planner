@@ -214,6 +214,26 @@ describe('simulation workspace', () => {
     expect(run).toHaveBeenCalledOnce()
   })
 
+  it('offers better-layout search and existing comparison after a completed run', async () => {
+    const project = createSeedProject()
+    const candidate = structuredClone(project.variants[0])
+    candidate.id = 'existing-candidate'
+    candidate.name = 'Existing candidate'
+    project.variants.push(candidate)
+    const store = createProjectStore(project)
+    const onFindBetterLayout = vi.fn()
+    const onCompareLayouts = vi.fn()
+    render(<SimulationWorkspace store={store} run={runSimulation} onFindBetterLayout={onFindBetterLayout} onCompareLayouts={onCompareLayouts} />)
+
+    expect(screen.queryByRole('button', { name: 'Find a better layout' })).not.toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: /Run 60-minute service/i }))
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Find a better layout' }))
+    expect(onFindBetterLayout).toHaveBeenCalledWith({ baselineVariantId: project.activeVariantId, scenarioId: project.activeScenarioId })
+    await userEvent.click(screen.getByRole('button', { name: 'Compare existing plans' }))
+    expect(onCompareLayouts).toHaveBeenCalledOnce()
+  })
+
   it('validates and runs the active variant architecture and layout constraints rather than the compatibility mirror', async () => {
     const project = createSeedProject()
     project.architecture.wallHeightMm = 2100

@@ -33,6 +33,8 @@ type Props = {
   run?: (input: SimulationInput, signal?: AbortSignal) => SimulationResult | Promise<SimulationResult>
   runStore?: SimulationRunStore
   threeRenderer?: ComponentType<SimulationThreeSceneProps>
+  onFindBetterLayout?(input: { baselineVariantId: string; scenarioId: string }): void
+  onCompareLayouts?(): void
 }
 type Layers = { heatmap: boolean; trails: boolean; queues: boolean; clearances: boolean; flows: boolean; labels: boolean }
 
@@ -46,6 +48,8 @@ export function SimulationWorkspace({
   run = (input, signal) => runSimulationResponsive(input, { signal }),
   runStore = simulationRunStore,
   threeRenderer: ThreeRenderer = SimulationThreeScene,
+  onFindBetterLayout,
+  onCompareLayouts,
 }: Props) {
   const project = useStore(store, (state) => state.project)
   const activeVariant = useStore(store, getActiveVariant)
@@ -202,6 +206,13 @@ export function SimulationWorkspace({
         </div>}
         {result && liveState ? <>
           <LiveServiceHUD result={result} state={liveState} />
+          {(onFindBetterLayout || (onCompareLayouts && project.variants.length >= 2)) && <section className="simulation-improvement-cta" aria-label="Improve or compare this layout">
+            <div><span className="eyebrow">Next step</span><h2>Could this layout perform better?</h2><p>Search alternatives using this same service scenario, then compare the strongest option side by side.</p></div>
+            <div>
+              {onFindBetterLayout && <button type="button" onClick={() => onFindBetterLayout({ baselineVariantId: variant.id, scenarioId: scenario.id })}>Find a better layout</button>}
+              {onCompareLayouts && project.variants.length >= 2 && <button type="button" onClick={onCompareLayouts}>Compare existing plans</button>}
+            </div>
+          </section>}
           <div className="simulation-view-stage">
             <SimulationViewSwitcher value={view} onChange={setView} />
             {view === 'operations-2d'

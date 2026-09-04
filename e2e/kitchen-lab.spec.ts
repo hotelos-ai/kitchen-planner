@@ -210,12 +210,10 @@ test('runs, inspects, compares, and atomically adopts an auto-layout finalist', 
   await expect(page.getByRole('region', { name: 'Inspected finalist' })).toBeVisible()
   await page.getByRole('button', { name: 'Compare Least travel' }).click()
   await expect(page.getByRole('region', { name: 'Finalist comparison' })).toBeVisible()
-  await page.getByRole('button', { name: 'Save Minimal change as new layout' }).click()
-  await expect(page.getByRole('status')).toContainText(/saved as a new layout/i)
-
-  await page.getByRole('button', { name: 'Auto-layout', exact: true }).click()
-  await page.getByRole('button', { name: 'Plan', exact: true }).click()
-  await expect(page.getByRole('tab', { name: /Minimal change/ })).toBeVisible()
+  await page.getByRole('button', { name: 'Save best observed and compare side by side' }).click()
+  await expect(page.getByRole('heading', { name: 'Priority findings' })).toBeVisible()
+  await expect(page.getByLabel('Baseline layout')).toHaveValue('baseline-trace')
+  await expect(page.getByLabel('Candidate layout').locator('option:checked')).toHaveText('Fastest service')
   expect(pageErrors).toEqual([])
 })
 

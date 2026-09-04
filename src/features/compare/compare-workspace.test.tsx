@@ -36,6 +36,22 @@ describe('layout comparison workspace', () => {
     expect(screen.getByLabelText('Different room plan preview')).toHaveAttribute('viewBox', '-80 -80 8160 8160')
   })
 
+  it('opens an explicitly requested baseline and candidate pair', () => {
+    const project = createSeedProject()
+    const candidate = structuredClone(project.variants[0])
+    candidate.id = 'recommended-layout'
+    candidate.name = 'Recommended layout'
+    project.variants.push(candidate)
+    const store = createProjectStore(project)
+
+    render(<CompareWorkspace store={store} initialBaselineId="baseline-trace" initialCandidateId="recommended-layout" />)
+
+    expect(screen.getByLabelText('Baseline layout')).toHaveValue('baseline-trace')
+    expect(screen.getByLabelText('Candidate layout')).toHaveValue('recommended-layout')
+    expect(screen.getByRole('img', { name: 'Layout A plan preview' })).toBeInTheDocument()
+    expect(screen.getByRole('img', { name: 'Recommended layout plan preview' })).toBeInTheDocument()
+  })
+
   it('prepares ReportView print and HTML export from the shared report generator', async () => {
     render(<CompareWorkspace />)
 

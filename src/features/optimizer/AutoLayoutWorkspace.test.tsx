@@ -288,6 +288,19 @@ describe('auto-layout workspace', () => {
     })
   })
 
+  it('saves the best finalist and opens it in the full comparison workspace', async () => {
+    vi.stubGlobal('crypto', { randomUUID: () => 'compare-adopted' })
+    const store = createProjectStore(createSeedProject())
+    const onCompareLayouts = vi.fn()
+    render(<AutoLayoutWorkspace store={store} runner={runner()} onCompareLayouts={onCompareLayouts} />)
+    await userEvent.click(screen.getByRole('button', { name: 'Run auto-layout' }))
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Save best observed and compare side by side' }))
+
+    expect(store.getState().project.variants).toHaveLength(2)
+    expect(onCompareLayouts).toHaveBeenCalledWith('baseline-trace', 'layout-compare-adopted')
+  })
+
   it('refuses to adopt a result after the workspace revision changes', async () => {
     const user = userEvent.setup()
     const store = createProjectStore(createSeedProject())

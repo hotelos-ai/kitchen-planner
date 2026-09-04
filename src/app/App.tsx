@@ -144,6 +144,8 @@ export function App() {
   const startScreenVisible = showStartScreen && agentActivityVersion === agentActivityBaseline
   const [activatedWorkspaceViews, setActivatedWorkspaceViews] = useState({ plan: false, scene: false })
   const [splitPlanPercent, setSplitPlanPercent] = useState(DEFAULT_SPLIT_PLAN_PERCENT)
+  const [autoLayoutSource, setAutoLayoutSource] = useState<{ baselineVariantId: string; scenarioId: string } | null>(null)
+  const [comparisonPair, setComparisonPair] = useState<{ baselineVariantId: string; candidateVariantId: string } | null>(null)
 
   useEffect(() => () => appStateStore.getState().reset(), [])
 
@@ -243,8 +245,8 @@ export function App() {
           showAutoLayout={showAutoLayout}
           onViewChange={setView}
           onStageChange={setStage}
-          onOpenCompare={() => toggleOverlay('compare')}
-          onOpenAutoLayout={() => toggleOverlay('auto-layout')}
+          onOpenCompare={() => { setComparisonPair(null); toggleOverlay('compare') }}
+          onOpenAutoLayout={() => { setAutoLayoutSource(null); toggleOverlay('auto-layout') }}
           aiToolsOpen={aiToolsOpen}
           onOpenAiTools={() => setDialogOpen('agent-tools', !aiToolsOpen)}
           onTourFocus={focusTourStep}
@@ -296,9 +298,20 @@ export function App() {
             />
           ) : (
           <section className={`workspace-surfaces${splitViewActive ? ' split-workspace' : ''}`} style={splitWorkspaceStyle}>
-            {overlay === 'compare' && <div className="workspace-surface active"><CompareWorkspace /></div>}
-            {overlay === 'auto-layout' && <div className="workspace-surface active"><AutoLayoutWorkspace runner={autoLayoutRunner} /></div>}
-            {overlay === null && stage === 'simulate' && <div className="workspace-surface active"><SimulationWorkspace /></div>}
+            {overlay === 'compare' && <div className="workspace-surface active"><CompareWorkspace key={`${comparisonPair?.baselineVariantId ?? 'default'}-${comparisonPair?.candidateVariantId ?? 'default'}`} initialBaselineId={comparisonPair?.baselineVariantId} initialCandidateId={comparisonPair?.candidateVariantId} /></div>}
+            {overlay === 'auto-layout' && <div className="workspace-surface active"><AutoLayoutWorkspace
+              runner={autoLayoutRunner}
+              baselineVariantId={autoLayoutSource?.baselineVariantId}
+              scenarioId={autoLayoutSource?.scenarioId}
+              onCompareLayouts={(baselineVariantId, candidateVariantId) => {
+                setComparisonPair({ baselineVariantId, candidateVariantId })
+                setOverlay('compare')
+              }}
+            /></div>}
+            {overlay === null && stage === 'simulate' && <div className="workspace-surface active"><SimulationWorkspace
+              onFindBetterLayout={(source) => { setAutoLayoutSource(source); setOverlay('auto-layout') }}
+              onCompareLayouts={() => { setComparisonPair(null); setOverlay('compare') }}
+            /></div>}
             {overlay === null && stage !== 'simulate' && view === 'plan' && (
               <div className="canvas-toolbar-wrap">
                 <StageToolbar

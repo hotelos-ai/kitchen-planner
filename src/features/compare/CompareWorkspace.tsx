@@ -32,12 +32,16 @@ function simulate(variant: LayoutVariant, scenario: SimulationScenario) {
   return runSimulation({ architecture: variant.architecture, equipment: variant.equipment, layoutConstraints: variant.layoutConstraints, scenario })
 }
 
-export function CompareWorkspace({ store = projectStore }: { store?: ProjectStore }) {
+export function CompareWorkspace({ store = projectStore, initialBaselineId, initialCandidateId }: { store?: ProjectStore; initialBaselineId?: string; initialCandidateId?: string }) {
   const project = useStore(store, (state) => state.project)
-  const defaultKind: CompareKind | null = project.variants.length >= 2 && project.scenarios.length < 2 ? 'layouts' : project.variants.length < 2 && project.scenarios.length >= 2 ? 'scenarios' : null
+  const defaultKind: CompareKind | null = initialBaselineId && initialCandidateId
+    ? 'layouts'
+    : project.variants.length >= 2 && project.scenarios.length < 2
+      ? 'layouts'
+      : project.variants.length < 2 && project.scenarios.length >= 2 ? 'scenarios' : null
   const [kind, setKind] = useState<CompareKind | null>(defaultKind)
-  const [baselineId, setBaselineId] = useState(project.variants[0].id)
-  const [candidateId, setCandidateId] = useState(project.variants[1]?.id ?? project.variants[0].id)
+  const [baselineId, setBaselineId] = useState(initialBaselineId ?? project.variants[0].id)
+  const [candidateId, setCandidateId] = useState(initialCandidateId ?? project.variants[1]?.id ?? project.variants[0].id)
   const [scenarioAId, setScenarioAId] = useState(project.scenarios[0].id)
   const [scenarioBId, setScenarioBId] = useState(project.scenarios[1]?.id ?? project.scenarios[0].id)
   const [mode, setMode] = useState<PreviewMode>('plan')

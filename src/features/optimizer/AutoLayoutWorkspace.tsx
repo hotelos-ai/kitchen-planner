@@ -42,6 +42,9 @@ type Props = {
   store?: ProjectStore
   runner?: AutoLayoutRunner
   now?: () => string
+  baselineVariantId?: string
+  scenarioId?: string
+  onCompareLayouts?(baselineVariantId: string, candidateVariantId: string): void
 }
 
 const roles: Array<{ role: StaffRole; label: string }> = [
@@ -144,10 +147,12 @@ function FinalistCard({
   )
 }
 
-export function AutoLayoutWorkspace({ store = projectStore, runner, now = () => new Date().toISOString() }: Props) {
+export function AutoLayoutWorkspace({ store = projectStore, runner, now = () => new Date().toISOString(), baselineVariantId, scenarioId, onCompareLayouts }: Props) {
   const state = useStore(store, (current) => current)
-  const baseline = getActiveVariant(state)
-  const activeScenario = state.project.scenarios.find((scenario) => scenario.id === state.project.activeScenarioId) ?? state.project.scenarios[0]
+  const baseline = state.project.variants.find((variant) => variant.id === baselineVariantId) ?? getActiveVariant(state)
+  const activeScenario = state.project.scenarios.find((scenario) => scenario.id === scenarioId)
+    ?? state.project.scenarios.find((scenario) => scenario.id === state.project.activeScenarioId)
+    ?? state.project.scenarios[0]
   const [covers, setCovers] = useState(activeScenario.covers)
   const [durationMinutes, setDurationMinutes] = useState(activeScenario.durationMinutes)
   const [arrivalPattern, setArrivalPattern] = useState(activeScenario.arrivalPattern)
@@ -169,6 +174,7 @@ export function AutoLayoutWorkspace({ store = projectStore, runner, now = () => 
   const [message, setMessage] = useState('')
   const [inspected, setInspected] = useState<{ name: string; candidate: AutoLayoutCandidate } | null>(null)
   const [compared, setCompared] = useState<AutoLayoutCandidate | null>(null)
+  const [savedVariantIds, setSavedVariantIds] = useState<Record<string, string>>({})
 
   const architectureElements = useMemo(() => [
     ...baseline.architecture.openings.map((opening) => ({ id: opening.id, label: opening.label })),
@@ -251,8 +257,10 @@ export function AutoLayoutWorkspace({ store = projectStore, runner, now = () => 
     spatial: spatialFromDiff(inspected.candidate.diff, inspected.candidate.score.changeCost),
   }) : null
 
-  const adopt = (name: string, candidate: AutoLayoutCandidate) => {
-    if (!result) return
+  const adopt = (name: string, candidate: AutoLayoutCandidate): string | null => {
+    const existingId = savedVariantIds[candidate.id]
+    if (existingId) return existingId
+    if (!result) return null
     const manifest = result.manifest
     const adopted: LayoutVariant = {
       ...structuredClone(candidate.variant),
@@ -278,17 +286,26 @@ export function AutoLayoutWorkspace({ store = projectStore, runner, now = () => 
         resultMetrics: { ...candidate.score, ...(candidate.serviceMetrics ?? {}) },
       },
     }
+    const newVariantId = makeId('layout')
     const applied = store.getState().adoptAutoLayoutCandidate({
       expectedDocumentId: manifest.documentId,
       expectedRevision: manifest.revision,
       runId: manifest.id,
       resultId: candidate.id,
       baselineVariantId: manifest.baselineVariantId,
-      newVariantId: makeId('layout'),
+      newVariantId,
       name,
       candidate: adopted,
     })
     setMessage(applied.ok ? `${name} saved as a new layout.` : applied.message)
+    if (!applied.ok) return null
+    setSavedVariantIds((current) => ({ ...current, [candidate.id]: newVariantId }))
+    return newVariantId
+  }
+
+  const saveAndCompare = (name: string, candidate: AutoLayoutCandidate) => {
+    const candidateVariantId = adopt(name, candidate)
+    if (candidateVariantId) onCompareLayouts?.(baseline.id, candidateVariantId)
   }
 
   return (
@@ -375,6 +392,7 @@ export function AutoLayoutWorkspace({ store = projectStore, runner, now = () => 
                 />
               ))}
             </div>
+            {onCompareLayouts && namedFinalists[0] && <button type="button" className="auto-layout-compare-best" onClick={() => saveAndCompare(namedFinalists[0].name, namedFinalists[0].candidate)}>Save best observed and compare side by side</button>}
             {namedFinalists.length > 0 && <button type="button" onClick={() => namedFinalists.slice(0, alternativeCount).forEach(({ name, candidate }) => adopt(name, candidate))}>Save alternatives as new layouts</button>}
           </>}
           {inspected && (
