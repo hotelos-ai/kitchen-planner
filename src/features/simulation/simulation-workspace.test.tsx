@@ -113,6 +113,26 @@ describe('simulation workspace', () => {
     expect(screen.getAllByLabelText(/live queue/i).length).toBeGreaterThan(0)
   })
 
+  it('keeps simulation available with access warnings and explains the closest-point fallback', async () => {
+    const project = createSeedProject()
+    const variant = project.variants[0]
+    const dirtyLanding = variant.equipment.find((item) => item.id === 'dirty-landing')!
+    Object.assign(dirtyLanding, { xMm: 2700, yMm: 5950, widthMm: 700, depthMm: 600 })
+    const store = createProjectStore(project)
+    const run = vi.fn(runSimulation)
+    render(<SimulationWorkspace store={store} run={run} />)
+
+    const runButton = screen.getByRole('button', { name: /Run 60-minute service/i })
+    expect(runButton).toBeEnabled()
+    expect(screen.getByText(/modeled warnings.*simulation can still run/i)).toBeInTheDocument()
+    await userEvent.click(screen.getByText('Review warnings'))
+    expect(screen.getByText(/staff walk to the closest reachable service point/i)).toBeInTheDocument()
+
+    await userEvent.click(runButton)
+    expect(await screen.findByText(/Total staff travel/i)).toBeInTheDocument()
+    expect(run).toHaveBeenCalledOnce()
+  })
+
   it('opens the compact strategy prompt and moves equipment without changing architecture', async () => {
     const project = createSeedProject()
     const variant = project.variants.find((candidate) => candidate.id === project.activeVariantId)!

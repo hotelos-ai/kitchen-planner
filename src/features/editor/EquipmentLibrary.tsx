@@ -60,7 +60,7 @@ export function EquipmentLibrary({ store }: Props) {
   const variant = useStore(store, getActiveVariant)
   const selectedIds = useStore(store, (state) => state.selectedIds)
   const [query, setQuery] = useState('')
-  const [catalogTab, setCatalogTab] = useState<'equipment' | 'storage' | 'templates' | 'placed'>('equipment')
+  const [catalogTab, setCatalogTab] = useState<'equipment' | 'storage' | 'waste' | 'templates' | 'placed'>('equipment')
   const [category, setCategory] = useState<CatalogCategory | ''>('')
   const [capability, setCapability] = useState('')
   const [placementError, setPlacementError] = useState('')
@@ -79,9 +79,14 @@ export function EquipmentLibrary({ store }: Props) {
   )
   const entries = useMemo(
     () => filterCatalog(searchCatalog(query), {
-      ...(catalogTab === 'storage' ? { category: 'storage' as const } : category ? { category } : {}),
+      ...(catalogTab === 'storage'
+        ? { category: 'storage' as const }
+        : catalogTab === 'waste'
+          ? { category: 'waste-janitorial' as const }
+          : category ? { category } : {}),
       ...(capability ? { capability } : {}),
-    }).filter((entry) => entry.category !== 'architecture'),
+    }).filter((entry) => entry.category !== 'architecture')
+      .filter((entry) => catalogTab !== 'waste' || entry.tags.includes('waste')),
     [query, category, capability, catalogTab],
   )
 
@@ -92,7 +97,7 @@ export function EquipmentLibrary({ store }: Props) {
       groups.set(key, [...(groups.get(key) ?? []), item])
     })
     return groups
-  }, [variant.equipment])
+  }, [variant])
 
   const addCatalogEntry = (entry: CatalogEntry) => {
     setPlacementError('')
@@ -153,18 +158,20 @@ export function EquipmentLibrary({ store }: Props) {
       <div className="catalog-tabs" role="tablist" aria-label="Equipment catalog tabs">
         <button type="button" role="tab" aria-selected={catalogTab === 'equipment'} onClick={() => setCatalogTab('equipment')}>Equipment</button>
         <button type="button" role="tab" aria-selected={catalogTab === 'storage'} onClick={() => { setCatalogTab('storage'); setQuery(''); setCategory(''); setCapability('') }}>Storage</button>
+        <button type="button" role="tab" aria-selected={catalogTab === 'waste'} onClick={() => { setCatalogTab('waste'); setQuery(''); setCategory(''); setCapability('') }}>Waste &amp; bins</button>
         <button type="button" role="tab" aria-selected={catalogTab === 'templates'} onClick={() => setCatalogTab('templates')}>Station templates</button>
         <button type="button" role="tab" aria-selected={catalogTab === 'placed'} onClick={() => setCatalogTab('placed')}>Placed · {variant.equipment.length}</button>
       </div>
-      {catalogTab === 'equipment' || catalogTab === 'storage' ? <>
+      {catalogTab === 'equipment' || catalogTab === 'storage' || catalogTab === 'waste' ? <>
       {catalogTab === 'storage' && <p className="stage-summary">Commercial stainless-steel shelves and racks. Add one, select it, then unlock dimensions in the inspector to change its height.</p>}
+      {catalogTab === 'waste' && <p className="stage-summary">Commercial trash, food-waste, and sorting bins. Add one, then drag it to the collection point on the plan.</p>}
       <label>
         Search
         <input
           type="search"
           value={query}
           onChange={(event) => setQuery(event.target.value)}
-          placeholder={catalogTab === 'storage' ? 'Shelf, rack, dry storage…' : 'Name, synonym, or use'}
+          placeholder={catalogTab === 'storage' ? 'Shelf, rack, dry storage…' : catalogTab === 'waste' ? 'Trash bin, food waste, recycling…' : 'Name, synonym, or use'}
         />
       </label>
       <div className="field-pair">

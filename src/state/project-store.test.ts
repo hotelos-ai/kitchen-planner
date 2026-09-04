@@ -3,6 +3,18 @@ import { createSeedProject } from '../domain/seed-project'
 import { configureWorkspaceAutoLayout, createProjectStore, getActiveItem, getActiveVariant, getVariantItem, getWorkspaceFacade } from './project-store'
 
 describe('project store', () => {
+  it('persists plan layer ordering and allows locked items to be visually reordered', () => {
+    const store = createProjectStore(createSeedProject())
+    const itemId = 'six-burner'
+    store.getState().setComponentLocked(itemId, true)
+
+    expect(store.getState().reorderItem(itemId, 'front')).toBe(true)
+    const equipment = store.getState().project.variants[0].equipment
+    const ordered = [...equipment].sort((left, right) => (left.planLayerOrder ?? 0) - (right.planLayerOrder ?? 0))
+    expect(ordered.at(-1)?.id).toBe(itemId)
+    expect(equipment.every((item) => Number.isInteger(item.planLayerOrder))).toBe(true)
+  })
+
   it('exposes the same domain-backed catalog, placement, requirements, and simulation facade used by the UI', () => {
     const store = createProjectStore(createSeedProject())
     const facade = getWorkspaceFacade(store)
@@ -157,9 +169,9 @@ describe('project store', () => {
       xMm: before.xMm,
       yMm: before.yMm,
       rotationDeg: before.rotationDeg,
-      widthMm: 1200,
-      depthMm: 700,
-      heightMm: 850,
+      widthMm: before.widthMm,
+      depthMm: before.depthMm,
+      heightMm: before.heightMm,
       visualPreset: 'chest-freezer',
       configurationPreset: 'cold-chest-freezer',
     })

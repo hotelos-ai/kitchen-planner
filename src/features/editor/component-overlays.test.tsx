@@ -15,7 +15,7 @@ describe('component editing overlays', () => {
     const onAction = vi.fn()
     render(<ComponentContextMenu item={item} locked={false} position={{ x: 20, y: 30 }} onAction={onAction} onClose={vi.fn()} />)
 
-    for (const name of ['Configure', 'Skin', 'Rotate left', 'Rotate right', 'Duplicate', 'Lock', 'Inspect in 3D', 'Remove']) {
+    for (const name of ['Configure', 'Skin', 'Rotate left', 'Rotate right', 'Duplicate', 'Bring to front', 'Bring forward', 'Send backward', 'Send to back', 'Lock', 'Inspect in 3D', 'Remove']) {
       expect(screen.getByRole('menuitem', { name })).toBeInTheDocument()
     }
     await user.click(screen.getByRole('menuitem', { name: 'Rotate left' }))

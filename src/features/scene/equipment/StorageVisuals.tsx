@@ -1,6 +1,7 @@
 import { BoxPart, Foot, KitchenSurfaceMaterial, TubularLeg } from './parts'
 import type { EquipmentVisualProps } from './types'
 import { physicalConfigurationDetails } from '../../../domain/equipment-configurations'
+import { shelfElevationsMmForItem } from '../../../domain/shelf-elevations'
 
 const safe = (value: number, minimum = .04) => Math.max(minimum, value)
 const positions = (count: number) => Array.from({ length: count }, (_, index) => index)
@@ -9,12 +10,13 @@ function ShelfDeck({ widthM, depthM, y, thickness = .045 }: { widthM: number; de
   return <BoxPart position={[0, y, 0]} size={[safe(widthM), thickness, safe(depthM)]} radius={.008} />
 }
 
-function RackFrame({ widthM, depthM, heightM, tiers = 4, mobile = false }: {
+function RackFrame({ widthM, depthM, heightM, tiers = 4, mobile = false, shelfElevationsM }: {
   widthM: number
   depthM: number
   heightM: number
   tiers?: number
   mobile?: boolean
+  shelfElevationsM?: number[]
 }) {
   const width = safe(widthM, .24)
   const depth = safe(depthM, .2)
@@ -33,19 +35,18 @@ function RackFrame({ widthM, depthM, heightM, tiers = 4, mobile = false }: {
       key={index}
       widthM={width}
       depthM={depth}
-      y={(mobile ? .1 : .04) + (postHeight - .08) * (index / Math.max(1, tiers - 1))}
+      y={shelfElevationsM?.[index] ?? (mobile ? .1 : .04) + (postHeight - .08) * (index / Math.max(1, tiers - 1))}
       thickness={.035}
     />)}
     {mobile && [-1, 1].flatMap((x) => [-1, 1].map((z) => <Foot key={`caster-${x}-${z}`} x={x * (width / 2 - inset)} z={z * (depth / 2 - inset)} />))}
   </group>
 }
 
-export function StorageWallShelfVisual({ item, widthM, depthM, heightM }: EquipmentVisualProps) {
-  const configuration = physicalConfigurationDetails(item)
-  const shelfY = Math.max(.45, (configuration.elevationMm ?? heightM * 1000) / 1000)
-  const tiers = configuration.tierCount ?? 1
+export function StorageWallShelfVisual({ item, widthM, depthM }: EquipmentVisualProps) {
+  const elevations = shelfElevationsMmForItem(item)
+  const shelfY = Math.max(...elevations.map((value) => value / 1000), .45)
   return <group>
-    {positions(tiers).map((index) => <ShelfDeck key={index} widthM={widthM} depthM={depthM} y={shelfY - index * .28} />)}
+    {elevations.map((elevationMm, index) => <ShelfDeck key={index} widthM={widthM} depthM={depthM} y={elevationMm / 1000} />)}
     {[-1, 1].map((side) => <group key={side} position={[side * widthM * .35, shelfY - .12, -depthM / 2]}>
       <BoxPart position={[0, 0, 0]} size={[.035, .24, .035]} material="darkSteel" radius={.006} />
       <BoxPart position={[0, .1, depthM * .22]} size={[.035, .035, safe(depthM * .44)]} material="darkSteel" radius={.006} />
@@ -54,25 +55,24 @@ export function StorageWallShelfVisual({ item, widthM, depthM, heightM }: Equipm
 }
 StorageWallShelfVisual.displayName = 'StorageWallShelfVisual'
 
-export function StorageOvershelfVisual({ item, widthM, depthM, heightM }: EquipmentVisualProps) {
-  const configuration = physicalConfigurationDetails(item)
-  const shelfY = Math.max(.45, (configuration.elevationMm ?? heightM * 1000) / 1000)
+export function StorageOvershelfVisual({ item, widthM, depthM }: EquipmentVisualProps) {
+  const elevations = shelfElevationsMmForItem(item)
+  const shelfY = Math.max(...elevations, .45)
   const postHeight = Math.max(.3, shelfY)
-  const tiers = configuration.tierCount ?? 1
   return <group>
-    {positions(tiers).map((index) => <ShelfDeck key={index} widthM={widthM} depthM={depthM} y={shelfY - index * .3} />)}
+    {elevations.map((elevationMm, index) => <ShelfDeck key={index} widthM={widthM} depthM={depthM} y={elevationMm / 1000} />)}
     {[-1, 1].map((side) => <TubularLeg key={side} x={side * (widthM / 2 - .05)} z={0} height={postHeight} radius={.018} />)}
   </group>
 }
 StorageOvershelfVisual.displayName = 'StorageOvershelfVisual'
 
 export function StorageRackVisual(props: EquipmentVisualProps) {
-  return <RackFrame {...props} tiers={physicalConfigurationDetails(props.item).tierCount ?? 4} />
+  return <RackFrame {...props} tiers={physicalConfigurationDetails(props.item).tierCount ?? 4} shelfElevationsM={shelfElevationsMmForItem(props.item).map((value) => value / 1000)} />
 }
 StorageRackVisual.displayName = 'StorageRackVisual'
 
 export function StorageMobileRackVisual(props: EquipmentVisualProps) {
-  return <RackFrame {...props} tiers={physicalConfigurationDetails(props.item).tierCount ?? 4} mobile />
+  return <RackFrame {...props} tiers={physicalConfigurationDetails(props.item).tierCount ?? 4} mobile shelfElevationsM={shelfElevationsMmForItem(props.item).map((value) => value / 1000)} />
 }
 StorageMobileRackVisual.displayName = 'StorageMobileRackVisual'
 
@@ -101,10 +101,10 @@ export function StorageBinVisual({ widthM, depthM, heightM }: EquipmentVisualPro
 }
 StorageBinVisual.displayName = 'StorageBinVisual'
 
-export function StoragePotRackVisual({ widthM, depthM, heightM }: EquipmentVisualProps) {
+export function StoragePotRackVisual({ item, widthM, depthM, heightM }: EquipmentVisualProps) {
   const height = safe(heightM, .5)
   return <group>
-    <RackFrame widthM={widthM} depthM={depthM} heightM={height} tiers={2} />
+    <RackFrame widthM={widthM} depthM={depthM} heightM={height} tiers={physicalConfigurationDetails(item).tierCount ?? 2} shelfElevationsM={shelfElevationsMmForItem(item).map((value) => value / 1000)} />
     <BoxPart position={[0, height - .08, depthM * .25]} size={[safe(widthM * .9), .035, .035]} material="darkSteel" radius={.006} />
     {positions(5).map((index) => <mesh key={index} position={[(index / 4 - .5) * widthM * .75, height - .16, depthM * .25]}>
       <torusGeometry args={[.035, .008, 8, 12, Math.PI * 1.5]} />

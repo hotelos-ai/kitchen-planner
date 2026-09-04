@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { createSeedProject } from '../domain/seed-project'
 import { createCatalogEquipmentItem, getCatalogEntry } from '../domain/catalog/kitchen-catalog'
 import { evaluateOperationalRequirements } from '../domain/requirements/operational-requirements'
-import { physicalStationCapacity, validateSimulationInput } from './validation'
+import { physicalStationCapacity, simulationValidationWarnings, validateSimulationInput } from './validation'
 
 describe('simulation input validation', () => {
   it('derives physical station capacity from the selected catalog preset', () => {
@@ -82,7 +82,7 @@ describe('simulation input validation', () => {
     expect(errors).toContainEqual(expect.objectContaining({ code: 'task-duration-capability-invalid', itemIds: ['mystery'] }))
   })
 
-  it('blocks a required station whose intended work approach is obstructed', () => {
+  it('warns but does not block when a required station approach is obstructed', () => {
     const project = createSeedProject()
     const equipment = structuredClone(project.variants[0].equipment)
     const tandoor = equipment.find((item) => item.id === 'tandoor')!
@@ -93,6 +93,8 @@ describe('simulation input validation', () => {
     blocker.yMm = tandoor.yMm - 850
 
     const errors = validateSimulationInput({ architecture: project.architecture, equipment, scenario: project.scenarios[0] })
-    expect(errors).toContainEqual(expect.objectContaining({ code: 'station-approach-blocked', itemIds: expect.arrayContaining(['tandoor']) }))
+    const warnings = simulationValidationWarnings({ architecture: project.architecture, equipment, scenario: project.scenarios[0] })
+    expect(errors).not.toContainEqual(expect.objectContaining({ code: 'station-approach-blocked' }))
+    expect(warnings).toContainEqual(expect.objectContaining({ code: 'route-station-unreachable', severity: 'warning', itemIds: expect.arrayContaining(['tandoor']) }))
   })
 })

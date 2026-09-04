@@ -48,6 +48,8 @@ export const equipmentSchema = z.object({
   visualPreset: z.string().min(1).optional(),
   configurationPreset: z.string().min(1).optional(),
   appearanceSkinId: z.string().min(1).optional(),
+  planLayerOrder: z.number().int().finite().safe().optional(),
+  shelfElevationsMm: z.array(z.number().nonnegative().finite().max(20_000)).max(100).optional(),
 }).strict()
 
 export const architectureSchema = z.object({

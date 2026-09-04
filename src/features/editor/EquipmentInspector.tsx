@@ -6,6 +6,7 @@ import type { ProjectStore } from '../../state/project-store'
 import { getActiveItem } from '../../state/project-store'
 import { EquipmentConfigurationField } from './EquipmentConfigurationField'
 import { equipmentAccessFlow } from '../../domain/equipment-access'
+import { defaultShelfElevationsMm, shelfElevationsMmForItem, shelfTierCount } from '../../domain/shelf-elevations'
 
 type Props = { store: ProjectStore }
 
@@ -47,6 +48,17 @@ function LengthField({ label, valueMm, unit, disabled, allowZero = false, onComm
 const CATEGORIES: EquipmentCategory[] = ['cooking', 'cold', 'prep', 'washing', 'landing', 'storage', 'hood', 'custom']
 const CAPABILITIES: StationCapability[] = ['flat-top-cook', 'fryer-cook', 'range-cook', 'tandoor-cook', 'cold-retrieval', 'food-prep', 'finish-plate', 'clean-window', 'dirty-window', 'dirty-landing', 'dish-pre-rinse', 'dish-wash', 'clean-landing', 'hand-wash', 'mix']
 
+const shelfLetter = (index: number) => {
+  let value = index + 1
+  let label = ''
+  while (value > 0) {
+    value -= 1
+    label = String.fromCharCode(65 + (value % 26)) + label
+    value = Math.floor(value / 26)
+  }
+  return label
+}
+
 export function EquipmentInspector({ store }: Props) {
   const project = useStore(store, (state) => state.project)
   const selectedIds = useStore(store, (state) => state.selectedIds)
@@ -59,6 +71,7 @@ export function EquipmentInspector({ store }: Props) {
   }
   const confirmRemove = confirmRemoveId === item.id
   const accessFlow = equipmentAccessFlow(item)
+  const tierCount = shelfTierCount(item)
 
   const update = (patch: Partial<EquipmentItem>) => {
     store.getState().updateItem(item.id, patch)
@@ -77,6 +90,26 @@ export function EquipmentInspector({ store }: Props) {
       </div>
       <LengthField key={`height-${item.id}-${item.heightMm}-${project.displayUnit}`} label="Height" valueMm={item.heightMm} unit={project.displayUnit} disabled={item.dimensionsLocked} onCommit={(heightMm) => update({ heightMm })} />
       <label className="checkbox-row"><input aria-label="Lock dimensions" type="checkbox" checked={item.dimensionsLocked} onChange={(event) => store.getState().setDimensionsLocked(item.id, event.target.checked)} />Lock dimensions</label>
+      {tierCount > 0 && <details className="capability-editor shelf-elevation-editor" open>
+        <summary>Shelf elevations ({tierCount})</summary>
+        <div>
+          <p>Set each deck's height above the floor. Changing tiers preserves the item's overall dimensions.</p>
+          {shelfElevationsMmForItem(item).map((elevationMm, index) => <LengthField
+            key={`shelf-${item.id}-${index}-${elevationMm}-${project.displayUnit}`}
+            label={`Shelf ${shelfLetter(index)} elevation`}
+            valueMm={elevationMm}
+            unit={project.displayUnit}
+            allowZero
+            onCommit={(nextElevationMm) => {
+              const elevations = shelfElevationsMmForItem(getActiveItem(store.getState(), item.id))
+              elevations[index] = nextElevationMm
+              update({ shelfElevationsMm: elevations })
+            }}
+          />)}
+          {item.shelfElevationsMm?.length ? <button type="button" onClick={() => update({ shelfElevationsMm: [] })}>Reset to evenly spaced</button> : null}
+          <small>Defaults: {defaultShelfElevationsMm(item).map((value) => formatLengthInput(value, project.displayUnit)).join(', ')} {project.displayUnit}</small>
+        </div>
+      </details>}
       {item.capabilities.includes('dish-wash') && accessFlow && <details className="capability-editor" open>
         <summary>Dishwasher rack flow</summary>
         <div>
@@ -118,6 +151,18 @@ export function EquipmentInspector({ store }: Props) {
         </div>
       </details>
       <details className="capability-editor"><summary>Simulation capabilities ({item.capabilities.length})</summary><div>{CAPABILITIES.map((capability) => <label className="checkbox-row" key={capability}><input type="checkbox" checked={item.capabilities.includes(capability)} onChange={(event) => update({ capabilities: event.target.checked ? [...item.capabilities, capability] : item.capabilities.filter((value) => value !== capability) })} />{capability.replaceAll('-', ' ')}</label>)}</div></details>
+      <details className="capability-editor plan-layer-editor">
+        <summary>Plan layer</summary>
+        <div>
+          <p>Choose how overlapping footprints are stacked in the 2D plan.</p>
+          <div className="plan-layer-actions">
+            <button type="button" onClick={() => store.getState().reorderItem(item.id, 'front')}>Bring to front</button>
+            <button type="button" onClick={() => store.getState().reorderItem(item.id, 'forward')}>Bring forward</button>
+            <button type="button" onClick={() => store.getState().reorderItem(item.id, 'backward')}>Send backward</button>
+            <button type="button" onClick={() => store.getState().reorderItem(item.id, 'back')}>Send to back</button>
+          </div>
+        </div>
+      </details>
       {item.notes && <p className="item-note">{item.notes}</p>}
       <div className="inspector-actions">
         <button type="button" aria-label="Duplicate selected item" onClick={() => store.getState().duplicateItem(item.id)}>Duplicate</button>

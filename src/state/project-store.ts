@@ -19,6 +19,7 @@ import { evaluateOperationalRequirements } from '../domain/requirements/operatio
 import { projectSchema } from '../domain/project-schema'
 import { createCheckpoint, restoreCheckpointOnto } from '../domain/layout-checkpoints'
 import { createSeedProject } from '../domain/seed-project'
+import { orderEquipmentForPlan, reorderEquipmentForPlan, type PlanLayerAction } from '../domain/plan-layer-order'
 import { appendHistory } from './history'
 import { loadProject, saveProject } from './persistence'
 import { runSimulation } from '../simulation/engine'
@@ -66,6 +67,7 @@ export interface ProjectState {
   setDimensionsLocked(id: string, locked: boolean): void
   setComponentLocked(id: string, locked: boolean): void
   setAppearanceSkin(id: string, skinId: string): void
+  reorderItem(id: string, action: PlanLayerAction): boolean
   updateItem(id: string, patch: Partial<EquipmentItem>): void
   applyEquipmentConfiguration(id: string, configurationId: string): boolean
   addCustomItem(input: CustomItemInput): string
@@ -197,6 +199,18 @@ export function createProjectStore(initialProject: KitchenProject): ProjectStore
       setDimensionsLocked: (id, locked) => { applyOperations([{ type: 'set_component_dimensions_lock', variantId: activeVariantId(), componentId: id, locked }], 'Set component dimension lock') },
       setComponentLocked: (id, locked) => { applyOperations([{ type: 'lock_components', variantId: activeVariantId(), componentIds: [id], locked }], 'Set component lock') },
       setAppearanceSkin: (id, skinId) => { applyOperations([{ type: 'skin_component', variantId: activeVariantId(), componentId: id, skinId }], 'Set component appearance') },
+      reorderItem: (id, action) => {
+        const variant = getActiveVariant(get())
+        const before = orderEquipmentForPlan(variant.equipment)
+        const ordered = reorderEquipmentForPlan(variant.equipment, id, action)
+        if (before.every((item, index) => item.id === ordered[index]?.id)) return false
+        return applyOperations(ordered.map((item, index) => ({
+          type: 'update_component',
+          variantId: variant.id,
+          componentId: item.id,
+          patch: { planLayerOrder: index },
+        })), `Move component ${action}`).ok
+      },
       updateItem: (id, patch) => {
         const current = getActiveItem(get(), id)
         const operations: unknown[] = []
@@ -205,7 +219,7 @@ export function createProjectStore(initialProject: KitchenProject): ProjectStore
           dimensions: { widthMm: patch.widthMm ?? current.widthMm, depthMm: patch.depthMm ?? current.depthMm, ...(patch.heightMm !== undefined ? { heightMm: patch.heightMm } : {}) },
         })
         if (patch.rotationDeg !== undefined && patch.rotationDeg !== current.rotationDeg) operations.push({ type: 'rotate_components', variantId: activeVariantId(), componentIds: [id], deltaDeg: patch.rotationDeg - current.rotationDeg })
-        const componentPatch = Object.fromEntries(Object.entries(patch).filter(([key, value]) => value !== undefined && ['label', 'category', 'heightMm', 'capabilities', 'clearance', 'accessFlow', 'approximate', 'notes'].includes(key)))
+        const componentPatch = Object.fromEntries(Object.entries(patch).filter(([key, value]) => value !== undefined && ['label', 'category', 'heightMm', 'capabilities', 'clearance', 'accessFlow', 'approximate', 'notes', 'planLayerOrder', 'shelfElevationsMm'].includes(key)))
         if (Object.keys(componentPatch).length) operations.push({ type: 'update_component', variantId: activeVariantId(), componentId: id, patch: componentPatch })
         if (operations.length) applyOperations(operations, 'Update component')
       },

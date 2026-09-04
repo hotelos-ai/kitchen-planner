@@ -4,15 +4,18 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#f3f1eb" />
-    <title>CalmKitchen Designer — commercial kitchen planning &amp; simulation</title>
-    <meta name="description" content="Design commercial kitchens in the browser: 2D drafting, 3D walkthroughs, deterministic service simulation, and evidence-based layout comparison." />
+    <meta name="color-scheme" content="light" />
+    <meta name="application-name" content="CalmKitchen Designer" />
+    <meta name="author" content="HotelOS" />
+    <title>Commercial Kitchen Design Software | 2D, 3D &amp; Simulation | CalmKitchen</title>
+    <meta name="description" content="Design commercial kitchens online with dimensioned 2D floor plans, interactive 3D walkthroughs, configurable equipment, and service-flow simulation." />
     <link rel="canonical" href="https://planner.kitchen.hotelos.ai/" />
     <meta name="robots" content="index,follow" />
 
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content="CalmKitchen Designer" />
-    <meta property="og:title" content="CalmKitchen Designer" />
-    <meta property="og:description" content="Plan, walk through, and pressure-test commercial kitchen layouts — 2D drafting, 3D walkthrough, and deterministic service simulation." />
+    <meta property="og:title" content="Commercial Kitchen Design Software — CalmKitchen Designer" />
+    <meta property="og:description" content="Design a dimensioned kitchen in 2D, walk it in 3D, and pressure-test service flow before construction begins." />
     <meta property="og:url" content="https://planner.kitchen.hotelos.ai/" />
     <meta property="og:image" content="https://planner.kitchen.hotelos.ai/share-card.png" />
     <meta property="og:image:secure_url" content="https://planner.kitchen.hotelos.ai/share-card.png" />
@@ -23,25 +26,60 @@
     <meta property="og:locale" content="en_US" />
 
     <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:title" content="CalmKitchen Designer" />
-    <meta name="twitter:description" content="Plan, walk through, and pressure-test commercial kitchen layouts — 2D drafting, 3D walkthrough, and deterministic service simulation." />
+    <meta name="twitter:url" content="https://planner.kitchen.hotelos.ai/" />
+    <meta name="twitter:title" content="Commercial Kitchen Design Software — CalmKitchen Designer" />
+    <meta name="twitter:description" content="Design a dimensioned kitchen in 2D, walk it in 3D, and pressure-test service flow before construction begins." />
     <meta name="twitter:image" content="https://planner.kitchen.hotelos.ai/share-card.png" />
     <meta name="twitter:image:alt" content="CalmKitchen Designer — commercial kitchen planning on paper" />
 
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <link rel="manifest" href="/site.webmanifest" />
     <meta name="apple-mobile-web-app-title" content="CalmKitchen Designer" />
 
     <script type="application/ld+json">
     {
       "@context": "https://schema.org",
-      "@type": "WebApplication",
-      "name": "CalmKitchen Designer",
-      "url": "https://planner.kitchen.hotelos.ai/",
-      "description": "Design commercial kitchens in the browser: 2D drafting, 3D walkthroughs, deterministic service simulation, and evidence-based layout comparison.",
-      "applicationCategory": "DesignApplication",
-      "operatingSystem": "Web",
-      "inLanguage": "en",
-      "publisher": { "@type": "Organization", "name": "HotelOS" }
+      "@graph": [
+        {
+          "@type": "Organization",
+          "@id": "https://hotelos.ai/#organization",
+          "name": "HotelOS",
+          "url": "https://hotelos.ai/"
+        },
+        {
+          "@type": "WebSite",
+          "@id": "https://planner.kitchen.hotelos.ai/#website",
+          "url": "https://planner.kitchen.hotelos.ai/",
+          "name": "CalmKitchen Designer",
+          "description": "Browser-based commercial kitchen design, 3D walkthrough, and service-flow simulation.",
+          "inLanguage": "en",
+          "publisher": { "@id": "https://hotelos.ai/#organization" }
+        },
+        {
+          "@type": "WebApplication",
+          "@id": "https://planner.kitchen.hotelos.ai/#application",
+          "name": "CalmKitchen Designer",
+          "alternateName": "CalmKitchen Commercial Kitchen Planner",
+          "url": "https://planner.kitchen.hotelos.ai/",
+          "description": "Design commercial kitchens online with dimensioned 2D floor plans, interactive 3D walkthroughs, configurable equipment, and deterministic service-flow simulation.",
+          "applicationCategory": "DesignApplication",
+          "applicationSubCategory": "Commercial kitchen design software",
+          "operatingSystem": "Any",
+          "browserRequirements": "Requires a modern browser with WebGL support",
+          "isAccessibleForFree": true,
+          "inLanguage": "en",
+          "featureList": [
+            "Dimensioned 2D commercial kitchen floor plans",
+            "Interactive 3D kitchen walkthroughs",
+            "Configurable commercial kitchen equipment",
+            "Deterministic service-flow simulation",
+            "Side-by-side layout comparison"
+          ],
+          "screenshot": "https://planner.kitchen.hotelos.ai/share-card.png",
+          "publisher": { "@id": "https://hotelos.ai/#organization" },
+          "isPartOf": { "@id": "https://planner.kitchen.hotelos.ai/#website" }
+        }
+      ]
     }
     </script>
     <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'%3E%3Cpath d='M30.5997 17.8983C30.5997 12.0483 25.8597 7.30835 20.0097 7.30835C14.1597 7.30835 9.42969 12.0483 9.42969 17.8983C9.42969 19.9383 10.0197 21.8283 11.0097 23.4483H29.0097C30.0097 21.8283 30.5897 19.9383 30.5897 17.8983H30.5997Z' fill='%23E38DBE'/%3E%3Cpath d='M29.02 23.4482C27.16 26.4682 23.83 28.4882 20.02 28.4882C16.21 28.4882 12.88 26.4682 11.02 23.4482H4V33.5482H36V23.4482H29.02Z' fill='%23E38DBE'/%3E%3Cpath d='M20.0198 28.478C23.8298 28.478 27.1598 26.4582 29.0198 23.4382H11.0098C12.8698 26.4582 16.1998 28.478 20.0098 28.478H20.0198Z' fill='%23CA4E8E'/%3E%3C/svg%3E" />

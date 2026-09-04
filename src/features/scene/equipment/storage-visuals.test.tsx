@@ -58,8 +58,15 @@ describe('storage visual elevation model', () => {
     />)
 
     const decks = deckElevations(container)
-    expect(decks).toEqual([(preset.elevationMm ?? 0) / 1000, (preset.elevationMm ?? 0) / 1000 - .28, (preset.elevationMm ?? 0) / 1000 - .56])
-    expect(decks[0]).toBeGreaterThanOrEqual(1.5)
+    expect(decks).toEqual([(preset.elevationMm ?? 0) / 1000 - .56, (preset.elevationMm ?? 0) / 1000 - .28, (preset.elevationMm ?? 0) / 1000])
+    expect(decks[2]).toBeGreaterThanOrEqual(1.5)
+  })
+
+  it('renders custom shelf elevations in the 3D model', () => {
+    const item = { ...itemWithPreset('storage-wall-shelf', 'wall-shelf-three-tier'), shelfElevationsMm: [305, 635, 1015] }
+    const { container } = render(<StorageWallShelfVisual item={item} widthM={1.2} depthM={.35} heightM={.3} />)
+
+    expect(deckElevations(container)).toEqual([.305, .635, 1.015])
   })
 
   it('keeps presetless wall shelves at a reachable working height above their own extent', () => {

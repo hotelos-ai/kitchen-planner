@@ -178,6 +178,10 @@ export function ProjectStartScreen({ onCreateRoom, onDrawManually, onOpenProject
           <span className="chip"><i style={{ background: 'var(--cat-wash)' }} />Deterministic simulation</span>
           <span className="chip"><i style={{ background: 'var(--cat-prep)' }} />Layout comparison</span>
         </div>
+        <section className="landing-seo-summary" aria-labelledby="landing-capabilities-title">
+          <h2 id="landing-capabilities-title">Commercial kitchen planning, from floor plan to service</h2>
+          <p>Build dimensioned layouts with doors, windows, stainless-steel equipment, storage, and waste stations. Review the kitchen in 3D, walk the room, and simulate a dinner rush before construction begins.</p>
+        </section>
         <p className="landing-explore">
           Curious what CalmKitchen does for running a kitchen? <a href="https://kitchen.hotelos.ai" target="_blank" rel="noreferrer">Learn about CalmKitchen ↗</a>
           <span className="footer-sep" aria-hidden="true"></span>

@@ -60,6 +60,20 @@ describe('catalog placement suggestion', () => {
     expect(suggestCatalogPlacement({ architecture, equipment, entry, snapMm: 100 })).toBeNull()
   })
 
+  it('allows elevated shelves to be placed above occupied floor footprints', () => {
+    const elevatedEntry = {
+      ...entry,
+      placementRules: { mounting: 'overhead' as const, requiresWall: false },
+    }
+    expect(suggestCatalogPlacement({
+      architecture,
+      equipment: [occupied('counter', 0, 0)],
+      entry: elevatedEntry,
+      snapMm: 100,
+      preferredPoint: { xMm: 0, yMm: 0 },
+    })).toEqual({ xMm: 0, yMm: 0, rotationDeg: 0 })
+  })
+
   it('keeps new floor equipment out of no-go zones and opening clearances', () => {
     const constrained: Architecture = {
       ...architecture,

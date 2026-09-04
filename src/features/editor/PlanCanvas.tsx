@@ -134,6 +134,10 @@ export function PlanCanvas({ store, showReference, sourceImageUrl = '/reference/
     else if (action === 'rotate-left') store.getState().rotateItems([id], -90)
     else if (action === 'rotate-right') store.getState().rotateItems([id], 90)
     else if (action === 'duplicate') store.getState().duplicateItem(id)
+    else if (action === 'bring-to-front') store.getState().reorderItem(id, 'front')
+    else if (action === 'bring-forward') store.getState().reorderItem(id, 'forward')
+    else if (action === 'send-backward') store.getState().reorderItem(id, 'backward')
+    else if (action === 'send-to-back') store.getState().reorderItem(id, 'back')
     else if (action === 'toggle-lock') {
       if (onComponentLockChange) onComponentLockChange(id, !contextLocked)
       else store.getState().setComponentLocked(id, !contextLocked)

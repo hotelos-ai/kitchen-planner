@@ -178,8 +178,8 @@ const rectPolygon = (rect: { xMm: number; yMm: number; widthMm: number; depthMm:
 
 const routeDefinition: OperationalRequirementDefinition = {
   code: 'route-station-unreachable',
-  severity: 'blocker',
-  reason: 'Every required work station and service flow must be reachable from the staff entry.',
+  severity: 'warning',
+  reason: 'Preferred station approaches should be reachable from the staff entry.',
   source: 'modeled-circulation',
   scope: 'layout',
   recommendedCatalogIds: [],
@@ -199,7 +199,7 @@ const routeDefinition: OperationalRequirementDefinition = {
           const goals = stationApproachPoints(station, undefined, approachOffsetMm)
           if (!goals.some((goal) => { try { findRoute(grid, start, goal); return true } catch { return false } })) throw new Error('unreachable')
         }
-        catch { evidence.push({ reason: `${station.label} cannot be reached from the staff entry on the modeled circulation grid.`, itemIds: [station.id] }) }
+        catch { evidence.push({ reason: `${station.label}'s preferred modeled approach is not directly reachable. Simulation will route staff to the closest reachable service point.`, itemIds: [station.id] }) }
       })
       openings.forEach((opening) => {
         try {
@@ -207,11 +207,11 @@ const routeDefinition: OperationalRequirementDefinition = {
           if (!goal) throw new Error('unreachable')
           findRoute(grid, start, goal)
         }
-        catch { evidence.push({ reason: `${opening.label} cannot be reached from the staff entry on the modeled circulation grid.`, itemIds: [opening.id] }) }
+        catch { evidence.push({ reason: `${opening.label}'s preferred modeled approach is not directly reachable. Simulation will route staff to the closest reachable service point.`, itemIds: [opening.id] }) }
       })
       return evidence
     } catch {
-      return [{ reason: 'The modeled circulation grid has no usable route from the staff entry.', itemIds: [] }]
+      return [{ reason: 'The modeled circulation grid has no direct route from the staff entry. Simulation will use the closest reachable service points where possible.', itemIds: [] }]
     }
   },
 }

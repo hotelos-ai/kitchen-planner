@@ -14,21 +14,21 @@ it('offers and applies typical configurations to the selected component', async 
 
   const field = screen.getByRole('combobox', { name: /Equipment configuration/i })
   expect(field).toHaveValue('cold-upright-double')
-  expect(screen.getByText(/Typical configuration · modified/i)).toBeInTheDocument()
+  expect(screen.getByText(/Configuration active · custom size or settings preserved/i)).toBeInTheDocument()
 
   await user.selectOptions(field, 'cold-chest-freezer')
 
   expect(getActiveItem(store.getState(), 'two-door-fridge')).toMatchObject({
     label: 'Chest freezer',
-    widthMm: 1200,
-    depthMm: 700,
-    heightMm: 850,
+    widthMm: 1400,
+    depthMm: 850,
+    heightMm: 1000,
     visualPreset: 'chest-freezer',
   })
-  expect(screen.getByLabelText(/^Width \(mm\)$/i)).toHaveValue('1200')
-  expect(screen.getByLabelText(/^Depth \(mm\)$/i)).toHaveValue('700')
-  expect(screen.getByLabelText(/^Height \(mm\)$/i)).toHaveValue('850')
-  expect(screen.getByText(/Applies typical size, clearance, capabilities, and 3D skin/i)).toBeInTheDocument()
+  expect(screen.getByLabelText(/^Width \(mm\)$/i)).toHaveValue('1400')
+  expect(screen.getByLabelText(/^Depth \(mm\)$/i)).toHaveValue('850')
+  expect(screen.getByLabelText(/^Height \(mm\)$/i)).toHaveValue('1000')
+  expect(screen.getByText(/Configuration active · custom size or settings preserved/i)).toBeInTheDocument()
 })
 
 it('offers all known configurations for a custom component', () => {
@@ -75,4 +75,41 @@ it('allows an industrial stainless-steel shelf height to be edited', async () =>
   await user.tab()
 
   expect(getActiveItem(store.getState(), 'ss-shelf').heightMm).toBe(2200)
+})
+
+it('allows every shelf tier elevation to be customized without resizing the rack', async () => {
+  const user = userEvent.setup()
+  const project = createSeedProject()
+  project.displayUnit = 'in'
+  project.variants[0].equipment = [createCatalogEquipmentItem({
+    catalogId: 'storage-freestanding-shelving',
+    componentId: 'ss-shelf',
+    configurationId: 'shelving-four-tier',
+    position: { xMm: 500, yMm: 500 },
+  })]
+  const store = createProjectStore(project)
+  const before = getActiveItem(store.getState(), 'ss-shelf')
+  store.getState().selectItems(['ss-shelf'])
+  render(<EquipmentInspector store={store} />)
+
+  const shelfA = screen.getByLabelText('Shelf A elevation (in)')
+  await user.clear(shelfA)
+  await user.type(shelfA, '12')
+  await user.tab()
+
+  const updated = getActiveItem(store.getState(), 'ss-shelf')
+  expect(updated.shelfElevationsMm?.[0]).toBeCloseTo(304.8)
+  expect(updated).toMatchObject({ widthMm: before.widthMm, depthMm: before.depthMm, heightMm: before.heightMm })
+  expect(screen.getByLabelText('Shelf D elevation (in)')).toBeInTheDocument()
+
+  await user.selectOptions(screen.getByLabelText('Equipment configuration'), 'shelving-six-tier')
+  expect(screen.getByLabelText('Shelf F elevation (in)')).toBeInTheDocument()
+  const reconfigured = getActiveItem(store.getState(), 'ss-shelf')
+  expect(reconfigured).toMatchObject({
+    widthMm: before.widthMm,
+    depthMm: before.depthMm,
+    heightMm: before.heightMm,
+  })
+  expect(reconfigured.shelfElevationsMm).toHaveLength(4)
+  expect(reconfigured.shelfElevationsMm?.[0]).toBeCloseTo(updated.shelfElevationsMm![0])
 })

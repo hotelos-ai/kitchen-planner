@@ -27,6 +27,7 @@ function equipmentSceneKey(item: LayoutVariant['equipment'][number]): string {
     item.appearanceSkinId ?? 'default',
     item.accessFlow?.inputFace ?? '',
     item.accessFlow?.outputFace ?? '',
+    item.shelfElevationsMm?.join(',') ?? '',
   ].join(':')
 }
 

@@ -39,6 +39,14 @@ describe('project start screen', () => {
   beforeEach(() => sceneRenderSpy.mockClear())
   afterEach(() => vi.unstubAllGlobals())
 
+  it('describes its commercial kitchen design capabilities in visible landing content', () => {
+    stubPreviewViewport(false)
+    render(<ProjectStartScreen onCreateRoom={vi.fn()} onDrawManually={vi.fn()} onOpenProject={vi.fn()} />)
+
+    expect(screen.getByRole('heading', { name: /Commercial kitchen planning, from floor plan to service/i })).toBeInTheDocument()
+    expect(screen.getByText(/doors, windows, stainless-steel equipment, storage, and waste stations/i)).toBeInTheDocument()
+  })
+
   it('does not initialize the CSS-hidden 3D preview on mobile', () => {
     stubPreviewViewport(false)
     render(<ProjectStartScreen onCreateRoom={vi.fn()} onDrawManually={vi.fn()} onOpenProject={vi.fn()} />)

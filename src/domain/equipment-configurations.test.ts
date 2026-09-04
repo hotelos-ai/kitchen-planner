@@ -27,8 +27,9 @@ describe('equipment configurations', () => {
     expect(listCompatibleConfigurations({ ...item, category: 'custom', configurationPreset: undefined })).toHaveLength(EQUIPMENT_CONFIGURATIONS.length)
   })
 
-  it('applies a configuration while preserving placement, rotation, permissions, and notes', () => {
-    const configured = applyEquipmentConfiguration({ ...item, rotationDeg: 90 }, 'cold-chest-freezer')
+  it('applies a configuration while preserving geometry, locks, placement, permissions, and notes', () => {
+    const existing = { ...item, widthMm: 1375, depthMm: 825, heightMm: 2075, rotationDeg: 90, dimensionsLocked: true }
+    const configured = applyEquipmentConfiguration(existing, 'cold-chest-freezer')
     expect(configured).toMatchObject({
       id: item.id,
       xMm: item.xMm,
@@ -39,13 +40,13 @@ describe('equipment configurations', () => {
       notes: item.notes,
       label: 'Chest freezer',
       category: 'cold',
-      widthMm: 1200,
-      depthMm: 700,
-      heightMm: 850,
+      widthMm: 1375,
+      depthMm: 825,
+      heightMm: 2075,
       capabilities: ['cold-retrieval'],
       visualPreset: 'chest-freezer',
       configurationPreset: 'cold-chest-freezer',
-      dimensionsLocked: false,
+      dimensionsLocked: true,
     })
     expect(configured.clearance).toEqual({ kind: 'door-swing', frontMm: 700 })
   })
@@ -53,7 +54,7 @@ describe('equipment configurations', () => {
   it('infers known seed equipment and detects manual modification', () => {
     expect(inferEquipmentConfiguration(item)).toBe('cold-upright-double')
     expect(isEquipmentConfigurationModified({ ...item, configurationPreset: 'cold-upright-double' })).toBe(true)
-    expect(isEquipmentConfigurationModified(applyEquipmentConfiguration(item, 'cold-upright-double'))).toBe(false)
+    expect(isEquipmentConfigurationModified(applyEquipmentConfiguration(item, 'cold-upright-double'))).toBe(true)
     expect(isEquipmentConfigurationModified({
       ...applyEquipmentConfiguration(item, 'cold-upright-double'),
       widthMm: item.widthMm + 100,
@@ -98,7 +99,11 @@ describe('equipment configurations', () => {
       appearanceSkinId: 'powder-black',
       visualPreset: 'storage-wall-shelf',
     })
-    expect(configured.widthMm).not.toBe(shelf.widthMm)
+    expect(configured).toMatchObject({
+      widthMm: shelf.widthMm,
+      depthMm: shelf.depthMm,
+      heightMm: shelf.heightMm,
+    })
     expect(physicalConfigurationDetails(configured)).toEqual(expect.objectContaining({ tierCount: 2, mounting: 'wall', mobile: false, elevationMm: expect.any(Number) }))
     expect(physicalConfigurationDetails(configured).elevationMm).toBeGreaterThanOrEqual(1500)
     expect(physicalConfigurationDetails({ ...configured, appearanceSkinId: 'galvanized' })).toEqual(physicalConfigurationDetails(configured))

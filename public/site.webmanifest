@@ -1,0 +1,18 @@
+{
+  "name": "CalmKitchen Designer",
+  "short_name": "CalmKitchen",
+  "description": "Commercial kitchen design, 3D walkthrough, and service-flow simulation.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#f3f1eb",
+  "theme_color": "#f3f1eb",
+  "icons": [
+    {
+      "src": "/apple-touch-icon.png",
+      "sizes": "180x180",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ]
+}

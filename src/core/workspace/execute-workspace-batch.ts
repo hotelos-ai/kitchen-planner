@@ -222,7 +222,8 @@ export function executeWorkspaceBatch(options: BatchOptions): WorkspaceBatchResu
       case 'update_component': {
         const item = requireComponents(variant, [operation.componentId])?.[0]
         if (!item) return fail('missing-component', `Component ${operation.componentId} does not exist in layout ${variant.id}.`)
-        if (variant.layoutConstraints?.lockedComponentIds?.includes(item.id)) return fail('locked-component', `Component ${item.id} is locked.`)
+        const changesOnlyPlanLayer = Object.keys(operation.patch).every((key) => key === 'planLayerOrder')
+        if (variant.layoutConstraints?.lockedComponentIds?.includes(item.id) && !changesOnlyPlanLayer) return fail('locked-component', `Component ${item.id} is locked.`)
         variant.equipment = variant.equipment.map((candidate) => candidate.id === item.id ? { ...candidate, ...operation.patch, id: candidate.id } : candidate)
         changedIds.push(item.id)
         return

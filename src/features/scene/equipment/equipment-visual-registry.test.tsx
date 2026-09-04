@@ -56,6 +56,16 @@ describe('equipment visual registry', () => {
     expect(equipmentVisualDescriptor(item)).toEqual({ preset, parts: expect.arrayContaining(parts) })
   })
 
+  it.each([
+    ['waste-mobile-bin', 'waste-mobile-bin', 'WasteMobileBinVisual', ['lidded-bin', 'rear-handle', 'wheels']],
+    ['waste-compost-bin', 'waste-compost-bin', 'WasteCompostBinVisual', ['food-waste-bin', 'colored-lid', 'foot-pedal']],
+    ['waste-bin-station', 'waste-sorting-station', 'WasteSortingStationVisual', ['three-bin-bank', 'color-coded-lids', 'front-openings']],
+  ])('%s registers a recognizable waste-bin model', (catalogId, preset, displayName, parts) => {
+    const item = createCatalogEquipmentItem({ catalogId, componentId: catalogId, position: { xMm: 0, yMm: 0 } })
+    expect(getEquipmentVisual(item).displayName).toBe(displayName)
+    expect(equipmentVisualDescriptor(item)).toEqual({ preset, parts })
+  })
+
   it('registers every catalog visual preset without a generic fallback', () => {
     const base = createSeedProject().variants[0].equipment[0]
     EQUIPMENT_CONFIGURATIONS.forEach((configuration) => {

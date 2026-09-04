@@ -36,8 +36,8 @@ export function EquipmentConfigurationField({ item, store, onApplied }: {
       </select>
       <small>
         {modified
-          ? 'Typical configuration · modified'
-          : 'Applies typical size, clearance, capabilities, and 3D skin'}
+          ? 'Configuration active · custom size or settings preserved'
+          : 'Preserves size · updates clearance, capabilities, and 3D form'}
       </small>
       {error && <small role="alert">{error}</small>}
     </label>

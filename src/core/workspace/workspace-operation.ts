@@ -149,6 +149,8 @@ const componentPatchSchema = z.object({
   }).strict().optional(),
   approximate: z.boolean().optional(),
   notes: z.string().max(4_000).optional(),
+  planLayerOrder: z.number().int().finite().safe().optional(),
+  shelfElevationsMm: z.array(z.number().finite().nonnegative().max(20_000)).max(100).optional(),
 }).strict().refine((patch) => Object.keys(patch).length > 0, 'Component patch cannot be empty')
 
 const durationRangeSchema = z.object({

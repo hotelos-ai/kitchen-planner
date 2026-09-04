@@ -296,6 +296,27 @@ test('keeps every 3D control usable and recovers a lost WebGL context', async ({
   expect(pageErrors).toEqual([])
 })
 
+test('keeps every split-view inspector control and the Remove action reachable', async ({ page }) => {
+  await page.setViewportSize({ width: 1050, height: 600 })
+  await openApp(page)
+  await page.getByRole('tab', { name: /Placed/i }).click()
+  await page.getByRole('button', { name: /Select Tandoor/i }).click()
+  await page.getByRole('button', { name: 'Split', exact: true }).click()
+  await page.getByRole('button', { name: 'Open split-view inspector' }).click()
+
+  const drawer = page.locator('[data-editor-drawer="inspector"]')
+  const remove = page.getByRole('button', { name: 'Remove selected item' })
+  await expect(drawer).toBeVisible()
+  await drawer.evaluate((element) => { element.scrollTop = element.scrollHeight })
+  await expect(remove).toBeVisible()
+
+  const [drawerBox, removeBox] = await Promise.all([drawer.boundingBox(), remove.boundingBox()])
+  expect(drawerBox).not.toBeNull()
+  expect(removeBox).not.toBeNull()
+  expect(removeBox!.y + removeBox!.height).toBeLessThanOrEqual(drawerBox!.y + drawerBox!.height)
+  expect(removeBox!.x + removeBox!.width).toBeLessThanOrEqual(drawerBox!.x + drawerBox!.width)
+})
+
 test('keeps overview 3D mounted when no safe Walk spawn exists', async ({ page }) => {
   const project = createSeedProject()
   project.variants[0].equipment = [{
@@ -342,14 +363,14 @@ test('applies a typical equipment configuration and reflects it in 3D', async ({
 
   await page.getByRole('button', { name: /Select 2-door fridge, 1400 mm by 850 mm/i }).click()
   await expect(page.getByLabel('Equipment configuration')).toHaveValue('cold-upright-double')
-  await expect(page.getByText(/Typical configuration · modified/i)).toBeVisible()
+  await expect(page.getByText(/Configuration active · custom size or settings preserved/i)).toBeVisible()
   await page.getByLabel('Equipment configuration').selectOption('cold-chest-freezer')
 
   await expect(page.getByLabel('Equipment label')).toHaveValue('Chest freezer')
-  await expect(page.getByLabel(/^Width \(mm\)$/i)).toHaveValue('1200')
-  await expect(page.getByLabel(/^Depth \(mm\)$/i)).toHaveValue('700')
-  await expect(page.getByLabel(/^Height \(mm\)$/i)).toHaveValue('850')
-  await expect(page.getByText(/Applies typical size, clearance, capabilities, and 3D skin/i)).toBeVisible()
+  await expect(page.getByLabel(/^Width \(mm\)$/i)).toHaveValue('1400')
+  await expect(page.getByLabel(/^Depth \(mm\)$/i)).toHaveValue('850')
+  await expect(page.getByLabel(/^Height \(mm\)$/i)).toHaveValue('1000')
+  await expect(page.getByText(/Configuration active · custom size or settings preserved/i)).toBeVisible()
 
   await page.getByRole('button', { name: '3D', exact: true }).click()
   await expect(page.getByTestId('kitchen-scene').locator('canvas')).toBeVisible()

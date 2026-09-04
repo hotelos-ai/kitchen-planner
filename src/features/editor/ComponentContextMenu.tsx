@@ -7,6 +7,10 @@ export type ComponentContextAction =
   | 'rotate-left'
   | 'rotate-right'
   | 'duplicate'
+  | 'bring-to-front'
+  | 'bring-forward'
+  | 'send-backward'
+  | 'send-to-back'
   | 'toggle-lock'
   | 'inspect-3d'
   | 'remove'
@@ -52,6 +56,10 @@ export function ComponentContextMenu({ item, locked, position, onAction, onClose
     <button type="button" role="menuitem" onClick={action('rotate-left')}>Rotate left</button>
     <button type="button" role="menuitem" onClick={action('rotate-right')}>Rotate right</button>
     <button type="button" role="menuitem" onClick={action('duplicate')}>Duplicate</button>
+    <button type="button" role="menuitem" onClick={action('bring-to-front')}>Bring to front</button>
+    <button type="button" role="menuitem" onClick={action('bring-forward')}>Bring forward</button>
+    <button type="button" role="menuitem" onClick={action('send-backward')}>Send backward</button>
+    <button type="button" role="menuitem" onClick={action('send-to-back')}>Send to back</button>
     <button type="button" role="menuitem" onClick={action('toggle-lock')}>{locked ? 'Unlock' : 'Lock'}</button>
     <button type="button" role="menuitem" onClick={action('inspect-3d')}>Inspect in 3D</button>
     <button type="button" role="menuitem" disabled={!item.removable} onClick={action('remove')}>Remove</button>

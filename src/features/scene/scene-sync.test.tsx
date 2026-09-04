@@ -168,7 +168,7 @@ describe('3D scene synchronization', () => {
     render(<SceneWorkspace renderer={StableRenderer} />)
     act(() => projectStore.getState().applyEquipmentConfiguration('two-door-fridge', 'cold-chest-freezer'))
 
-    expect(screen.getByTestId('live-fridge-configuration')).toHaveTextContent('Chest freezer:1200:chest-freezer')
+    expect(screen.getByTestId('live-fridge-configuration')).toHaveTextContent('Chest freezer:1400:chest-freezer')
     expect(mounts).toBe(1)
     expect(screen.getByTestId('kitchen-scene')).toHaveAttribute('data-renderer-generation', '0')
   })
@@ -185,14 +185,16 @@ describe('3D scene synchronization', () => {
     let mounts = 0
     const ShelfRenderer = ({ items }: SceneRendererProps) => {
       useEffect(() => { mounts += 1 }, [])
-      return <output data-testid="live-shelf-tiers">{physicalConfigurationDetails(items[0]).tierCount}</output>
+      return <output data-testid="live-shelf-tiers">{physicalConfigurationDetails(items[0]).tierCount}:{items[0].shelfElevationsMm?.join(',') ?? 'default'}</output>
     }
 
     render(<SceneWorkspace renderer={ShelfRenderer} />)
-    expect(screen.getByTestId('live-shelf-tiers')).toHaveTextContent('1')
+    expect(screen.getByTestId('live-shelf-tiers')).toHaveTextContent('1:default')
     act(() => projectStore.getState().applyEquipmentConfiguration('scene-shelf', 'wall-shelf-three-tier'))
 
-    expect(screen.getByTestId('live-shelf-tiers')).toHaveTextContent('3')
+    expect(screen.getByTestId('live-shelf-tiers')).toHaveTextContent('3:default')
+    act(() => projectStore.getState().updateItem('scene-shelf', { shelfElevationsMm: [300, 650, 1_050] }))
+    expect(screen.getByTestId('live-shelf-tiers')).toHaveTextContent('3:300,650,1050')
     expect(mounts).toBe(1)
   })
 

@@ -4,6 +4,7 @@ import { Group, Layer, Rect, Text, Transformer } from 'react-konva'
 import type { DisplayUnit, EquipmentItem, PointMm } from '../../domain/project'
 import { snapMm as snapValue } from '../../domain/geometry'
 import { formatDimensions, formatLength } from '../../domain/units'
+import { orderEquipmentForPlan } from '../../domain/plan-layer-order'
 import type { OverlayPosition } from './ComponentContextMenu'
 import { equipmentTransformPatch } from './equipment-transform'
 
@@ -169,12 +170,6 @@ type LayerProps = Omit<NodeProps, 'item' | 'selected'> & {
   items: EquipmentItem[]
   selectedIds: string[]
   warningIds: string[]
-}
-
-// Shared with a focused draw-order regression test.
-// eslint-disable-next-line react-refresh/only-export-components
-export function orderEquipmentForPlan(items: EquipmentItem[]) {
-  return [...items].sort((left, right) => Number(left.category !== 'hood') - Number(right.category !== 'hood'))
 }
 
 export function EquipmentLayer({ items, selectedIds, warningIds, ...nodeProps }: LayerProps) {

@@ -90,8 +90,8 @@ describe('executeWorkspaceBatch', () => {
       configurationPreset: 'cold-chest-freezer',
       visualPreset: 'chest-freezer',
       appearanceSkinId: 'powder-coat-blue',
-      widthMm: 1200,
-      depthMm: 700,
+      widthMm: 1400,
+      depthMm: 850,
     })
   })
 

@@ -172,4 +172,41 @@ export function findRoute(grid: NavGrid, startMm: PointMm, goalMm: PointMm): Poi
   throw new Error('Required station is unreachable')
 }
 
+/** Routes within the staff member's connected walkable area to the cell nearest any preferred service point. */
+export function findRouteToClosestReachablePoint(grid: NavGrid, startMm: PointMm, preferredPoints: readonly PointMm[]): PointMm[] {
+  if (!preferredPoints.length) throw new Error('A preferred service point is required')
+  const start = grid.nearestWalkable(grid.toCell(startMm))
+  const queue: NavCell[] = [start]
+  const cameFrom = new Map<string, NavCell>()
+  const steps = new Map<string, number>([[grid.key(start), 0]])
+  let best = start
+  let bestDistance = Math.min(...preferredPoints.map((point) => Math.hypot(grid.toPointMm(start).x - point.x, grid.toPointMm(start).y - point.y)))
+
+  for (let cursor = 0; cursor < queue.length; cursor += 1) {
+    const current = queue[cursor]
+    const currentPoint = grid.toPointMm(current)
+    const distance = Math.min(...preferredPoints.map((point) => Math.hypot(currentPoint.x - point.x, currentPoint.y - point.y)))
+    const currentSteps = steps.get(grid.key(current)) ?? 0
+    const bestSteps = steps.get(grid.key(best)) ?? 0
+    if (distance < bestDistance || (distance === bestDistance && currentSteps < bestSteps)) {
+      best = current
+      bestDistance = distance
+    }
+    for (const next of grid.walkableNeighbours(current)) {
+      if (steps.has(grid.key(next))) continue
+      cameFrom.set(grid.key(next), current)
+      steps.set(grid.key(next), currentSteps + 1)
+      queue.push(next)
+    }
+  }
+
+  const route = [best]
+  let routeCursor = best
+  while (cameFrom.has(grid.key(routeCursor))) {
+    routeCursor = cameFrom.get(grid.key(routeCursor))!
+    route.push(routeCursor)
+  }
+  return route.reverse().map(grid.toPointMm)
+}
+
 export const routeDistanceMm = (route: readonly PointMm[]) => route.slice(1).reduce((sum, point, index) => sum + Math.hypot(point.x - route[index].x, point.y - route[index].y), 0)

@@ -1,7 +1,7 @@
 import type { EquipmentItem, PointMm, StaffRole } from '../domain/project'
 import { pointInPolygon, rotatedFootprint } from '../domain/geometry'
 import { doorSwingEnvelopes, UNKNOWN_PROFESSIONAL_CONSTRAINTS } from '../domain/layout-diagnostics'
-import { buildNavGrid, findRoute, navigationApproachOffsetMm, resolveNominalGoal, routeDistanceMm, stationApproachPoints } from './nav-grid'
+import { buildNavGrid, findRoute, findRouteToClosestReachablePoint, navigationApproachOffsetMm, resolveNominalGoal, routeDistanceMm, stationApproachPoints } from './nav-grid'
 import { aggregateMetrics } from './metrics'
 import { createRng } from './rng'
 import { generateServiceTasks } from './tasks'
@@ -129,7 +129,8 @@ export function runSimulation(input: SimulationInput): SimulationRunResult {
     const nominal = openingInteriorPoint(input, station.id)
     stationGoals.set(station.id, [resolveNominalGoal(grid, nominal) ?? nominal])
   })
-  const routeCache = new Map<string, PointMm[] | null>()
+  const routeCache = new Map<string, { route: PointMm[]; usedClosestPoint: boolean } | null>()
+  const closestPointWarnings = new Set<string>()
   const taskById = new Map(tasks.map((task) => [task.id, task]))
   const hasSuccessor = new Set(tasks.flatMap((task) => task.predecessorId ? [task.predecessorId] : []))
   const traffic = new Map<string, { xMm: number; yMm: number; visits: number }>()
@@ -142,7 +143,7 @@ export function runSimulation(input: SimulationInput): SimulationRunResult {
 
   type Candidate = {
     task: SimTask; station: EquipmentItem; agent: Agent; eligibleAtSeconds: number; departure: number
-    route: PointMm[]; distance: number; travelSeconds: number; arrival: number
+    route: PointMm[]; usedClosestPoint: boolean; distance: number; travelSeconds: number; arrival: number
     slots: number[]; slotIndex: number; workStart: number; queueSeconds: number; workEnd: number
   }
   const remaining = new Map(tasks.map((task) => [task.id, task]))
@@ -162,15 +163,22 @@ export function runSimulation(input: SimulationInput): SimulationRunResult {
         const departure = Math.max(agent.availableAt, eligibleAtSeconds)
         const routeKey = `${agent.point.x},${agent.point.y}:${station.id}`
         if (!routeCache.has(routeKey)) {
-          const routes = (stationGoals.get(station.id) ?? []).flatMap((goal) => {
+          const goals = stationGoals.get(station.id) ?? []
+          const routes = goals.flatMap((goal) => {
             try { return [findRoute(grid, agent.point, goal)] }
             catch { return [] }
           })
           routes.sort((left, right) => routeDistanceMm(left) - routeDistanceMm(right))
-          routeCache.set(routeKey, routes[0] ?? null)
+          if (routes[0]) routeCache.set(routeKey, { route: routes[0], usedClosestPoint: false })
+          else {
+            const preferredPoints = goals.length ? goals : [{ x: station.xMm + station.widthMm / 2, y: station.yMm + station.depthMm / 2 }]
+            try { routeCache.set(routeKey, { route: findRouteToClosestReachablePoint(grid, agent.point, preferredPoints), usedClosestPoint: true }) }
+            catch { routeCache.set(routeKey, null) }
+          }
         }
-        const route = routeCache.get(routeKey)
-        if (!route) continue
+        const routeResult = routeCache.get(routeKey)
+        if (!routeResult) continue
+        const { route } = routeResult
         const distance = routeDistanceMm(route)
         const travelSeconds = distance / WALK_SPEED_MM_S
         const arrival = departure + travelSeconds
@@ -178,7 +186,7 @@ export function runSimulation(input: SimulationInput): SimulationRunResult {
         const slots = stationAvailable.get(station.id) ?? Array.from({ length: capacity }, () => 0)
         const slotIndex = slots.reduce((earliest, value, index) => value < slots[earliest] ? index : earliest, 0)
         const workStart = Math.max(arrival, slots[slotIndex])
-        const candidate: Candidate = { task, station, agent, eligibleAtSeconds, departure, route, distance, travelSeconds, arrival, slots, slotIndex, workStart, queueSeconds: workStart - arrival, workEnd: workStart + task.durationSeconds }
+        const candidate: Candidate = { task, station, agent, eligibleAtSeconds, departure, route, usedClosestPoint: routeResult.usedClosestPoint, distance, travelSeconds, arrival, slots, slotIndex, workStart, queueSeconds: workStart - arrival, workEnd: workStart + task.durationSeconds }
         if (!best || candidate.workStart < best.workStart || (candidate.workStart === best.workStart && (candidate.eligibleAtSeconds < best.eligibleAtSeconds || (candidate.eligibleAtSeconds === best.eligibleAtSeconds && `${candidate.task.id}:${candidate.agent.id}` < `${best.task.id}:${best.agent.id}`)))) best = candidate
         }
       }
@@ -193,7 +201,11 @@ export function runSimulation(input: SimulationInput): SimulationRunResult {
       continue
     }
 
-    const { task, station, agent, eligibleAtSeconds, departure, route, distance, travelSeconds, arrival, slots, slotIndex, workStart, queueSeconds, workEnd } = best
+    const { task, station, agent, eligibleAtSeconds, departure, route, usedClosestPoint, distance, travelSeconds, arrival, slots, slotIndex, workStart, queueSeconds, workEnd } = best
+    if (usedClosestPoint && !closestPointWarnings.has(station.id)) {
+      closestPointWarnings.add(station.id)
+      warnings.push(`${station.label}: staff use the closest reachable service point because the preferred modeled approach is obstructed.`)
+    }
     if (travelSeconds > 0) agent.intervals.push({ start: departure, end: arrival, state: 'walking', taskId: task.id, from: agent.point, to: route.at(-1)!, route })
     if (queueSeconds > 0) agent.intervals.push({ start: arrival, end: workStart, state: 'waiting', taskId: task.id, from: route.at(-1)!, to: route.at(-1)! })
     agent.intervals.push({ start: workStart, end: workEnd, state: 'working', taskId: task.id, from: route.at(-1)!, to: route.at(-1)! })

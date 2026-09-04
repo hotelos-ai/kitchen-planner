@@ -116,6 +116,10 @@ export interface EquipmentItem {
   visualPreset?: string
   configurationPreset?: string
   appearanceSkinId?: string
+  /** Explicit 2D plan draw order. Higher values render above lower values. */
+  planLayerOrder?: number
+  /** Custom shelf-deck elevations measured from the floor, ordered bottom to top. */
+  shelfElevationsMm?: Millimetres[]
 }
 
 export interface OperationalProfile {

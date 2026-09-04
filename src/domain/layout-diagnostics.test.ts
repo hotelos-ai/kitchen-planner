@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { createCatalogEquipmentItem } from './catalog/kitchen-catalog'
 import type { Architecture, EquipmentItem } from './project'
 import { analyzeLayout, UNKNOWN_PROFESSIONAL_CONSTRAINTS } from './layout-diagnostics'
 import { createSeedProject } from './seed-project'
@@ -19,6 +20,19 @@ describe('layout diagnostics', () => {
     const project = createSeedProject()
     const issues = analyzeLayout(project.architecture, project.variants[0].equipment)
     expect(issues.some((issue) => issue.code === 'pillar-overlap' && issue.itemIds.includes('tandoor'))).toBe(false)
+  })
+
+  it('allows wall shelves and other walk-under items to overlap floor equipment', () => {
+    const project = createSeedProject()
+    const floorItem = project.variants[0].equipment.find((item) => item.id === 'six-burner')!
+    const shelf = createCatalogEquipmentItem({
+      catalogId: 'storage-wall-shelf',
+      componentId: 'wall-shelf-over-range',
+      position: { xMm: floorItem.xMm, yMm: floorItem.yMm },
+    })
+    const issues = analyzeLayout(project.architecture, [floorItem, shelf])
+
+    expect(issues.some((issue) => issue.code === 'equipment-overlap')).toBe(false)
   })
 
   it('checks full rotated clearance envelopes against equipment, pillars, walls, doors, and no-go zones', () => {

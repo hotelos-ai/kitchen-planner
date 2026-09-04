@@ -3,7 +3,7 @@ import { useStore } from 'zustand'
 import type { StaffRole } from '../../domain/project'
 import { runSimulationResponsive } from '../../simulation/responsive-runner'
 import type { SimulationInput, SimulationResult } from '../../simulation/types'
-import { validateSimulationInput } from '../../simulation/validation'
+import { simulationValidationWarnings, validateSimulationInput } from '../../simulation/validation'
 import { getActiveVariant, projectStore, type ProjectStore } from '../../state/project-store'
 import { appStateStore } from '../../state/app-state-store'
 import { EssentialsChecker } from '../editor/EssentialsChecker'
@@ -77,6 +77,7 @@ export function SimulationWorkspace({
     scenario,
     layoutConstraints: variant.layoutConstraints,
   }), [scenario, variant.architecture, variant.equipment, variant.layoutConstraints])
+  const validationWarnings = useMemo(() => simulationValidationWarnings(simulationInput), [simulationInput])
   const requestedSimulationInput = useMemo(() => {
     if (!requestedRun) return null
     const requestedVariant = project.variants.find((candidate) => candidate.id === requestedRun.variantId)
@@ -185,10 +186,19 @@ export function SimulationWorkspace({
           {hasValidationErrors && <button type="button" className="simulation-autofix-button" onClick={() => setAutoFixStrategyOpen(true)}>Auto-fix plan</button>}
           <button type="button" className="run-simulation" disabled={hasValidationErrors} onClick={startRun}>Run {scenario.durationMinutes}-minute service</button>
         </div>
-        {(validationErrors.length > 0 || autoFixStatus) && <div role={validationErrors.length > 0 ? 'alert' : 'status'} className="simulation-validation">
-          <strong>{validationErrors.length > 0 ? `${validationErrors.length} blocking issue${validationErrors.length === 1 ? '' : 's'} must be resolved before simulation` : 'Ready to simulate'}</strong>
+        {(validationErrors.length > 0 || validationWarnings.length > 0 || autoFixStatus) && <div role={validationErrors.length > 0 ? 'alert' : 'status'} className={`simulation-validation${!validationErrors.length && validationWarnings.length ? ' warning' : ''}`}>
+          <strong>{validationErrors.length > 0
+            ? `${validationErrors.length} blocking issue${validationErrors.length === 1 ? '' : 's'} must be resolved before simulation`
+            : validationWarnings.length > 0
+              ? `${validationWarnings.length} modeled warning${validationWarnings.length === 1 ? '' : 's'} — simulation can still run`
+              : 'Ready to simulate'}</strong>
           {autoFixStatus && <span>{autoFixStatus}</span>}
           {validationErrors.length > 0 && <button type="button" onClick={() => setAutoFixOpen(true)}>Review issues</button>}
+          {!validationErrors.length && validationWarnings.length > 0 && <details>
+            <summary>Review warnings</summary>
+            <ul>{validationWarnings.map((warning, index) => <li key={`${warning.code}-${warning.itemIds.join('-')}-${index}`}>{warning.message}</li>)}</ul>
+            <p>When a preferred approach is obstructed, staff walk to the closest reachable service point and complete the task there.</p>
+          </details>}
         </div>}
         {result && liveState ? <>
           <LiveServiceHUD result={result} state={liveState} />

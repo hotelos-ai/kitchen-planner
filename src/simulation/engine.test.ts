@@ -111,6 +111,20 @@ describe('simulation engine', () => {
     expect(result.warnings).toContain('Professional fire, ventilation, hygiene, accessibility, electrical, and drainage constraints remain unknown pending qualified review.')
   })
 
+  it('completes station work from the closest reachable point when the preferred approach is obstructed', () => {
+    const project = createSeedProject()
+    const equipment = structuredClone(project.variants[0].equipment)
+    const dirtyLanding = equipment.find((item) => item.id === 'dirty-landing')!
+    Object.assign(dirtyLanding, { xMm: 2700, yMm: 5950, widthMm: 700, depthMm: 600 })
+    const scenario = { ...project.scenarios[0], covers: 2, durationMinutes: 10 }
+
+    const result = runSimulation({ architecture: project.architecture, equipment, scenario })
+
+    expect(result.warnings).toContainEqual(expect.stringMatching(/Dishwasher.*closest reachable service point/i))
+    expect(result.metrics.unreachableTasks).toBe(0)
+    expect(result.events).toContainEqual(expect.objectContaining({ type: 'station-work', stationId: 'dishwasher' }))
+  })
+
   it('derives navigation opening points from arbitrary polygon segments', () => {
     const project = createSeedProject()
     const architecture = {

@@ -229,15 +229,11 @@ export function applyEquipmentConfiguration(item: EquipmentItem, configurationId
     ...item,
     label: item.catalogId ? item.label : selected.label,
     category: selected.category,
-    widthMm: selected.widthMm,
-    depthMm: selected.depthMm,
-    heightMm: selected.heightMm,
     capabilities: [...selected.capabilities],
     clearance: structuredClone(selected.clearance),
     accessFlow: selected.accessFlow ? structuredClone(selected.accessFlow) : undefined,
     visualPreset: selected.visualPreset,
     configurationPreset: selected.id,
-    dimensionsLocked: false,
   }
 }
 
@@ -252,6 +248,7 @@ export function isEquipmentConfigurationModified(item: EquipmentItem): boolean {
     || item.depthMm !== selected.depthMm
     || item.heightMm !== selected.heightMm
     || item.visualPreset !== selected.visualPreset
+    || Boolean(item.shelfElevationsMm?.length)
     || !sameCapabilities(item.capabilities, selected.capabilities)
     || !sameClearance(item.clearance, selected.clearance)
     || JSON.stringify(item.accessFlow) !== JSON.stringify(selected.accessFlow)

@@ -53,6 +53,24 @@ describe('equipment catalog gallery', () => {
     screen.getAllByTestId('catalog-card').forEach((card) => expect(card).toHaveAttribute('data-category', 'storage'))
   })
 
+  it('surfaces trash and recycling bins in a dedicated waste tab', async () => {
+    const user = userEvent.setup()
+    const store = emptyStore()
+    render(<EquipmentLibrary store={store} />)
+
+    await user.click(screen.getByRole('tab', { name: 'Waste & bins' }))
+
+    expect(screen.getByRole('heading', { name: 'Mobile trash / waste bin' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Food-waste bin' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Waste sorting station' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Add Mobile trash / waste bin' })).toBeInTheDocument()
+    screen.getAllByTestId('catalog-card').forEach((card) => expect(card).toHaveAttribute('data-category', 'waste-janitorial'))
+
+    await user.click(screen.getByRole('button', { name: 'Add Mobile trash / waste bin' }))
+    expect(getActiveVariant(store.getState()).equipment[0]).toMatchObject({ catalogId: 'waste-mobile-bin', label: 'Mobile trash / waste bin' })
+    expect(store.getState().selectedIds).toEqual([getActiveVariant(store.getState()).equipment[0].id])
+  })
+
   it('renders a useful empty state', async () => {
     render(<EquipmentLibrary store={emptyStore()} />)
     await userEvent.type(screen.getByRole('searchbox', { name: /^Search$/i }), 'no-such-kitchen-component-zzzz')

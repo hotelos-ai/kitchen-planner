@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { EquipmentItem } from '../domain/project'
-import { buildNavGrid, findRoute, stationApproachPoints } from './nav-grid'
+import { buildNavGrid, findRoute, findRouteToClosestReachablePoint, stationApproachPoints } from './nav-grid'
 
 const room = {
   architecture: {
@@ -27,6 +27,20 @@ describe('navigation grid', () => {
     expect(grid.isWalkable({ x: 950, y: 1050 })).toBe(false)
     expect(grid.isWalkable({ x: 1050, y: 1050 })).toBe(false)
     expect(() => findRoute(grid, { x: 100, y: 1000 }, { x: 1900, y: 1000 })).toThrow(/unreachable/i)
+  })
+
+  it('routes to the closest point in the reachable region when a preferred station point is isolated', () => {
+    const blocked = structuredClone(room)
+    blocked.architecture.pillars = [{ id: 'wall', xMm: 900, yMm: 0, widthMm: 200, depthMm: 2000 }]
+    const grid = buildNavGrid(blocked, 100)
+    const preferred = { x: 1900, y: 1000 }
+    const route = findRouteToClosestReachablePoint(grid, { x: 100, y: 1000 }, [preferred])
+
+    expect(route.every((point) => grid.isWalkable(point))).toBe(true)
+    expect(route.at(-1)!.x).toBeLessThan(900)
+    expect(Math.hypot(route.at(-1)!.x - preferred.x, route.at(-1)!.y - preferred.y)).toBeLessThan(
+      Math.hypot(route[0].x - preferred.x, route[0].y - preferred.y),
+    )
   })
 
   it('does not relocate a blocked intended goal to an arbitrary nearby cell', () => {
