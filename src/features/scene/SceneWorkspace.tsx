@@ -74,8 +74,8 @@ export function SceneWorkspace({ store = projectStore, renderer: Renderer, compa
   const sharedWallsTransparent = useStore(appStateStore, (state) => state.wallsTransparent)
   const sharedShowLabels = useStore(appStateStore, (state) => state.showLabels)
   const [previewShowClearances, setPreviewShowClearances] = useState(false)
-  const [previewWallsTransparent, setPreviewWallsTransparent] = useState(false)
-  const [previewShowLabels, setPreviewShowLabels] = useState(true)
+  const [previewWallsTransparent, setPreviewWallsTransparent] = useState(true)
+  const [previewShowLabels, setPreviewShowLabels] = useState(false)
   const showClearances = readOnly ? previewShowClearances : sharedShowClearances
   const wallsTransparent = readOnly ? previewWallsTransparent : sharedWallsTransparent
   const showLabels = readOnly ? previewShowLabels : sharedShowLabels

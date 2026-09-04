@@ -99,8 +99,8 @@ const initialState = {
   walkView: 'first-person' as const,
   cameraMode: 'perspective' as const,
   showClearances: false,
-  wallsTransparent: false,
-  showLabels: true,
+  wallsTransparent: true,
+  showLabels: false,
   simulationView: 'operations-2d' as const,
   panels: {
     catalog: true,

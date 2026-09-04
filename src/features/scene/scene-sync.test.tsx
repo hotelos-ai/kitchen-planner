@@ -126,14 +126,24 @@ describe('3D scene synchronization', () => {
     expect(screen.getByTestId('kitchen-scene')).toHaveAttribute('data-renderer-generation', '1')
   })
 
-  it('toggles transparent wall surfaces without hiding their borders', async () => {
+  it('defaults to transparent walls without labels and keeps both controls toggleable', async () => {
     const user = userEvent.setup()
-    const FakeRenderer = (props: SceneRendererProps) => <output data-testid="wall-state">{String(props.wallsTransparent)}</output>
+    const FakeRenderer = (props: SceneRendererProps) => <output data-testid="wall-state">{String(props.wallsTransparent)}:{String(props.showLabels)}</output>
     render(<SceneWorkspace renderer={FakeRenderer} />)
-    expect(screen.getByTestId('wall-state')).toHaveTextContent('false')
-    await user.click(screen.getByRole('button', { name: 'Transparent walls' }))
-    expect(screen.getByTestId('wall-state')).toHaveTextContent('true')
+    expect(screen.getByTestId('wall-state')).toHaveTextContent('true:false')
     expect(screen.getByRole('button', { name: 'Transparent walls' })).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByRole('button', { name: 'Labels' })).toHaveAttribute('aria-pressed', 'false')
+    await user.click(screen.getByRole('button', { name: 'Transparent walls' }))
+    await user.click(screen.getByRole('button', { name: 'Labels' }))
+    expect(screen.getByTestId('wall-state')).toHaveTextContent('false:true')
+    expect(screen.getByRole('button', { name: 'Transparent walls' })).toHaveAttribute('aria-pressed', 'false')
+    expect(screen.getByRole('button', { name: 'Labels' })).toHaveAttribute('aria-pressed', 'true')
+  })
+
+  it('uses the same clean defaults in read-only 3D previews', () => {
+    const FakeRenderer = (props: SceneRendererProps) => <output data-testid="preview-scene-state">{String(props.wallsTransparent)}:{String(props.showLabels)}</output>
+    render(<SceneWorkspace renderer={FakeRenderer} readOnly />)
+    expect(screen.getByTestId('preview-scene-state')).toHaveTextContent('true:false')
   })
 
   it('synchronizes visible scene controls with shared app state', () => {
