@@ -38,6 +38,7 @@ describe('storage visual elevation model', () => {
     />)
 
     expect(deckElevations(container)).toHaveLength(1)
+    expect(container.querySelectorAll('[name="wall-shelf-tier-bracket"]')).toHaveLength(2)
     rerender(<StorageWallShelfVisual
       item={itemWithPreset('storage-wall-shelf', threeTier.id)}
       widthM={1.2}
@@ -45,6 +46,8 @@ describe('storage visual elevation model', () => {
       heightM={.9}
     />)
     expect(deckElevations(container)).toHaveLength(3)
+    expect(container.querySelectorAll('[name="wall-shelf-upright"]')).toHaveLength(2)
+    expect(container.querySelectorAll('[name="wall-shelf-tier-bracket"]')).toHaveLength(6)
   })
 
   it('anchors wall shelf decks at the configured preset elevation', () => {

@@ -219,7 +219,7 @@ export function createProjectStore(initialProject: KitchenProject): ProjectStore
           dimensions: { widthMm: patch.widthMm ?? current.widthMm, depthMm: patch.depthMm ?? current.depthMm, ...(patch.heightMm !== undefined ? { heightMm: patch.heightMm } : {}) },
         })
         if (patch.rotationDeg !== undefined && patch.rotationDeg !== current.rotationDeg) operations.push({ type: 'rotate_components', variantId: activeVariantId(), componentIds: [id], deltaDeg: patch.rotationDeg - current.rotationDeg })
-        const componentPatch = Object.fromEntries(Object.entries(patch).filter(([key, value]) => value !== undefined && ['label', 'category', 'heightMm', 'capabilities', 'clearance', 'accessFlow', 'approximate', 'notes', 'planLayerOrder', 'baseElevationMm', 'shelfElevationsMm'].includes(key)))
+        const componentPatch = Object.fromEntries(Object.entries(patch).filter(([key, value]) => value !== undefined && ['label', 'xMm', 'yMm', 'category', 'heightMm', 'capabilities', 'clearance', 'accessFlow', 'approximate', 'notes', 'planLayerOrder', 'baseElevationMm', 'shelfElevationsMm'].includes(key)))
         if (Object.keys(componentPatch).length) operations.push({ type: 'update_component', variantId: activeVariantId(), componentId: id, patch: componentPatch })
         if (operations.length) applyOperations(operations, 'Update component')
       },

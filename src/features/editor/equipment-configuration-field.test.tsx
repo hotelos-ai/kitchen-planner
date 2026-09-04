@@ -57,24 +57,25 @@ it('configures a dishwasher with a front input and side output', async () => {
   })
 })
 
-it('allows an industrial stainless-steel shelf height to be edited', async () => {
+it('labels and edits a shelf thickness without confusing it with floor height', async () => {
   const user = userEvent.setup()
   const project = createSeedProject()
   project.variants[0].equipment = [createCatalogEquipmentItem({
-    catalogId: 'storage-freestanding-shelving',
+    catalogId: 'storage-wall-shelf',
     componentId: 'ss-shelf',
+    configurationId: 'wall-shelf-one-tier',
     position: { xMm: 500, yMm: 500 },
   })]
   const store = createProjectStore(project)
   store.getState().selectItems(['ss-shelf'])
   render(<EquipmentInspector store={store} />)
 
-  const height = screen.getByLabelText(/^Height \(mm\)$/i)
-  await user.clear(height)
-  await user.type(height, '2200')
+  const thickness = screen.getByLabelText(/^Thickness \(mm\)$/i)
+  await user.clear(thickness)
+  await user.type(thickness, '50')
   await user.tab()
 
-  expect(getActiveItem(store.getState(), 'ss-shelf').heightMm).toBe(2200)
+  expect(getActiveItem(store.getState(), 'ss-shelf').heightMm).toBe(50)
 })
 
 it('commits inspector dimensions when Enter is pressed', async () => {
@@ -89,6 +90,22 @@ it('commits inspector dimensions when Enter is pressed', async () => {
 
   expect(getActiveItem(store.getState(), 'tandoor').widthMm).toBe(1350)
   expect(screen.getByLabelText(/^Width \(mm\)$/i)).toHaveValue('1350')
+})
+
+it('preserves precise half-grid positions entered in the inspector', async () => {
+  const user = userEvent.setup()
+  const project = createSeedProject()
+  project.snapMm = 100
+  const store = createProjectStore(project)
+  store.getState().selectItems(['tandoor'])
+  render(<EquipmentInspector store={store} />)
+
+  const x = screen.getByLabelText(/^X position \(mm\)$/i)
+  await user.clear(x)
+  await user.type(x, '6650{Enter}')
+
+  expect(getActiveItem(store.getState(), 'tandoor').xMm).toBe(6650)
+  expect(x).toHaveValue('6650')
 })
 
 it('allows every shelf tier elevation to be customized without resizing the rack', async () => {
@@ -145,4 +162,26 @@ it('moves a complete shelf assembly to an explicit height from the floor', async
 
   expect(getActiveItem(store.getState(), 'raised-shelf').baseElevationMm).toBe(900)
   expect(screen.getByLabelText('Shelf A elevation (mm)')).toHaveValue('940')
+})
+
+it('keeps edited tiers ordered and visibly snaps an overlapping shelf above its neighbor', async () => {
+  const user = userEvent.setup()
+  const project = createSeedProject()
+  project.variants[0].equipment = [createCatalogEquipmentItem({
+    catalogId: 'storage-freestanding-shelving',
+    componentId: 'ss-shelf',
+    configurationId: 'shelving-four-tier',
+    position: { xMm: 500, yMm: 500 },
+  })]
+  const store = createProjectStore(project)
+  store.getState().selectItems(['ss-shelf'])
+  render(<EquipmentInspector store={store} />)
+
+  const shelfB = Number((screen.getByLabelText('Shelf B elevation (mm)') as HTMLInputElement).value)
+  const shelfC = screen.getByLabelText('Shelf C elevation (mm)')
+  await user.clear(shelfC)
+  await user.type(shelfC, '100{Enter}')
+
+  expect(getActiveItem(store.getState(), 'ss-shelf').shelfElevationsMm?.[2]).toBe(shelfB + 50)
+  expect(shelfC).toHaveValue(String(shelfB + 50))
 })

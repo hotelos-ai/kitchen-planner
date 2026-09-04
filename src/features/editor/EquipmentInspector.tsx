@@ -6,7 +6,7 @@ import type { ProjectStore } from '../../state/project-store'
 import { getActiveItem } from '../../state/project-store'
 import { EquipmentConfigurationField } from './EquipmentConfigurationField'
 import { equipmentAccessFlow } from '../../domain/equipment-access'
-import { defaultShelfElevationsMm, shelfElevationsMmForItem, shelfTierCount } from '../../domain/shelf-elevations'
+import { defaultShelfElevationsMm, shelfElevationsMmForItem, shelfTierCount, updateShelfElevationMm } from '../../domain/shelf-elevations'
 import { elevatedShelfOffsetMm, resolvedShelfBaseElevationMm } from '../scene/equipment-elevation'
 
 type Props = { store: ProjectStore }
@@ -21,18 +21,18 @@ type LengthFieldProps = {
 }
 
 function LengthField({ label, valueMm, unit, disabled, allowZero = false, onCommit }: LengthFieldProps) {
-  const [draft, setDraft] = useState(() => formatLengthInput(valueMm, unit))
+  const [draft, setDraft] = useState<string | null>(null)
   const [error, setError] = useState('')
   const errorId = useId()
-  const commit = (rawValue = draft) => {
+  const commit = (rawValue = draft ?? formatLengthInput(valueMm, unit)) => {
     try {
       const parsed = parseLength(rawValue, unit)
       if (!Number.isFinite(parsed) || parsed < (allowZero ? 0 : Number.EPSILON) || parsed > 20000) throw new Error('range')
-      onCommit(parsed)
-      setDraft(formatLengthInput(parsed, unit))
+      if (parsed !== valueMm) onCommit(parsed)
+      setDraft(null)
       setError('')
     } catch {
-      setDraft(formatLengthInput(valueMm, unit))
+      setDraft(null)
       setError(`Enter a length ${allowZero ? 'of 0 or more' : 'greater than 0'} and no more than 20,000 mm.`)
     }
   }
@@ -40,10 +40,11 @@ function LengthField({ label, valueMm, unit, disabled, allowZero = false, onComm
     <label>{label} ({unit})
       <input
         aria-label={`${label} (${unit})`}
-        value={draft}
+        value={draft ?? formatLengthInput(valueMm, unit)}
         disabled={disabled}
         aria-invalid={Boolean(error)}
         aria-describedby={error ? errorId : undefined}
+        inputMode="decimal"
         onChange={(event) => setDraft(event.target.value)}
         onBlur={(event) => commit(event.currentTarget.value)}
         onKeyDown={(event) => {
@@ -97,17 +98,17 @@ export function EquipmentInspector({ store }: Props) {
       <EquipmentConfigurationField item={item} store={store} />
       <label>Category<select aria-label="Equipment category" value={item.category} onChange={(event) => update({ category: event.target.value as EquipmentCategory })}>{CATEGORIES.map((category) => <option key={category} value={category}>{category[0].toUpperCase() + category.slice(1)}</option>)}</select></label>
       <div className="field-pair">
-        <LengthField key={`width-${item.id}-${item.widthMm}-${project.displayUnit}`} label="Width" valueMm={item.widthMm} unit={project.displayUnit} disabled={item.dimensionsLocked} onCommit={(widthMm) => store.getState().resizeItem(item.id, { widthMm, depthMm: item.depthMm })} />
-        <LengthField key={`depth-${item.id}-${item.depthMm}-${project.displayUnit}`} label="Depth" valueMm={item.depthMm} unit={project.displayUnit} disabled={item.dimensionsLocked} onCommit={(depthMm) => store.getState().resizeItem(item.id, { widthMm: item.widthMm, depthMm })} />
+        <LengthField key={`width-${item.id}-${project.displayUnit}`} label="Width" valueMm={item.widthMm} unit={project.displayUnit} disabled={item.dimensionsLocked} onCommit={(widthMm) => store.getState().resizeItem(item.id, { widthMm, depthMm: getActiveItem(store.getState(), item.id).depthMm })} />
+        <LengthField key={`depth-${item.id}-${project.displayUnit}`} label="Depth" valueMm={item.depthMm} unit={project.displayUnit} disabled={item.dimensionsLocked} onCommit={(depthMm) => store.getState().resizeItem(item.id, { widthMm: getActiveItem(store.getState(), item.id).widthMm, depthMm })} />
       </div>
-      <LengthField key={`height-${item.id}-${item.heightMm}-${project.displayUnit}`} label="Height" valueMm={item.heightMm} unit={project.displayUnit} disabled={item.dimensionsLocked} onCommit={(heightMm) => update({ heightMm })} />
+      <LengthField key={`height-${item.id}`} label={item.catalogId === 'storage-wall-shelf' ? 'Thickness' : 'Height'} valueMm={item.heightMm} unit={project.displayUnit} disabled={item.dimensionsLocked} onCommit={(heightMm) => update({ heightMm })} />
       <label className="checkbox-row"><input aria-label="Lock dimensions" type="checkbox" checked={item.dimensionsLocked} onChange={(event) => store.getState().setDimensionsLocked(item.id, event.target.checked)} />Lock dimensions</label>
       {tierCount > 0 && <details className="capability-editor shelf-elevation-editor" open>
         <summary>Shelf elevations ({tierCount})</summary>
         <div>
           <p>Set the assembly's height from the floor, then fine-tune individual decks. Changing tiers preserves the item's dimensions.</p>
           <LengthField
-            key={`base-elevation-${item.id}-${resolvedShelfBaseElevationMm(item, activeEquipment)}-${project.displayUnit}`}
+            key={`base-elevation-${item.id}`}
             label="Height from floor"
             valueMm={resolvedShelfBaseElevationMm(item, activeEquipment)}
             unit={project.displayUnit}
@@ -115,15 +116,14 @@ export function EquipmentInspector({ store }: Props) {
             onCommit={(baseElevationMm) => update({ baseElevationMm })}
           />
           {shelfElevationsMmForItem(item).map((elevationMm, index) => <LengthField
-            key={`shelf-${item.id}-${index}-${elevationMm}-${shelfOffsetMm}-${project.displayUnit}`}
+            key={`shelf-${item.id}-${index}`}
             label={`Shelf ${shelfLetter(index)} elevation`}
             valueMm={elevationMm + shelfOffsetMm}
             unit={project.displayUnit}
             allowZero
             onCommit={(nextElevationMm) => {
-              const elevations = shelfElevationsMmForItem(getActiveItem(store.getState(), item.id))
-              elevations[index] = Math.max(0, nextElevationMm - shelfOffsetMm)
-              update({ shelfElevationsMm: elevations })
+              const current = getActiveItem(store.getState(), item.id)
+              update({ shelfElevationsMm: updateShelfElevationMm(current, index, Math.max(0, nextElevationMm - shelfOffsetMm)) })
             }}
           />)}
           {item.shelfElevationsMm?.length ? <button type="button" onClick={() => update({ shelfElevationsMm: [] })}>Reset to evenly spaced</button> : null}
@@ -147,8 +147,8 @@ export function EquipmentInspector({ store }: Props) {
         </div>
       </details>}
       <div className="field-pair">
-        <LengthField key={`x-${item.id}-${item.xMm}-${project.displayUnit}`} label="X position" valueMm={item.xMm} unit={project.displayUnit} onCommit={(xMm) => store.getState().moveItems([item.id], { x: xMm, y: item.yMm })} />
-        <LengthField key={`y-${item.id}-${item.yMm}-${project.displayUnit}`} label="Y position" valueMm={item.yMm} unit={project.displayUnit} onCommit={(yMm) => store.getState().moveItems([item.id], { x: item.xMm, y: yMm })} />
+        <LengthField allowZero key={`x-${item.id}`} label="X position" valueMm={item.xMm} unit={project.displayUnit} onCommit={(xMm) => update({ xMm })} />
+        <LengthField allowZero key={`y-${item.id}`} label="Y position" valueMm={item.yMm} unit={project.displayUnit} onCommit={(yMm) => update({ yMm })} />
       </div>
       <details className="capability-editor clearance-editor" open>
         <summary>Clearances{item.clearance ? '' : ' (none set)'}</summary>
@@ -162,10 +162,10 @@ export function EquipmentInspector({ store }: Props) {
             </select>
           </label>
           <div className="field-pair">
-            <LengthField allowZero key={`cf-${item.id}-${item.clearance?.frontMm ?? 0}-${project.displayUnit}`} label="Front" valueMm={item.clearance?.frontMm ?? 0} unit={project.displayUnit} onCommit={(frontMm) => update({ clearance: { ...item.clearance, kind: item.clearance?.kind ?? (item.category === 'cooking' ? 'heat' : 'work'), frontMm } })} />
-            <LengthField allowZero key={`cb-${item.id}-${item.clearance?.backMm ?? 0}-${project.displayUnit}`} label="Back" valueMm={item.clearance?.backMm ?? 0} unit={project.displayUnit} onCommit={(backMm) => update({ clearance: { ...item.clearance, kind: item.clearance?.kind ?? (item.category === 'cooking' ? 'heat' : 'work'), frontMm: item.clearance?.frontMm ?? 0, backMm } })} />
-            <LengthField allowZero key={`cl-${item.id}-${item.clearance?.leftMm ?? 0}-${project.displayUnit}`} label="Left" valueMm={item.clearance?.leftMm ?? 0} unit={project.displayUnit} onCommit={(leftMm) => update({ clearance: { ...item.clearance, kind: item.clearance?.kind ?? (item.category === 'cooking' ? 'heat' : 'work'), frontMm: item.clearance?.frontMm ?? 0, leftMm } })} />
-            <LengthField allowZero key={`cr-${item.id}-${item.clearance?.rightMm ?? 0}-${project.displayUnit}`} label="Right" valueMm={item.clearance?.rightMm ?? 0} unit={project.displayUnit} onCommit={(rightMm) => update({ clearance: { ...item.clearance, kind: item.clearance?.kind ?? (item.category === 'cooking' ? 'heat' : 'work'), frontMm: item.clearance?.frontMm ?? 0, rightMm } })} />
+            <LengthField allowZero key={`cf-${item.id}`} label="Front" valueMm={item.clearance?.frontMm ?? 0} unit={project.displayUnit} onCommit={(frontMm) => update({ clearance: { ...getActiveItem(store.getState(), item.id).clearance, kind: getActiveItem(store.getState(), item.id).clearance?.kind ?? (item.category === 'cooking' ? 'heat' : 'work'), frontMm } })} />
+            <LengthField allowZero key={`cb-${item.id}`} label="Back" valueMm={item.clearance?.backMm ?? 0} unit={project.displayUnit} onCommit={(backMm) => { const current = getActiveItem(store.getState(), item.id); update({ clearance: { ...current.clearance, kind: current.clearance?.kind ?? (current.category === 'cooking' ? 'heat' : 'work'), frontMm: current.clearance?.frontMm ?? 0, backMm } }) }} />
+            <LengthField allowZero key={`cl-${item.id}`} label="Left" valueMm={item.clearance?.leftMm ?? 0} unit={project.displayUnit} onCommit={(leftMm) => { const current = getActiveItem(store.getState(), item.id); update({ clearance: { ...current.clearance, kind: current.clearance?.kind ?? (current.category === 'cooking' ? 'heat' : 'work'), frontMm: current.clearance?.frontMm ?? 0, leftMm } }) }} />
+            <LengthField allowZero key={`cr-${item.id}`} label="Right" valueMm={item.clearance?.rightMm ?? 0} unit={project.displayUnit} onCommit={(rightMm) => { const current = getActiveItem(store.getState(), item.id); update({ clearance: { ...current.clearance, kind: current.clearance?.kind ?? (current.category === 'cooking' ? 'heat' : 'work'), frontMm: current.clearance?.frontMm ?? 0, rightMm } }) }} />
           </div>
           <p className="field-error" style={{ color: 'var(--ink-4)' }}>Clearances drive plan checks and 3D overlays.</p>
         </div>

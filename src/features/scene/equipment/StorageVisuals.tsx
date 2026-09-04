@@ -45,13 +45,23 @@ function RackFrame({ widthM, depthM, heightM, tiers = 4, mobile = false, shelfEl
 
 export function StorageWallShelfVisual({ item, widthM, depthM }: EquipmentVisualProps) {
   const elevations = shelfElevationsMmForItem(item)
-  const shelfY = Math.max(...elevations.map((value) => value / 1000), .45)
+  const elevationsM = elevations.map((value) => value / 1000)
+  const lowestShelfY = elevationsM.length ? Math.min(...elevationsM) : .45
+  const highestShelfY = elevationsM.length ? Math.max(...elevationsM) : .45
+  const uprightBottomY = Math.max(0, lowestShelfY - .16)
+  const uprightHeight = Math.max(.24, highestShelfY - uprightBottomY + .08)
   return <group>
     {elevations.map((elevationMm, index) => <ShelfDeck key={index} widthM={widthM} depthM={depthM} y={elevationMm / 1000} />)}
-    {[-1, 1].map((side) => <group key={side} position={[side * widthM * .35, shelfY - .12, -depthM / 2]}>
-      <BoxPart position={[0, 0, 0]} size={[.035, .24, .035]} material="darkSteel" radius={.006} />
-      <BoxPart position={[0, .1, depthM * .22]} size={[.035, .035, safe(depthM * .44)]} material="darkSteel" radius={.006} />
+    {[-1, 1].map((side) => <group name="wall-shelf-upright" key={side} position={[side * widthM * .35, uprightBottomY, -depthM / 2]}>
+      <BoxPart position={[0, uprightHeight / 2, 0]} size={[.035, uprightHeight, .035]} material="darkSteel" radius={.006} />
     </group>)}
+    {elevationsM.flatMap((elevationM, index) => [-1, 1].map((side) => <group
+      name="wall-shelf-tier-bracket"
+      key={`${index}-${side}`}
+      position={[side * widthM * .35, elevationM - .045, -depthM / 2]}
+    >
+      <BoxPart position={[0, 0, depthM * .22]} size={[.035, .035, safe(depthM * .44)]} material="darkSteel" radius={.006} />
+    </group>))}
   </group>
 }
 StorageWallShelfVisual.displayName = 'StorageWallShelfVisual'

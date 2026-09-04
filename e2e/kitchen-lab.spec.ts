@@ -19,6 +19,27 @@ test.beforeEach(async ({ page }) => {
   await page.addInitScript(() => localStorage.clear())
 })
 
+test('commits Fit-out inspector numbers with Enter or blur', async ({ page }) => {
+  await openApp(page)
+  await page.getByRole('tab', { name: /Placed/i }).click()
+  await page.getByRole('button', { name: /Select Tandoor, 700 mm by 700 mm/i }).click()
+
+  const width = page.getByLabel(/^Width \(mm\)$/i)
+  await width.fill('760')
+  await width.press('Enter')
+  await expect(width).toHaveValue('760')
+
+  const depth = page.getByLabel(/^Depth \(mm\)$/i)
+  await depth.fill('775')
+  await page.getByRole('heading', { name: 'Selected equipment' }).click()
+  await expect(depth).toHaveValue('775')
+
+  await page.getByRole('button', { name: /Select 6-burner range/i }).click()
+  await page.getByRole('button', { name: /Select Tandoor/i }).click()
+  await expect(page.getByLabel(/^Width \(mm\)$/i)).toHaveValue('760')
+  await expect(page.getByLabel(/^Depth \(mm\)$/i)).toHaveValue('775')
+})
+
 test('edits, simulates, compares, exports, and restores the example kitchen', async ({ page }) => {
   await openApp(page)
   await expect(page.getByRole('heading', { name: /CalmKitchen Designer/i })).toBeVisible()
