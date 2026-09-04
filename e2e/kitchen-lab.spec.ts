@@ -317,6 +317,27 @@ test('keeps every split-view inspector control and the Remove action reachable',
   expect(removeBox!.x + removeBox!.width).toBeLessThanOrEqual(drawerBox!.x + drawerBox!.width)
 })
 
+test('removes a table overshelf by Delete or one inspector click', async ({ page }) => {
+  await page.setViewportSize({ width: 1600, height: 900 })
+  await openApp(page)
+  await page.getByRole('tab', { name: 'Storage' }).click()
+  const addOvershelf = page.getByRole('button', { name: 'Add Table overshelf' })
+
+  await addOvershelf.click()
+  await expect(page.getByLabel('Equipment label')).toHaveValue('Table overshelf')
+  await page.keyboard.press('Delete')
+  await expect(page.getByLabel('Equipment label')).toHaveCount(0)
+
+  await addOvershelf.click()
+  await expect(page.getByLabel('Equipment label')).toHaveValue('Table overshelf')
+  const floorHeight = page.getByLabel('Height from floor (mm)')
+  await floorHeight.fill('1000')
+  await floorHeight.press('Enter')
+  await expect(page.getByLabel('Height from floor (mm)')).toHaveValue('1000')
+  await page.getByRole('button', { name: 'Remove selected item' }).click()
+  await expect(page.getByLabel('Equipment label')).toHaveCount(0)
+})
+
 test('keeps overview 3D mounted when no safe Walk spawn exists', async ({ page }) => {
   const project = createSeedProject()
   project.variants[0].equipment = [{

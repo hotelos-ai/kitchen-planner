@@ -126,3 +126,23 @@ it('allows every shelf tier elevation to be customized without resizing the rack
   expect(reconfigured.shelfElevationsMm).toHaveLength(4)
   expect(reconfigured.shelfElevationsMm?.[0]).toBeCloseTo(updated.shelfElevationsMm![0])
 })
+
+it('moves a complete shelf assembly to an explicit height from the floor', async () => {
+  const user = userEvent.setup()
+  const project = createSeedProject()
+  project.variants[0].equipment = [createCatalogEquipmentItem({
+    catalogId: 'storage-freestanding-shelving',
+    componentId: 'raised-shelf',
+    position: { xMm: 500, yMm: 500 },
+  })]
+  const store = createProjectStore(project)
+  store.getState().selectItems(['raised-shelf'])
+  render(<EquipmentInspector store={store} />)
+
+  const floorHeight = screen.getByLabelText('Height from floor (mm)')
+  await user.clear(floorHeight)
+  await user.type(floorHeight, '900{Enter}')
+
+  expect(getActiveItem(store.getState(), 'raised-shelf').baseElevationMm).toBe(900)
+  expect(screen.getByLabelText('Shelf A elevation (mm)')).toHaveValue('940')
+})

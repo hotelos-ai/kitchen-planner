@@ -49,6 +49,7 @@ export const equipmentSchema = z.object({
   configurationPreset: z.string().min(1).optional(),
   appearanceSkinId: z.string().min(1).optional(),
   planLayerOrder: z.number().int().finite().safe().optional(),
+  baseElevationMm: z.number().nonnegative().finite().max(20_000).optional(),
   shelfElevationsMm: z.array(z.number().nonnegative().finite().max(20_000)).max(100).optional(),
 }).strict()
 

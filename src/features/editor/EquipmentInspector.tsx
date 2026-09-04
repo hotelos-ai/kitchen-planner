@@ -7,6 +7,7 @@ import { getActiveItem } from '../../state/project-store'
 import { EquipmentConfigurationField } from './EquipmentConfigurationField'
 import { equipmentAccessFlow } from '../../domain/equipment-access'
 import { defaultShelfElevationsMm, shelfElevationsMmForItem, shelfTierCount } from '../../domain/shelf-elevations'
+import { elevatedShelfOffsetMm, resolvedShelfBaseElevationMm } from '../scene/equipment-elevation'
 
 type Props = { store: ProjectStore }
 
@@ -75,14 +76,14 @@ export function EquipmentInspector({ store }: Props) {
   const selectedIds = useStore(store, (state) => state.selectedIds)
   const item = selectedIds[0] ? getActiveItem(store.getState(), selectedIds[0]) : null
   const [, forceRender] = useState(0)
-  const [confirmRemoveId, setConfirmRemoveId] = useState<string | null>(null)
 
   if (!item) {
     return <aside className="inspector empty-inspector"><div><span className="eyebrow">Inspector</span><h2>No item selected</h2><p>Select an equipment footprint to edit its size, position, and metadata.</p></div></aside>
   }
-  const confirmRemove = confirmRemoveId === item.id
   const accessFlow = equipmentAccessFlow(item)
   const tierCount = shelfTierCount(item)
+  const activeEquipment = project.variants.find((variant) => variant.id === project.activeVariantId)?.equipment ?? []
+  const shelfOffsetMm = tierCount > 0 ? elevatedShelfOffsetMm(item, activeEquipment) : 0
 
   const update = (patch: Partial<EquipmentItem>) => {
     store.getState().updateItem(item.id, patch)
@@ -104,21 +105,29 @@ export function EquipmentInspector({ store }: Props) {
       {tierCount > 0 && <details className="capability-editor shelf-elevation-editor" open>
         <summary>Shelf elevations ({tierCount})</summary>
         <div>
-          <p>Set each deck's height above the floor. Changing tiers preserves the item's overall dimensions.</p>
+          <p>Set the assembly's height from the floor, then fine-tune individual decks. Changing tiers preserves the item's dimensions.</p>
+          <LengthField
+            key={`base-elevation-${item.id}-${resolvedShelfBaseElevationMm(item, activeEquipment)}-${project.displayUnit}`}
+            label="Height from floor"
+            valueMm={resolvedShelfBaseElevationMm(item, activeEquipment)}
+            unit={project.displayUnit}
+            allowZero
+            onCommit={(baseElevationMm) => update({ baseElevationMm })}
+          />
           {shelfElevationsMmForItem(item).map((elevationMm, index) => <LengthField
-            key={`shelf-${item.id}-${index}-${elevationMm}-${project.displayUnit}`}
+            key={`shelf-${item.id}-${index}-${elevationMm}-${shelfOffsetMm}-${project.displayUnit}`}
             label={`Shelf ${shelfLetter(index)} elevation`}
-            valueMm={elevationMm}
+            valueMm={elevationMm + shelfOffsetMm}
             unit={project.displayUnit}
             allowZero
             onCommit={(nextElevationMm) => {
               const elevations = shelfElevationsMmForItem(getActiveItem(store.getState(), item.id))
-              elevations[index] = nextElevationMm
+              elevations[index] = Math.max(0, nextElevationMm - shelfOffsetMm)
               update({ shelfElevationsMm: elevations })
             }}
           />)}
           {item.shelfElevationsMm?.length ? <button type="button" onClick={() => update({ shelfElevationsMm: [] })}>Reset to evenly spaced</button> : null}
-          <small>Defaults: {defaultShelfElevationsMm(item).map((value) => formatLengthInput(value, project.displayUnit)).join(', ')} {project.displayUnit}</small>
+          <small>Deck heights from floor: {defaultShelfElevationsMm(item).map((value) => formatLengthInput(value + shelfOffsetMm, project.displayUnit)).join(', ')} {project.displayUnit}</small>
         </div>
       </details>}
       {item.capabilities.includes('dish-wash') && accessFlow && <details className="capability-editor" open>
@@ -177,7 +186,7 @@ export function EquipmentInspector({ store }: Props) {
       {item.notes && <p className="item-note">{item.notes}</p>}
       <div className="inspector-actions">
         <button type="button" aria-label="Duplicate selected item" onClick={() => store.getState().duplicateItem(item.id)}>Duplicate</button>
-        <button type="button" className="danger-button" aria-label={confirmRemove ? 'Confirm remove selected item' : 'Remove selected item'} disabled={!item.removable} onClick={() => confirmRemove ? store.getState().removeItems([item.id]) : setConfirmRemoveId(item.id)}>{confirmRemove ? 'Confirm remove' : 'Remove'}</button>
+        <button type="button" className="danger-button" aria-label="Remove selected item" disabled={!item.removable} onClick={() => store.getState().removeItems([item.id])}>Remove</button>
       </div>
     </aside>
   )

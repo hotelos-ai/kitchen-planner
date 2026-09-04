@@ -50,7 +50,7 @@ function CatalogCard({ entry, displayUnit, onAdd }: { entry: CatalogEntry; displ
         <p>{entry.description}</p>
         <small>{formatDimensions(entry.typicalDimensions, displayUnit)}</small>
       </div>
-      <button type="button" onClick={onAdd} aria-label={`Add ${entry.displayName}`}>Add</button>
+      <button type="button" data-workspace-delete-selection="true" onClick={onAdd} aria-label={`Add ${entry.displayName}`}>Add</button>
     </article>
   )
 }
@@ -220,6 +220,7 @@ export function EquipmentLibrary({ store }: Props) {
                   key={item.id}
                   type="button"
                   className={selectedIds.includes(item.id) ? 'equipment-row selected' : 'equipment-row'}
+                  data-workspace-delete-selection="true"
                   aria-label={`Select ${item.label}, ${item.widthMm} mm by ${item.depthMm} mm`}
                   onClick={(event) => event.shiftKey ? store.getState().toggleItemSelection(item.id) : store.getState().selectItems([item.id])}
                 >

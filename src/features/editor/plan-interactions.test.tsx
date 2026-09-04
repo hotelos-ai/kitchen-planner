@@ -96,11 +96,42 @@ describe('plan workspace', () => {
     await user.click(screen.getByRole('button', { name: /Duplicate selected item/i }))
     expect(screen.getByDisplayValue('Rice warmer copy')).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: /Remove selected item/i }))
-    expect(screen.getByRole('button', { name: /Confirm remove selected item/i })).toBeInTheDocument()
-    await user.click(screen.getByRole('button', { name: /Confirm remove selected item/i }))
     await user.click(screen.getByRole('button', { name: /Undo/i }))
     await user.click(screen.getByRole('tab', { name: /Placed/i }))
     expect(screen.getByRole('button', { name: /Select Rice warmer copy/i })).toBeInTheDocument()
+  })
+
+  it('removes a table overshelf with one inspector click', async () => {
+    const user = userEvent.setup()
+    const store = createProjectStore(createSeedProject())
+    render(workspace({ store }))
+
+    await user.click(screen.getByRole('tab', { name: 'Storage' }))
+    await user.click(screen.getByRole('button', { name: 'Add Table overshelf' }))
+    const shelfId = store.getState().selectedIds[0]
+    expect(getActiveItem(store.getState(), shelfId).catalogId).toBe('storage-overshelf')
+
+    await user.click(screen.getByRole('button', { name: 'Remove selected item' }))
+
+    expect(store.getState().project.variants[0].equipment.some((item) => item.id === shelfId)).toBe(false)
+    expect(store.getState().selectedIds).toEqual([])
+  })
+
+  it('removes a newly added table overshelf with Delete while its Add button retains focus', async () => {
+    const user = userEvent.setup()
+    const store = createProjectStore(createSeedProject())
+    render(workspace({ store }))
+
+    await user.click(screen.getByRole('tab', { name: 'Storage' }))
+    const add = screen.getByRole('button', { name: 'Add Table overshelf' })
+    await user.click(add)
+    const shelfId = store.getState().selectedIds[0]
+    expect(add).toHaveFocus()
+
+    await user.keyboard('{Delete}')
+
+    expect(store.getState().project.variants[0].equipment.some((item) => item.id === shelfId)).toBe(false)
+    expect(store.getState().selectedIds).toEqual([])
   })
 
   it('duplicates the complete multi-selection in one workspace revision', () => {

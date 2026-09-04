@@ -55,4 +55,21 @@ describe('elevated equipment placement', () => {
 
     expect(overshelfPostGeometry(shelf)).toEqual({ bottomM: .75, heightM: .7 })
   })
+
+  it('honors an explicit shelf height from the floor instead of automatic support placement', () => {
+    const table = {
+      ...createSeedProject().variants[0].equipment.find((item) => item.category === 'prep')!,
+      heightMm: 900,
+    }
+    const shelf = {
+      ...createCatalogEquipmentItem({
+        catalogId: 'storage-overshelf',
+        componentId: 'placed-overshelf',
+        position: { xMm: table.xMm, yMm: table.yMm },
+      }),
+      baseElevationMm: 1_100,
+    }
+
+    expect(750 + elevatedShelfOffsetMm(shelf, [table, shelf])).toBe(1_100)
+  })
 })

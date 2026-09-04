@@ -30,6 +30,7 @@ describe('3D scene synchronization', () => {
     expect(equipmentSceneKey({ ...item, widthMm: item.widthMm + 100 })).not.toBe(originalKey)
     expect(equipmentSceneKey({ ...item, depthMm: item.depthMm + 100 })).not.toBe(originalKey)
     expect(equipmentSceneKey({ ...item, heightMm: item.heightMm + 100 })).not.toBe(originalKey)
+    expect(equipmentSceneKey({ ...item, baseElevationMm: 900 })).not.toBe(originalKey)
   })
 
   it('uses the active item geometry and synchronizes selection', async () => {

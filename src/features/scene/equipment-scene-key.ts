@@ -13,6 +13,7 @@ export function equipmentSceneKey(item: EquipmentItem): string {
     item.widthMm,
     item.depthMm,
     item.heightMm,
+    item.baseElevationMm ?? 'auto-elevation',
     item.shelfElevationsMm?.join(',') ?? '',
   ].join(':')
 }

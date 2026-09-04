@@ -141,6 +141,19 @@ describe('useWorkspaceShortcuts', () => {
     expect(options.clearSelection).not.toHaveBeenCalled()
   })
 
+  it('allows Delete from an explicit equipment selection control', () => {
+    const options = makeOptions()
+    render(<Harness options={options} />)
+    const control = document.createElement('button')
+    control.dataset.workspaceDeleteSelection = 'true'
+    document.body.append(control)
+
+    fireEvent.keyDown(control, { key: 'Delete' })
+
+    expect(options.remove).toHaveBeenCalledWith(['range-1', 'prep-1'])
+    control.remove()
+  })
+
   it('does not intercept selection commands when nothing is selected', () => {
     const options = makeOptions({ selectedIds: [] })
     render(<Harness options={options} />)

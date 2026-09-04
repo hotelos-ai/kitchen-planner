@@ -18,12 +18,31 @@ export function overshelfPostGeometry(item: EquipmentItem): { bottomM: number; h
   return { bottomM, heightM: Math.max(.08, shelfTopM - bottomM) }
 }
 
+export function naturalShelfBaseElevationMm(item: EquipmentItem): number {
+  const shelfElevations = shelfElevationsMmForItem(item)
+  if (item.catalogId === 'storage-overshelf' && shelfElevations.length) {
+    return Math.max(0, Math.max(...shelfElevations) - item.heightMm)
+  }
+  if (isElevatedShelf(item)) {
+    if (shelfElevations.length) {
+      const top = Math.max(...shelfElevations)
+      return Math.max(0, Math.min(Math.min(...shelfElevations), top - item.heightMm))
+    }
+    return physicalConfigurationDetails(item).elevationMm ?? 0
+  }
+  return 0
+}
+
 /**
  * Lifts an elevated shelf just enough to clear the tallest floor item beneath it.
  * Plan draw order never changes physical depth; overlapping footprints represent
  * a vertical table/shelf arrangement for wall-mounted and overhead storage.
  */
 export function elevatedShelfOffsetMm(item: EquipmentItem, equipment: readonly EquipmentItem[]): number {
+  const naturalBottomMm = naturalShelfBaseElevationMm(item)
+  if (item.category === 'storage' && item.baseElevationMm !== undefined) {
+    return item.baseElevationMm - naturalBottomMm
+  }
   if (!isElevatedShelf(item)) return 0
   const itemFootprint = rotatedFootprint(item)
   const supportHeightMm = equipment
@@ -32,13 +51,10 @@ export function elevatedShelfOffsetMm(item: EquipmentItem, equipment: readonly E
     .reduce((height, candidate) => Math.max(height, candidate.heightMm), 0)
   if (supportHeightMm === 0) return 0
 
-  const shelfElevations = shelfElevationsMmForItem(item)
-  const configurationElevationMm = physicalConfigurationDetails(item).elevationMm
-  const naturalBottomMm = item.catalogId === 'storage-overshelf' && shelfElevations.length
-    ? Math.max(0, Math.max(...shelfElevations) - item.heightMm)
-    : shelfElevations.length
-      ? Math.min(...shelfElevations)
-      : configurationElevationMm ?? item.heightMm
   const supportGapMm = item.catalogId === 'storage-overshelf' ? 0 : SUPPORT_GAP_MM
   return Math.max(0, supportHeightMm + supportGapMm - naturalBottomMm)
+}
+
+export function resolvedShelfBaseElevationMm(item: EquipmentItem, equipment: readonly EquipmentItem[]): number {
+  return naturalShelfBaseElevationMm(item) + elevatedShelfOffsetMm(item, equipment)
 }

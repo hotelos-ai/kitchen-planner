@@ -118,6 +118,8 @@ export interface EquipmentItem {
   appearanceSkinId?: string
   /** Explicit 2D plan draw order. Higher values render above lower values. */
   planLayerOrder?: number
+  /** Explicit height of the bottom of a shelf assembly above the finished floor. */
+  baseElevationMm?: Millimetres
   /** Custom shelf-deck elevations measured from the floor, ordered bottom to top. */
   shelfElevationsMm?: Millimetres[]
 }

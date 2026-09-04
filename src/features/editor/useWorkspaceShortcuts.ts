@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useLayoutEffect, useRef } from 'react'
 import type { PointMm } from '../../domain/project'
 
 export type WorkspaceShortcutOptions = {
@@ -45,18 +45,22 @@ export function isWorkspaceShortcutTarget(target: EventTarget | null): boolean {
 export function useWorkspaceShortcuts(options: WorkspaceShortcutOptions): void {
   const optionsRef = useRef(options)
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     optionsRef.current = options
   }, [options])
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       const current = optionsRef.current
-      if (current.enabled === false || isWorkspaceShortcutTarget(event.target)) return
+      if (current.enabled === false) return
 
       const key = event.key.toLowerCase()
       const command = event.metaKey || event.ctrlKey
       const selectedIds = [...current.selectedIds]
+      const selectionDelete = !command && !event.altKey && (event.key === 'Delete' || event.key === 'Backspace') && selectedIds.length > 0
+      const deleteEnabledControl = event.target instanceof Element
+        && event.target.closest('[data-workspace-delete-selection="true"]') !== null
+      if (isWorkspaceShortcutTarget(event.target) && !(selectionDelete && deleteEnabledControl)) return
 
       if (command && key === 'z') {
         event.preventDefault()
@@ -77,7 +81,7 @@ export function useWorkspaceShortcuts(options: WorkspaceShortcutOptions): void {
         return
       }
 
-      if (!command && !event.altKey && (event.key === 'Delete' || event.key === 'Backspace') && selectedIds.length) {
+      if (selectionDelete) {
         event.preventDefault()
         current.remove(selectedIds)
         return
