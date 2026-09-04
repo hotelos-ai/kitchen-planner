@@ -84,21 +84,63 @@ describe('webmcp tools', () => {
     const guide = await call('get_workspace_guide', {})
     expect(guide.ok).toBe(true)
     expect(guide.coordinateSystem).toMatchObject({ unit: expect.stringContaining('millimetres'), componentAnchor: expect.stringContaining('top-left') })
-    expect(guide.referenceImagePolicy).toMatch(/never receives/)
-    expect(guide.agentWorkflow).toEqual(expect.arrayContaining([expect.stringContaining('preview_layout_changes')]))
-    const toolNames = (guide.tools as { name: string }[]).map((tool) => tool.name)
+    expect(guide.workflow).toEqual(expect.arrayContaining([expect.stringContaining('Preview reviewable edits')]))
+    expect(JSON.stringify(guide).length).toBeLessThanOrEqual(1_500)
+    expect(guide).not.toHaveProperty('operationSchema')
+    expect(guide).not.toHaveProperty('errorCodeTaxonomy')
+
+    const fullGuide = await call('get_workspace_guide', { detail: 'full' })
+    expect(fullGuide).toMatchObject({ detail: 'full', operationSchema: expect.any(Object), errorCodeTaxonomy: expect.any(Array) })
+    expect(fullGuide.referenceImagePolicy).toMatch(/does not receive.+attached reference images/)
+    expect(fullGuide.referenceImagePolicy).toMatch(/intent text.+human-readable action summary/)
+    expect(fullGuide.agentWorkflow).toEqual(expect.arrayContaining([expect.stringContaining('preview_layout_changes')]))
+    expect(fullGuide.agentWorkflow).toEqual(expect.arrayContaining([expect.stringContaining('direct current-revision batch')]))
+    expect(fullGuide.limitations).toEqual(expect.arrayContaining([expect.stringContaining('import_project performs explicit validated replacement')]))
+    expect((fullGuide.agentWorkflow as string[]).join(' ')).not.toMatch(/\bCall\b/)
+    expect((fullGuide.limitations as string[]).join(' ')).not.toMatch(/Every mutation goes through/)
+    const toolNames = (fullGuide.tools as { name: string }[]).map((tool) => tool.name)
     expect(toolNames).toContain('apply_layout_changes')
-    expect(guide.room).toMatchObject({ polygonVertices: expect.any(Number), openings: expect.any(Number) })
+    expect(fullGuide.room).toMatchObject({ polygonVertices: expect.any(Number), openings: expect.any(Number) })
+    expect((fullGuide.tools as { description?: string }[])[0]?.description).toEqual(expect.any(String))
   })
 
-  it('filters the component catalog', async () => {
+  it('filters and paginates compact component catalog results with full detail on request', async () => {
     const { call } = setup()
     const all = await call('get_component_catalog', {})
     const cooking = await call('get_component_catalog', { category: 'cooking-hot-line' })
     expect(all.ok).toBe(true)
     expect(cooking.ok).toBe(true)
     expect((cooking.entries as unknown[]).length).toBeGreaterThan(0)
-    expect((cooking.entries as unknown[]).length).toBeLessThan((all.entries as unknown[]).length)
+    expect(all).toMatchObject({ detail: 'compact', offset: 0, limit: 5, returnedCount: 5, hasMore: true, nextOffset: 5 })
+    expect((all.entries as Record<string, unknown>[])[0]).not.toHaveProperty('placementRules')
+
+    const secondPage = await call('get_component_catalog', { offset: 20, limit: 5 })
+    expect(secondPage).toMatchObject({ ok: true, offset: 20, limit: 5 })
+    expect((secondPage.entries as Record<string, unknown>[])[0]?.catalogId).not.toBe((all.entries as Record<string, unknown>[])[0]?.catalogId)
+
+    const full = await call('get_component_catalog', { query: 'six-burner', detail: 'full', limit: 1 })
+    expect(full).toMatchObject({ ok: true, detail: 'full', returnedCount: 1 })
+    expect((full.entries as Record<string, unknown>[])[0]).toHaveProperty('placementRules')
+  })
+
+  it('distinguishes unknown catalog entries from known components with no available placement', async () => {
+    const store = createProjectStore(createSeedProject())
+    const facade = getWorkspaceFacade(store)
+    const tools = createWebMcpTools({
+      store,
+      getFacade: () => ({ ...facade, suggestPlacement: () => null }),
+      manifest: kitchenCapabilityManifest,
+    })
+    const placement = tools.find((tool) => tool.name === 'suggest_component_placement')!
+
+    const unavailable = await placement.execute({ catalogId: 'hot-six-burner-range' }) as Envelope
+    expect(unavailable).toMatchObject({ ok: true, found: false, suggestion: null, reason: expect.stringContaining('No collision-free placement') })
+
+    const unknown = await placement.execute({ catalogId: 'does-not-exist' }) as Envelope
+    expect(unknown).toMatchObject({ ok: false, code: 'unknown-catalog-entry' })
+
+    const missingVariant = await placement.execute({ catalogId: 'hot-six-burner-range', variantId: 'does-not-exist' }) as Envelope
+    expect(missingVariant).toMatchObject({ ok: false, code: 'missing-variant' })
   })
 
   it('returns cloned layout data and defaults to the active variant', async () => {

@@ -45,9 +45,14 @@ const runAutoLayoutInput = z.object({
 
 const getAutoLayoutRunInput = z.object({
   runId: z.string().min(1).max(160),
+  resultId: z.string().min(1).max(160).optional(),
+  offset: z.number().int().nonnegative().optional(),
+  limit: z.number().int().min(1).max(50).optional(),
 }).strict()
 
-const cancelAutoLayoutRunInput = getAutoLayoutRunInput
+const cancelAutoLayoutRunInput = z.object({
+  runId: z.string().min(1).max(160),
+}).strict()
 
 const adoptAutoLayoutCandidateInput = z.object({
   runId: z.string().min(1).max(160),
@@ -169,7 +174,15 @@ const candidateSummary = (candidate: EvaluatedCandidate) => ({
   id: candidate.id,
   hash: candidate.hash,
   score: structuredClone(candidate.score),
-  diff: structuredClone(candidate.diff),
+  changeCounts: {
+    moved: candidate.diff.moved.length,
+    rotated: candidate.diff.rotated.length,
+    resized: candidate.diff.resized.length,
+    substituted: candidate.diff.substituted.length,
+    added: candidate.diff.added.length,
+    removed: candidate.diff.removed.length,
+    architectureChanged: candidate.diff.architectureChanged,
+  },
   evaluatedSeeds: [...candidate.evaluatedSeeds],
   confirmationSeeds: [...candidate.confirmationSeeds],
 })
@@ -409,12 +422,17 @@ export function createLayoutIntelligenceTools(deps: LayoutIntelligenceToolDepend
     name: 'get_auto_layout_run',
     title: 'Get auto-layout run',
     description:
-      'Read status, progress, and confirmed finalists from a run started by run_auto_layout. Reports when its source project revision has become stale; never changes or adopts a layout.',
+      'Read status, progress, and compact confirmed-finalist and candidate summaries from a run started by run_auto_layout. Page candidates with offset and limit; pass a confirmed finalist resultId to retrieve its complete layout. Reports when its source project revision has become stale; never changes or adopts a layout.',
     inputSchema: {
       type: 'object',
       additionalProperties: false,
       required: ['runId'],
-      properties: { runId: { type: 'string', description: 'Run ID returned by run_auto_layout.' } },
+      properties: {
+        runId: { type: 'string', minLength: 1, maxLength: 160, description: 'Run ID returned by run_auto_layout.' },
+        resultId: { type: 'string', minLength: 1, maxLength: 160, description: 'Optional confirmed finalist ID. When present, finalist contains its complete saved-layout candidate.' },
+        offset: { type: 'integer', minimum: 0, description: 'Zero-based candidate-summary offset. Defaults to 0.' },
+        limit: { type: 'integer', minimum: 1, maximum: 50, description: 'Maximum candidate summaries to return. Defaults to 20.' },
+      },
     },
     annotations: { readOnlyHint: true },
     execute: (input) => {
@@ -424,6 +442,20 @@ export function createLayoutIntelligenceTools(deps: LayoutIntelligenceToolDepend
         const state = deps.store.getState()
         const run = runs.get(parsed.value.runId)
         if (!run) return failure(state.revision, 'run-not-found', `Auto-layout run ${parsed.value.runId} does not exist in this page session.`)
+        if (parsed.value.resultId && !run.result) {
+          return failure(state.revision, 'run-not-complete', `Auto-layout run ${run.runId} is ${run.status}; finalist detail is available only after completion.`)
+        }
+        const requestedFinalist = parsed.value.resultId
+          ? run.result?.finalists.find((candidate) => candidate.id === parsed.value.resultId)
+          : undefined
+        if (parsed.value.resultId && !requestedFinalist) {
+          return failure(state.revision, 'result-not-finalist', `Result ${parsed.value.resultId} is not a confirmed finalist from run ${run.runId}.`)
+        }
+        const offset = parsed.value.offset ?? 0
+        const limit = parsed.value.limit ?? 20
+        const candidates = run.result?.candidates ?? []
+        const candidatePage = candidates.slice(offset, offset + limit)
+        const hasMoreCandidates = offset + candidatePage.length < candidates.length
         return success(state.revision, {
           runId: run.runId,
           status: run.status,
@@ -438,8 +470,17 @@ export function createLayoutIntelligenceTools(deps: LayoutIntelligenceToolDepend
             termination: run.result.termination,
             evaluationCount: run.result.evaluationCount,
             bestObservedDisclaimer: run.result.bestObservedDisclaimer,
-            finalists: run.result.finalists.map(candidatePayload),
-            candidates: run.result.candidates.map(candidateSummary),
+            finalists: run.result.finalists.map(candidateSummary),
+            candidates: candidatePage.map(candidateSummary),
+            candidatePage: {
+              offset,
+              limit,
+              returned: candidatePage.length,
+              total: candidates.length,
+              hasMore: hasMoreCandidates,
+              ...(hasMoreCandidates ? { nextOffset: offset + candidatePage.length } : {}),
+            },
+            ...(requestedFinalist ? { finalist: candidatePayload(requestedFinalist) } : {}),
             ...(run.result.searchStats ? { searchStats: structuredClone(run.result.searchStats) } : {}),
             ...(run.result.diagnostics ? { diagnostics: structuredClone(run.result.diagnostics) } : {}),
           } : {}),

@@ -110,6 +110,7 @@ describe('WebMCP layout intelligence tools', () => {
       progressPct: expect.any(Number),
       progress: { phase: 'simulation', simulatedCandidates: 6, bestObserved: 'candidate-a' },
     })
+    expect(await byName(tools, 'get_auto_layout_run').execute({ runId: started.runId, resultId: 'candidate-a' })).toMatchObject({ ok: false, code: 'run-not-complete' })
 
     const variant = structuredClone(store.getState().project.variants[0])
     variant.equipment[0].xMm += 200
@@ -131,9 +132,11 @@ describe('WebMCP layout intelligence tools', () => {
         moved: [variant.equipment[0].id], rotated: [], resized: [], substituted: [], added: [], removed: [], architectureChanged: false,
       },
     }
+    const candidateB = { ...candidate, id: 'candidate-b', hash: 'hash-b' }
+    const candidateC = { ...candidate, id: 'candidate-c', hash: 'hash-c' }
     resolveSearch({
       manifest: capturedManifest!,
-      candidates: [candidate],
+      candidates: [candidate, candidateB, candidateC],
       finalists: [candidate],
       evaluationCount: 12,
       termination: 'evaluation-budget',
@@ -148,8 +151,27 @@ describe('WebMCP layout intelligence tools', () => {
       progressPct: 100,
       termination: 'evaluation-budget',
       evaluationCount: 12,
-      finalists: [{ id: 'candidate-a', variant: { id: 'baseline-trace' } }],
+      finalists: [{ id: 'candidate-a', hash: 'hash-a', changeCounts: { moved: 1, architectureChanged: false } }],
+      candidates: [{ id: 'candidate-a' }, { id: 'candidate-b' }, { id: 'candidate-c' }],
+      candidatePage: { offset: 0, limit: 20, returned: 3, total: 3, hasMore: false },
     })
+    expect((completed.finalists as Array<Record<string, unknown>>)[0]).not.toHaveProperty('variant')
+    expect((completed.candidates as Array<Record<string, unknown>>)[0]).not.toHaveProperty('variant')
+
+    const paged = await byName(tools, 'get_auto_layout_run').execute({ runId: started.runId, offset: 1, limit: 1 }) as Envelope
+    expect(paged).toMatchObject({
+      ok: true,
+      candidates: [{ id: 'candidate-b', hash: 'hash-b' }],
+      candidatePage: { offset: 1, limit: 1, returned: 1, total: 3, hasMore: true, nextOffset: 2 },
+    })
+
+    const detailed = await byName(tools, 'get_auto_layout_run').execute({ runId: started.runId, resultId: 'candidate-a' }) as Envelope
+    expect(detailed).toMatchObject({
+      ok: true,
+      finalist: { id: 'candidate-a', hash: 'hash-a', variant: { id: 'baseline-trace' } },
+    })
+    expect(await byName(tools, 'get_auto_layout_run').execute({ runId: started.runId, resultId: 'candidate-b' })).toMatchObject({ ok: false, code: 'result-not-finalist' })
+    expect(await byName(tools, 'get_auto_layout_run').execute({ runId: started.runId, offset: -1 })).toMatchObject({ ok: false, code: 'invalid-input' })
     expect(store.getState().revision).toBe(0)
 
     const adopted = await byName(tools, 'adopt_auto_layout_candidate').execute({
@@ -212,7 +234,13 @@ describe('WebMCP layout intelligence tools', () => {
     const store = createProjectStore(createSeedProject())
     const tools = createLayoutIntelligenceTools({ store, getFacade: () => getWorkspaceFacade(store) })
     const runSchema = byName(tools, 'run_auto_layout').inputSchema
+    const resultSchema = byName(tools, 'get_auto_layout_run').inputSchema
     expect(runSchema).toMatchObject({ type: 'object', additionalProperties: false })
     expect(runSchema.properties.permissions).toMatchObject({ type: 'object', additionalProperties: false })
+    expect(resultSchema.properties).toMatchObject({
+      resultId: { type: 'string', maxLength: 160 },
+      offset: { type: 'integer', minimum: 0 },
+      limit: { type: 'integer', minimum: 1, maximum: 50 },
+    })
   })
 })

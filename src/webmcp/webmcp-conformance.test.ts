@@ -174,8 +174,8 @@ describe('WebMCP protocol conformance', () => {
         inputSchema: tool.inputSchema,
         annotations: tool.annotations,
       }
-      // The complete 31-operation write union, including strict nested object schemas,
-      // cannot fit the generic 8 KiB budget without unresolved external references.
+      // The complete 31-operation write union cannot fit the generic 8 KiB budget without
+      // unresolved external references, but remains capped at 16 KiB.
       const budget = ['preview_layout_changes', 'apply_layout_changes'].includes(tool.name) ? 16 * 1024 : 8 * 1024
       expect(byteLength(registrationManifest), tool.name).toBeLessThan(budget)
     }
@@ -214,6 +214,11 @@ describe('WebMCP protocol conformance', () => {
     const applySchema = tools.find((tool) => tool.name === 'apply_layout_changes')!.inputSchema as typeof tools[number]['inputSchema'] & {
       oneOf: Array<{ required: string[] }>
     }
+    const applyDescription = tools.find((tool) => tool.name === 'apply_layout_changes')!.description
+    expect(applyDescription).toMatch(/live workspace/)
+    expect(applyDescription).toMatch(/previewToken/)
+    expect(applyDescription).toMatch(/expectedRevision/)
+    expect(applyDescription).toMatch(/idempotencyKey/)
     expect(applySchema.oneOf[0].required).toEqual(['previewToken'])
     expect(applySchema.oneOf[1].required).toEqual(['expectedRevision', 'operations'])
     expect(applySchema.oneOf[1].required).not.toContain('idempotencyKey')
@@ -251,6 +256,12 @@ describe('WebMCP protocol conformance', () => {
       expect((definitions.A.properties as Record<string, unknown>).roomPolygon).toMatchObject({ type: 'array', items: { $ref: '#/$defs/p' } })
       expect((definitions.S.properties as Record<string, unknown>).staff).toMatchObject({ type: 'array', items: { $ref: '#/$defs/f' } })
       expect((definitions.e.properties as Record<string, unknown>).steps).toMatchObject({ type: 'array', items: { $ref: '#/$defs/m' } })
+      expect((definitions.C.properties as Record<string, unknown>)).toMatchObject({
+        planLayerOrder: { type: 'integer' },
+        baseElevationMm: { $ref: '#/$defs/h' },
+        shelfElevationsMm: { type: 'array', maxItems: 100, items: { $ref: '#/$defs/h' } },
+      })
+      expect(definitions.h).toEqual({ type: 'number', minimum: 0, maximum: 20_000 })
       const updateOpening = (item.allOf as Array<{ if: { properties: { type: { const: string } } }; then: { properties: { patch: unknown } } }>)
         .find((condition) => condition.if.properties.type.const === 'update_opening')
       expect(updateOpening?.then.properties.patch).toEqual({ $ref: '#/$defs/O' })
@@ -270,6 +281,20 @@ describe('WebMCP protocol conformance', () => {
       expect(conformsToSchema(inputSchema, inputSchema, {
         expectedRevision: 0,
         operations: [{ type: 'update_scenario', variantId: 'layout-a', scenarioId: 'dinner', patch: { staff: [{ role: 'head-chef', count: 1, rogue: true }] } }],
+      })).toBe(false)
+      expect(conformsToSchema(inputSchema, inputSchema, {
+        expectedRevision: 0,
+        operations: [{
+          type: 'update_component', variantId: 'layout-a', componentId: 'rack-a',
+          patch: { planLayerOrder: 3, baseElevationMm: 120, shelfElevationsMm: [300, 600, 900] },
+        }],
+      })).toBe(true)
+      expect(conformsToSchema(inputSchema, inputSchema, {
+        expectedRevision: 0,
+        operations: [{
+          type: 'update_component', variantId: 'layout-a', componentId: 'rack-a',
+          patch: { shelfElevationsMm: [20_001] },
+        }],
       })).toBe(false)
     }
     controller.dispose()

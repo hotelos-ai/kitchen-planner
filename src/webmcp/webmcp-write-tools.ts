@@ -77,6 +77,7 @@ const workspaceOperationDefinitions: Record<string, Schema> = {
   x: { type: 'number', minimum: -1_000_000, maximum: 1_000_000 },
   a: { type: 'number', minimum: 0, maximum: 1_000_000 },
   k: { type: 'number', minimum: 0, maximum: 100_000 },
+  h: { type: 'number', minimum: 0, maximum: 20_000 },
   d: { type: 'number', exclusiveMinimum: 0, maximum: 100_000 },
   r: { type: 'number', minimum: -1_000_000, maximum: 1_000_000 },
   p: strictObject({ xMm: ref('x'), yMm: ref('x') }, ['xMm', 'yMm']),
@@ -100,7 +101,7 @@ const workspaceOperationDefinitions: Record<string, Schema> = {
   t: strictObject({ minSeconds: { type: 'number', exclusiveMinimum: 0, maximum: 86_400 }, maxSeconds: { type: 'number', exclusiveMinimum: 0, maximum: 86_400 } }, ['minSeconds', 'maxSeconds']),
   m: strictObject({ label: ref('n'), capability: ref('c'), activeSeconds: { type: 'number', exclusiveMinimum: 0, maximum: 86_400 }, passiveSeconds: ref('t') }, ['label', 'capability', 'activeSeconds']),
   e: strictObject({ id: ref('i'), name: ref('n'), sharePct: { type: 'number', minimum: 0, maximum: 100 }, source: { enum: ['user-provided', 'imported', 'template-estimate', 'system-inferred'] }, steps: { type: 'array', minItems: 1, maxItems: 24, items: ref('m') } }, ['id', 'name', 'sharePct', 'source', 'steps']),
-  C: strictPatch({ label: ref('n'), xMm: ref('x'), yMm: ref('x'), category: { enum: ['cooking', 'cold', 'prep', 'washing', 'landing', 'storage', 'hood', 'custom'] }, heightMm: ref('d'), capabilities: { type: 'array', maxItems: 100, items: ref('c') }, clearance: ref('l'), accessFlow: ref('D'), approximate: booleanSchema, notes: { type: 'string' } }),
+  C: strictPatch({ label: ref('n'), xMm: ref('x'), yMm: ref('x'), category: { enum: ['cooking', 'cold', 'prep', 'washing', 'landing', 'storage', 'hood', 'custom'] }, heightMm: ref('d'), capabilities: { type: 'array', maxItems: 100, items: ref('c') }, clearance: ref('l'), accessFlow: ref('D'), approximate: booleanSchema, notes: { type: 'string' }, planLayerOrder: { type: 'integer' }, baseElevationMm: ref('h'), shelfElevationsMm: { type: 'array', maxItems: 100, items: ref('h') } }),
   O: strictPatch({ label: ref('n'), kind: { enum: ['door', 'window', 'service-window', 'sealed-opening'] }, wall: { enum: ['top', 'right', 'bottom', 'left'] }, segmentIndex: nullable({ type: 'integer', minimum: 0, maximum: 999 }), offsetMm: ref('a'), widthMm: ref('d'), sillHeightMm: nullable(ref('a')), heightMm: nullable(ref('d')), flow: nullable({ enum: ['entry', 'clean-out', 'dirty-in', 'closed'] }), doorType: nullable({ enum: ['hinged', 'double-hinged', 'sliding', 'double-sliding'] }), swingDepthMm: nullable(ref('a')), swingHinge: nullable({ enum: ['start', 'end'] }), swingDirection: nullable({ enum: ['inward', 'outward'] }) }),
   P: strictPatch({ xMm: ref('a'), yMm: ref('a'), widthMm: ref('d'), depthMm: ref('d') }),
   G: strictPatch({ xMm: ref('a'), yMm: ref('a'), widthMm: ref('d'), depthMm: ref('d'), label: ref('n'), adjacent: booleanSchema }),
@@ -114,7 +115,8 @@ const operationProperties: Record<string, Schema> = {
   type: { type: 'string' }, variantId: ref('i'), name: ref('n'), parentVariantId: ref('i'), equipmentMode: { enum: ['duplicate', 'empty'] },
   componentId: ref('i'), catalogId: ref('i'), position: ref('p'), dimensions: ref('z'), rotationDeg: ref('r'),
   configurationId: ref('i'), skinId: ref('i'), label: ref('n'), capabilities: { type: 'array', maxItems: 100, items: ref('i') },
-  patch: { anyOf: ['C', 'O', 'P', 'G', 'A', 'F', 'W', 'S'].map(ref) }, componentIds: { type: 'array', minItems: 1, maxItems: 500, uniqueItems: true, items: ref('i') },
+  // Each update operation's conditional branch below supplies its exact patch schema.
+  patch: { type: 'object' }, componentIds: { type: 'array', minItems: 1, maxItems: 500, uniqueItems: true, items: ref('i') },
   anchor: ref('p'), delta: ref('p'), deltaDeg: ref('r'), locked: booleanSchema,
   components: { type: 'array', minItems: 1, maxItems: 500, items: ref('u') }, offset: ref('p'),
   opening: ref('o'), pillar: ref('Q'), storageZone: ref('H'), id: ref('i'), scenarioId: ref('i'), runId: ref('i'), resultId: ref('i'), newVariantId: ref('i'),
@@ -255,8 +257,8 @@ export function createWriteTools(deps: WriteToolDependencies): WebMcpToolDefinit
 
   const applyLayoutChanges: WebMcpToolDefinition = {
     name: 'apply_layout_changes',
-    title: 'Apply layout changes',
-    description: 'Commit kitchen edits.',
+    title: 'Apply',
+    description: 'Commit live workspace: previewToken or expectedRevision + operations; idempotencyKey makes retries safe.',
     inputSchema: {
       type: 'object',
       additionalProperties: false,
@@ -268,11 +270,11 @@ export function createWriteTools(deps: WriteToolDependencies): WebMcpToolDefinit
         ],
       } as Record<string, unknown>),
       properties: {
-        previewToken: { type: 'string', minLength: 1, maxLength: 200 },
-        expectedRevision: { type: 'integer', minimum: 0 },
-        operations: operationsSchema,
-        intent: { type: 'string', maxLength: 2000 },
-        idempotencyKey: { type: 'string', minLength: 1, maxLength: 200 },
+        previewToken: { type: 'string' },
+        expectedRevision: { type: 'integer' },
+        operations: { type: 'array', items: registeredWorkspaceOperationSchema },
+        intent: { type: 'string' },
+        idempotencyKey: { type: 'string' },
       },
     },
     execute: (input, context) => {

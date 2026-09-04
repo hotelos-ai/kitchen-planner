@@ -135,6 +135,9 @@ describe('webmcp controller', () => {
   it('exposes a starter prompt naming the core tools', () => {
     const { controller } = setup()
     const prompt = controller.getStarterPrompt()
+    expect(prompt.startsWith("Use this page's site tools")).toBe(true)
+    expect(prompt).toMatch(/Choose a focused tool sequence/)
+    expect(prompt).not.toMatch(/\bCall\b/)
     expect(prompt).toMatch(/get_workspace_guide/)
     expect(prompt).toMatch(/preview_layout_changes/)
     expect(prompt).toMatch(/apply_layout_changes/)

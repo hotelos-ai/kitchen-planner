@@ -62,7 +62,7 @@ describe('AgentToolsPanel', () => {
     for (const name of toolNames) {
       expect(screen.getByText(name)).toBeInTheDocument()
     }
-    const prompt = screen.getByText(/Inspect my attached reference image/)
+    const prompt = screen.getByText(/Use this page's site tools/)
     expect(prompt).toBeInTheDocument()
     expect(screen.getByText(/never receives, uploads, or interprets images/i)).toBeInTheDocument()
     expect(screen.getByText(/only in this tab and this document/i)).toBeInTheDocument()

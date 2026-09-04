@@ -168,7 +168,7 @@ describe('WebMCP schema and read-only conformance', () => {
       expect(entry.recovery, entry.code).toMatch(/[.!]$/)
     }
 
-    const guide = await call('get_workspace_guide', {})
+    const guide = await call('get_workspace_guide', { detail: 'full' })
     expect(guide.errorCodeTaxonomy).toEqual(WEBMCP_ERROR_TAXONOMY)
   })
 

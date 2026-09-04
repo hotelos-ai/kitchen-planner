@@ -91,16 +91,14 @@ const withConformantAnnotations = (tool: WebMcpToolDefinition): WebMcpToolDefini
 const starterPromptFor = (toolNames: readonly string[]) => {
   const tool = (name: string) => toolNames.find((candidate) => candidate === name) ?? 'the site tools'
   return [
-    'Inspect my attached reference image — you interpret it; this page never receives it.',
-    `Call ${tool('get_workspace_guide')} to learn the coordinate system and units, then ${tool('get_app_state')}, ${tool('get_component_catalog')}, and ${tool('get_layout')} to read the visible workspace, catalog, and current plan.`,
-    'Translate the sketch into explicit millimetre coordinates, dimensions, rotations, and component IDs.',
-    `Call ${tool('preview_layout_changes')} with the current revision and a complete operation batch, then ${tool('apply_layout_changes')} with the returned preview token.`,
-    `Verify with ${tool('analyze_layout')}, ${tool('check_operational_essentials')}, and ${tool('get_layout')}. For follow-up edits such as "move the fryer beside the range", re-read the revision, preview only the delta, apply, and verify.`,
-    `Use ${tool('set_app_view')} to move between Space, Fit-out, 2D/3D, and Simulate, and ${tool('select_components')} to reveal the equipment you are discussing.`,
-    `For operational questions, read ${tool('get_simulation_guide')}, adjust scenario parameters through preview/apply, then ${tool('run_simulation')} with visible playback and report assumptions separately from results.`,
-    `Use ${tool('compare_layouts')} or ${tool('run_auto_layout')} when alternatives should be evaluated with the same evidence.`,
-    `Save or download the finished plan with ${tool('export_project')}, or create a deep-linked handoff with ${tool('share_results')}.`,
-    'Never invent measurements: mark uncertain components approximate and ask me when scale is unclear.',
+    'Use this page\'s site tools to improve the live commercial-kitchen workspace from my goal or attached reference, and leave me with a verified, saved plan.',
+    `Interpret any attached reference yourself—the page does not receive it. Read ${tool('get_workspace_guide')} for coordinates and units, then use ${tool('get_app_state')}, a filtered ${tool('get_component_catalog')} query, and ${tool('get_layout')} for only the current state and stable IDs the task needs.`,
+    'Choose a focused tool sequence for the task. Translate the goal or reference into explicit millimetre coordinates, dimensions, rotations, and component IDs.',
+    `For plan edits, use ${tool('preview_layout_changes')} with the current revision and an ordered operation batch, then commit its single-use token with ${tool('apply_layout_changes')}.`,
+    `Confirm the visible result with the relevant combination of ${tool('analyze_layout')}, ${tool('check_operational_essentials')}, and ${tool('get_layout')}. For follow-up edits such as "move the fryer beside the range", re-read the revision and apply only the requested delta.`,
+    `Use ${tool('set_app_view')} to show Space, Fit-out, 2D/3D, or Simulate and ${tool('select_components')} to reveal the equipment being discussed.`,
+    `For operational questions, use ${tool('get_simulation_guide')} and ${tool('run_simulation')}; report model assumptions separately from results. Evaluate alternatives with ${tool('compare_layouts')} or ${tool('run_auto_layout')} when that helps the decision.`,
+    `Save or download the finished plan with ${tool('export_project')}, or create a deep-linked handoff with ${tool('share_results')}. Treat unscaled measurements as approximate and ask me only when an ambiguity would materially change the plan.`,
   ].join(' ')
 }
 

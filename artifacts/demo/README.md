@@ -1,6 +1,8 @@
 # Submission demo
 
-`calmkitchen-webmcp-demo.mp4` is an 83-second, narrated 1440×900 walkthrough recorded against the production app. It shows real WebMCP registration and calls for discovery, preview/apply, shared 2D/3D selection, simulation, comparison, and sharing.
+`calmkitchen-webmcp-demo.mp4` is an 83-second, narrated 1440×900 deterministic integration-harness walkthrough recorded against the production app. The harness injects the experimental `document.modelContext` surface, captures the registered definitions, and invokes their real handlers to verify discovery, preview/apply, shared 2D/3D selection, simulation, comparison, and sharing.
+
+This artifact proves registration, handler execution, and visible UI effects; it is not evidence that an external agent selected the tools from natural language. For the competition submission, replace or supplement it with a clean recording from a natively supported Site Tools/WebMCP client that shows the prompt and actual tool-call trace.
 
 Devpost-ready stills are included alongside it:
 
@@ -21,6 +23,12 @@ Devpost-ready stills are included alongside it:
 > Source: https://github.com/hotelos-ai/kitchen-planner
 
 Set visibility to **Public**, confirm narration is audible, and verify the final runtime remains below three minutes before adding the YouTube URL to Devpost.
+
+## Native-agent recording prompt
+
+> Use this page's site tools to improve the current commercial kitchen for a 90-cover dinner service. First identify the main bottleneck. Create a safer, faster candidate while preserving aisle clearance. Simulate the baseline and candidate with the same seed, compare them, and show the winning layout in split 2D/3D view. Do not commit a change without previewing it.
+
+Lead the edited video with the measured result, show the native Site Tools registry and call trace, and close the AI drawer before the final comparison so both metric columns remain unobstructed.
 
 ## Regenerate
 

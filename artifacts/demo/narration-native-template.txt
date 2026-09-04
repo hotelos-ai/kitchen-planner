@@ -1,0 +1,20 @@
+[0:00-0:10]
+A browser agent redesigned this 90-cover commercial kitchen. Under the same dinner scenario and random seed, P90 ticket wait fell from [BASELINE] to [CANDIDATE], staff travel changed from [BASELINE] to [CANDIDATE], and service level rose from [BASELINE] to [CANDIDATE], while preserving a [MINIMUM] millimetre aisle.
+
+[0:10-0:18]
+These are the site's native WebMCP tools, discovered by the agent from the top-level page. This is the real Site Tools registry and call trace, not screenshot automation.
+
+[0:18-0:42]
+I give the goal, not a sequence of clicks. The agent reads exact geometry and operational state, identifies the dominant bottleneck, and proposes one revision. Preview validates the complete batch against the current revision without changing the plan. Apply commits the approved token as one visible, atomic, undoable step.
+
+[0:42-0:57]
+The same selected equipment appears in Plan and 3D because the person and agent share one live workspace. Stable component identities and millimetre coordinates keep the discussion precise.
+
+[0:57-1:12]
+The agent now pressure-tests baseline and candidate with the same scenario and seed. The visible playback and the agent use the same retained result: queues, staff movement, throughput, ticket-time distribution, congestion, and ranked findings.
+
+[1:12-1:23]
+Here is the unobstructed comparison. The outcome is modeled planning evidence, not regulatory certification, and the user keeps the final judgment.
+
+[1:23-1:30]
+One undo returns the shared workspace safely. CalmKitchen lets agents inspect, change, simulate, verify, and recover in the browser where the work already lives.

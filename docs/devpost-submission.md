@@ -26,35 +26,37 @@ A kitchen layout is too precise for screenshot clicking and too visual for a hea
 
 CalmKitchen is a React/TypeScript browser application deployed as static assets on Cloudflare Workers. It registers 26 strict-schema tools through `document.modelContext` and falls back to the legacy navigator surface. Tool results use interoperable MCP text and structured content with explicit error flags and a 256 KiB cap. Registration retries transient failures, reconciles unexpected tool removal, and restores across back/forward cache navigation. Project writes pass through the same Zod-validated workspace facade as human edits, use optimistic revision checks, and produce one labeled, undoable history step. High-cover simulation runs move off the UI thread into an abortable Web Worker while preserving the exact deterministic result shared by the app and agent. A stable error taxonomy supplies recovery guidance, and self-contained reports carry assumptions, metrics, station evidence, ranked findings, and the SVG plan.
 
-## Three-minute demo script
+## Recommended 90-second native-agent demo
 
-### 0:00–0:20 — Problem and product
+Record this in a clean, natively supported ChatGPT Site Tools session or Chrome WebMCP client. Do not use the deterministic Playwright recording harness as evidence of external agent selection.
 
-Show the finished 2D/3D workspace. Say: “A kitchen is both a spatial design and a live operating system. Today those decisions are split across sketches, CAD, spreadsheets, and intuition. CalmKitchen lets a person and their agent design and test one exact model together.”
+Use this prompt:
 
-### 0:20–0:45 — Prove WebMCP depth
+> Use this page's site tools to improve the current commercial kitchen for a 90-cover dinner service. First identify the main bottleneck. Create a safer, faster candidate while preserving aisle clearance. Simulate the baseline and candidate with the same seed, compare them, and show the winning layout in split 2D/3D view. Do not commit a change without previewing it.
 
-Open **AI tools**. Show the registered-tool count and live activity. Ask the agent to call `get_workspace_guide`, `get_app_state`, and `get_layout`. Briefly show exact millimetres, stable IDs, current revision, and strict schemas.
+### 0:00–0:10 — Outcome first
 
-### 0:45–1:20 — Shared visible editing
+Show the unobstructed before/after comparison and say: “A browser agent redesigned this 90-cover kitchen and reduced P90 ticket wait from X to Y while preserving a Z millimetre minimum aisle.” Add overlays for P90 wait, staff travel distance, and service-level attainment.
 
-Prompt: “Create a prep table beside the cold line, keep the aisle clear, and show me the change in 3D.” The agent should use placement guidance, preview/apply, selection, and camera focus. Show the selected item, agent intent toast, the labeled Agent entry in Revision History, and one-click Undo. Emphasize that the user never leaves the shared canvas.
+### 0:10–0:18 — Native discovery
 
-### 1:20–1:55 — Operational intelligence
+Briefly show **Site Tools → Available site tools** in the actual agent client. Keep the prompt and tool-call trace legible.
 
-Ask: “Check this plan for a 90-cover dinner and run the service.” Show operational essentials, live Simulate playback, station queues, chef movement, throughput, and warnings. Point out that the exact retained run is available to both UI and agent.
+### 0:18–0:45 — Shared visible editing
 
-### 1:55–2:25 — Alternatives, not a chatbot answer
+Show the natural-language prompt, the agent reading layout state, analyzing the bottleneck, previewing the operation batch, and applying the approved revision. Show the same selected equipment in Plan and 3D, plus the Agent entry in Revision History.
 
-Ask the agent to compare the baseline with the candidate under the same seed, or launch auto-layout and poll it. Show ranked evidence and adopt a confirmed finalist. Say: “The agent cannot silently overwrite a changed plan; experiments are revision-bound, cancellable, and adoption is one undoable edit.”
+### 0:45–1:05 — Operational evidence
 
-### 2:25–2:50 — Handoff
+Run baseline and candidate simulations with the same scenario and seed. Show service playback only long enough to establish that it is live, then return to the comparison.
 
-Ask for a shareable result. Show the deep link and open/download the self-contained HTML report with assumptions, SVG plan, equipment schedule, metrics, and professional disclaimer.
+### 1:05–1:22 — Quantified comparison
 
-### 2:50–3:00 — Close
+Close the AI tools drawer. Show both metric columns and the three deltas without obstruction. State one preserved constraint and one operational limitation/assumption.
 
-Say: “WebMCP turns a complex professional canvas into a trustworthy shared instrument—humans provide judgment, agents provide precision and speed, and every important action stays visible and reversible.”
+### 1:22–1:30 — Recovery and close
+
+Show undo or a named checkpoint. Say: “CalmKitchen lets agents inspect, change, simulate, verify, and recover in one shared browser workspace.”
 
 ## Recording checklist
 

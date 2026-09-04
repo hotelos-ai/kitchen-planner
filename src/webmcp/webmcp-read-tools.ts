@@ -25,10 +25,17 @@ export type ReadToolDependencies = ToolDependencies & {
 
 const emptyInput = z.object({}).strict()
 
+const guideInput = z.object({
+  detail: z.enum(['compact', 'full']).optional(),
+}).strict()
+
 const catalogInput = z.object({
   query: z.string().trim().max(200).optional(),
   category: z.string().trim().max(60).optional(),
   capability: z.string().trim().max(60).optional(),
+  detail: z.enum(['compact', 'full']).optional(),
+  offset: z.number().int().min(0).max(10_000).optional(),
+  limit: z.number().int().min(1).max(100).optional(),
 }).strict()
 
 const layoutInput = z.object({
@@ -54,26 +61,30 @@ export function createReadTools(deps: ReadToolDependencies): WebMcpToolDefinitio
   const guideSchema: JsonSchemaObject = {
     type: 'object',
     additionalProperties: false,
-    properties: {},
-    description: 'No parameters. Returns the coordinate system, workflow, and conventions agents must follow.',
+    properties: {
+      detail: { type: 'string', enum: ['compact', 'full'], description: 'Defaults to compact. Use full for operation schemas, error recovery, and tool descriptions.' },
+    },
+    description: 'Returns the coordinate system, workflow, and conventions agents must follow.',
   }
 
   const getWorkspaceGuide: WebMcpToolDefinition = {
     name: 'get_workspace_guide',
     title: 'Get workspace guide',
     description:
-      'Read the workspace conventions before any other call: coordinate system (origin, axes, millimetre units, rotation, component anchor), current revision, room boundary summary, agent workflow, uncertainty guidance, tool list, and limitations.',
+      'Read compact workspace conventions when the task needs coordinate, revision, workflow, or safety guidance. Request full detail only for operation schemas, recovery codes, tool descriptions, and complete limitations.',
     inputSchema: guideSchema,
     annotations: { readOnlyHint: true },
     execute: (input) => {
       try {
-        const parsed = parseInput(deps, emptyInput, input)
-        if (!parsed.ok) return failure(currentRevision(deps), 'invalid-input', 'Input must be an empty object.', parsed.issues)
+        const parsed = parseInput(deps, guideInput, input)
+        if (!parsed.ok) return failure(currentRevision(deps), 'invalid-input', 'Invalid workspace guide query.', parsed.issues)
         const state = deps.store.getState()
         const variant = resolveVariant(state.project)
         if (!variant) return failure(state.revision, 'missing-variant', 'The active layout variant is missing.')
-        return success(state.revision, {
+        const toolSummaries = deps.getToolSummaries()
+        const common = {
           documentId: state.documentId,
+          detail: parsed.value.detail ?? 'compact',
           workspace: {
             kind: deps.manifest.workspaceKind,
             displayName: deps.manifest.displayName,
@@ -95,10 +106,36 @@ export function createReadTools(deps: ReadToolDependencies): WebMcpToolDefinitio
           agentWorkflow: [...deps.manifest.agentWorkflow],
           uncertaintyGuidance: deps.manifest.uncertaintyGuidance,
           supportedOperations: [...WORKSPACE_OPERATION_TYPES],
+          limitations: [...deps.manifest.limitations],
+        }
+        if (parsed.value.detail !== 'full') {
+          return success(state.revision, {
+            documentId: state.documentId,
+            detail: 'compact',
+            workspace: common.workspace,
+            coordinateSystem: {
+              unit: 'millimetres',
+              origin: 'room bounding-box top-left',
+              xAxis: '+x right/east',
+              yAxis: '+y down/south',
+              componentAnchor: 'unrotated top-left',
+              rotation: 'clockwise around component centre',
+            },
+            workflow: [
+              'Read only the state and filtered catalog entries needed for the goal.',
+              'Preview reviewable edits at the current revision, then apply the single-use token.',
+              'Verify persistent edits with a relevant read or analysis tool.',
+              'Use same-scenario, same-seed simulation or comparison for operational evidence.',
+            ],
+            safety: 'Keep uncertain measurements approximate; re-read and recompute on a stale revision. Results are planning evidence, not professional certification.',
+            fullGuideHint: 'Request detail="full" only for operation schemas, error recovery, complete tool descriptions, or all limitations.',
+          })
+        }
+        return success(state.revision, {
+          ...common,
           operationSchema: structuredClone(workspaceOperationJsonSchema),
           errorCodeTaxonomy: WEBMCP_ERROR_TAXONOMY.map((entry) => ({ ...entry })),
-          tools: deps.getToolSummaries(),
-          limitations: [...deps.manifest.limitations],
+          tools: toolSummaries,
         })
       } catch (error) {
         return failure(currentRevision(deps), 'internal-error', unknownErrorMessage(error))
@@ -110,7 +147,7 @@ export function createReadTools(deps: ReadToolDependencies): WebMcpToolDefinitio
     name: 'get_component_catalog',
     title: 'Get component catalog',
     description:
-      'List catalog components that can be added with add_component operations: stable catalogId, label, category, typical and maximum dimensions in millimetres, station capabilities, clearances, configurations, and tags. Filter by free-text query, category, or capability.',
+      'Search catalog components for add_component operations. Returns a compact, paginated list by default; request full detail only for shortlisted entries. Filter by free text, category, or capability.',
     inputSchema: {
       type: 'object',
       additionalProperties: false,
@@ -118,6 +155,9 @@ export function createReadTools(deps: ReadToolDependencies): WebMcpToolDefinitio
         query: { type: 'string', description: 'Optional free-text search over catalog names, synonyms, and tags.' },
         category: { type: 'string', description: 'Optional category filter such as cooking, cold, prep, washing, landing, storage, hood.' },
         capability: { type: 'string', description: 'Optional station capability filter such as range-cook or dish-wash.' },
+        detail: { type: 'string', enum: ['compact', 'full'], description: 'Defaults to compact. Full includes clearances, placement rules, presets, skins, and footprint.' },
+        offset: { type: 'integer', minimum: 0, maximum: 10000, description: 'Zero-based result offset; defaults to 0.' },
+        limit: { type: 'integer', minimum: 1, maximum: 100, description: 'Maximum entries to return; defaults to 5.' },
       },
     },
     annotations: { readOnlyHint: true },
@@ -129,8 +169,31 @@ export function createReadTools(deps: ReadToolDependencies): WebMcpToolDefinitio
         if (parsed.value.query !== undefined) filters.query = parsed.value.query
         if (parsed.value.category !== undefined) filters.category = parsed.value.category
         if (parsed.value.capability !== undefined) filters.capability = parsed.value.capability
-        const entries = deps.getFacade().getComponentCatalog(filters) as unknown[]
-        return success(currentRevision(deps), { count: entries.length, entries })
+        const allEntries = deps.getFacade().getComponentCatalog(filters) as Record<string, unknown>[]
+        const offset = parsed.value.offset ?? 0
+        const limit = parsed.value.limit ?? 5
+        const page = allEntries.slice(offset, offset + limit)
+        const entries = parsed.value.detail === 'full'
+          ? page
+          : page.map((entry) => ({
+              catalogId: entry.catalogId,
+              displayName: entry.displayName,
+              category: entry.category,
+              typicalDimensions: entry.typicalDimensions,
+              capabilities: entry.capabilities,
+            }))
+        const nextOffset = offset + entries.length
+        return success(currentRevision(deps), {
+          detail: parsed.value.detail ?? 'compact',
+          count: allEntries.length,
+          totalCount: allEntries.length,
+          returnedCount: entries.length,
+          offset,
+          limit,
+          hasMore: nextOffset < allEntries.length,
+          ...(nextOffset < allEntries.length ? { nextOffset } : {}),
+          entries,
+        })
       } catch (error) {
         return failure(currentRevision(deps), 'internal-error', unknownErrorMessage(error))
       }
@@ -300,13 +363,28 @@ export function createReadTools(deps: ReadToolDependencies): WebMcpToolDefinitio
         if (!parsed.ok) return failure(currentRevision(deps), 'invalid-input', 'Invalid placement query.', parsed.issues)
         const state = deps.store.getState()
         const variantId = parsed.value.variantId ?? state.project.activeVariantId
+        if (!resolveVariant(state.project, variantId)) {
+          return failure(state.revision, 'missing-variant', `Layout variant ${variantId} does not exist.`)
+        }
+        const catalogEntries = deps.getFacade().getComponentCatalog({}) as { catalogId?: unknown }[]
+        if (!catalogEntries.some((entry) => entry.catalogId === parsed.value.catalogId)) {
+          return failure(state.revision, 'unknown-catalog-entry', `Catalog entry ${parsed.value.catalogId} is unknown.`)
+        }
         const suggestion = deps.getFacade().suggestPlacement({
           variantId,
           catalogId: parsed.value.catalogId,
           ...(parsed.value.preferredPoint ? { preferredPoint: parsed.value.preferredPoint } : {}),
         }) as unknown
-        if (!suggestion) return failure(state.revision, 'unknown-catalog-entry', `Catalog entry ${parsed.value.catalogId} is unknown.`)
-        return success(state.revision, { suggestion })
+        if (suggestion === null || suggestion === undefined) {
+          return success(state.revision, {
+            found: false,
+            suggestion: null,
+            catalogId: parsed.value.catalogId,
+            variantId,
+            reason: 'No collision-free placement was found for this component in the requested layout.',
+          })
+        }
+        return success(state.revision, { found: true, suggestion, catalogId: parsed.value.catalogId, variantId })
       } catch (error) {
         return failure(currentRevision(deps), 'internal-error', unknownErrorMessage(error))
       }

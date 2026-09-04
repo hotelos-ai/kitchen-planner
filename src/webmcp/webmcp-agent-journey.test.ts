@@ -44,10 +44,10 @@ describe('canonical WebMCP agent journey', () => {
       return result.structuredContent as Envelope
     }
 
-    const guide = await call('get_workspace_guide', {})
+    const guide = await call('get_workspace_guide', { detail: 'full' })
     expect(guide).toMatchObject({ ok: true, operationSchema: expect.any(Object), errorCodeTaxonomy: expect.any(Array) })
 
-    const catalog = await call('get_component_catalog', {})
+    const catalog = await call('get_component_catalog', { limit: 100 })
     const entries = catalog.entries as { catalogId: string }[]
     const equipmentCatalogIds = [
       'hot-six-burner-range',
