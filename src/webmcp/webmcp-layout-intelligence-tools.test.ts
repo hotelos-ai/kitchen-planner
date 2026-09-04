@@ -83,15 +83,16 @@ describe('WebMCP layout intelligence tools', () => {
       },
     } as WorkspaceFacade
     const tools = createLayoutIntelligenceTools({ store, getFacade: () => facade, now: () => '2026-09-03T00:00:00.000Z' })
+    appStateStore.getState().reset()
 
     const started = await byName(tools, 'run_auto_layout').execute({
       objective: 'travel',
       seed: 41,
       maxCandidates: 12,
       maxDurationMs: 2_000,
-      openOverlay: false,
     }) as Envelope
-    expect(started).toMatchObject({ ok: true, status: 'running', revision: 0, runId: 'auto-layout-0-1' })
+    expect(started).toMatchObject({ ok: true, status: 'running', revision: 0, runId: 'auto-layout-0-1', overlayOpened: false })
+    expect(appStateStore.getState().overlay).toBeNull()
     await nextTask()
     expect(capturedManifest).toMatchObject({
       id: 'auto-layout-0-1',

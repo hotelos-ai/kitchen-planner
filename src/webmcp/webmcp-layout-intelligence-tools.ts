@@ -275,7 +275,7 @@ export function createLayoutIntelligenceTools(deps: LayoutIntelligenceToolDepend
     name: 'run_auto_layout',
     title: 'Run auto-layout',
     description:
-      'Start a deterministic, revision-bound auto-layout search without changing the project. Returns a run ID immediately; poll get_auto_layout_run for candidates, then use adopt_auto_layout_candidate if the user chooses a confirmed finalist.',
+      'Use only when the user explicitly requests an automated multi-candidate search; do not use for routine improvements that a focused preview/apply edit can solve. Starts a computationally expensive, deterministic, revision-bound search without changing the project. Poll get_auto_layout_run, then adopt only a user-chosen confirmed finalist.',
     inputSchema: {
       type: 'object',
       additionalProperties: false,
@@ -298,7 +298,7 @@ export function createLayoutIntelligenceTools(deps: LayoutIntelligenceToolDepend
             architecture: { type: 'boolean' },
           },
         },
-        openOverlay: { type: 'boolean', description: 'Open the visible Auto-layout overlay. Defaults to true.' },
+        openOverlay: { type: 'boolean', description: 'Open manual Auto-layout controls. Agent-run progress is returned by get_auto_layout_run; defaults to false.' },
       },
     },
     execute: (input, context?: WebMcpToolExecutionContext) => {
@@ -365,7 +365,7 @@ export function createLayoutIntelligenceTools(deps: LayoutIntelligenceToolDepend
           context.signal.addEventListener('abort', cancel, { once: true })
           run.removeAbortListener = () => context.signal?.removeEventListener('abort', cancel)
         }
-        if (parsed.value.openOverlay ?? true) appStateStore.getState().setOverlay('auto-layout')
+        if (parsed.value.openOverlay === true) appStateStore.getState().setOverlay('auto-layout')
 
         void Promise.resolve().then(() => deps.getFacade().runAutoLayout({
           request: {
@@ -409,6 +409,7 @@ export function createLayoutIntelligenceTools(deps: LayoutIntelligenceToolDepend
           variantId: baseline.id,
           scenarioId: scenario.id,
           manifest: structuredClone(manifest),
+          overlayOpened: parsed.value.openOverlay === true,
           pollWith: { tool: 'get_auto_layout_run', runId },
           note: 'The search is transient and will not change or adopt a layout automatically.',
         })

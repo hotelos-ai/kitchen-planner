@@ -52,6 +52,7 @@ export const kitchenCapabilityManifest: CapabilityManifest = {
     'After a persistent edit, use the relevant read or analysis tools to verify visible state and review the diagnostics returned by apply.',
     'For follow-up edits, re-read state when necessary and prefer a focused delta that preserves unrelated user work.',
     'For operational questions, get_simulation_guide explains scenario inputs; update only the needed scenario fields, then use run_simulation when execution evidence is required.',
+    'Treat auto-layout as an opt-in, computationally expensive search. Use it only when the user explicitly requests generated alternatives; prefer focused preview/apply edits and comparison of existing variants.',
   ],
   uncertaintyGuidance:
     'Never invent exact measurements when the reference has no trustworthy scale. Mark uncertain components with approximate: true in update_component, record assumptions in notes, and ask the user when an ambiguity materially affects the layout.',

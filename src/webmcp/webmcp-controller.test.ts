@@ -145,6 +145,7 @@ describe('webmcp controller', () => {
     expect(prompt).toMatch(/select_components/)
     expect(prompt).toMatch(/check_operational_essentials/)
     expect(prompt).toMatch(/run_simulation/)
+    expect(prompt).toMatch(/run_auto_layout.*only when I explicitly request/)
     expect(prompt).toMatch(/export_project/)
   })
 

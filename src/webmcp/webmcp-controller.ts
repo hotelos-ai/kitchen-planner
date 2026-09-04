@@ -97,7 +97,7 @@ const starterPromptFor = (toolNames: readonly string[]) => {
     `For plan edits, use ${tool('preview_layout_changes')} with the current revision and an ordered operation batch, then commit its single-use token with ${tool('apply_layout_changes')}.`,
     `Confirm the visible result with the relevant combination of ${tool('analyze_layout')}, ${tool('check_operational_essentials')}, and ${tool('get_layout')}. For follow-up edits such as "move the fryer beside the range", re-read the revision and apply only the requested delta.`,
     `Use ${tool('set_app_view')} to show Space, Fit-out, 2D/3D, or Simulate and ${tool('select_components')} to reveal the equipment being discussed.`,
-    `For operational questions, use ${tool('get_simulation_guide')} and ${tool('run_simulation')}; report model assumptions separately from results. Evaluate alternatives with ${tool('compare_layouts')} or ${tool('run_auto_layout')} when that helps the decision.`,
+    `For operational questions, use ${tool('get_simulation_guide')} and ${tool('run_simulation')}; report model assumptions separately from results. Prefer focused preview/apply edits and ${tool('compare_layouts')} for saved variants. Use ${tool('run_auto_layout')} only when I explicitly request an automated multi-candidate search.`,
     `Save or download the finished plan with ${tool('export_project')}, or create a deep-linked handoff with ${tool('share_results')}. Treat unscaled measurements as approximate and ask me only when an ambiguity would materially change the plan.`,
   ].join(' ')
 }
