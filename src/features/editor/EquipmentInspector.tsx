@@ -23,6 +23,18 @@ function LengthField({ label, valueMm, unit, disabled, allowZero = false, onComm
   const [draft, setDraft] = useState(() => formatLengthInput(valueMm, unit))
   const [error, setError] = useState('')
   const errorId = useId()
+  const commit = (rawValue = draft) => {
+    try {
+      const parsed = parseLength(rawValue, unit)
+      if (!Number.isFinite(parsed) || parsed < (allowZero ? 0 : Number.EPSILON) || parsed > 20000) throw new Error('range')
+      onCommit(parsed)
+      setDraft(formatLengthInput(parsed, unit))
+      setError('')
+    } catch {
+      setDraft(formatLengthInput(valueMm, unit))
+      setError(`Enter a length ${allowZero ? 'of 0 or more' : 'greater than 0'} and no more than 20,000 mm.`)
+    }
+  }
   return (
     <label>{label} ({unit})
       <input
@@ -32,12 +44,11 @@ function LengthField({ label, valueMm, unit, disabled, allowZero = false, onComm
         aria-invalid={Boolean(error)}
         aria-describedby={error ? errorId : undefined}
         onChange={(event) => setDraft(event.target.value)}
-        onBlur={() => {
-          try {
-            const parsed = parseLength(draft, unit)
-            if (!Number.isFinite(parsed) || parsed < (allowZero ? 0 : Number.EPSILON) || parsed > 20000) throw new Error('range')
-            onCommit(parsed); setError('')
-          } catch { setDraft(formatLengthInput(valueMm, unit)); setError(`Enter a length ${allowZero ? 'of 0 or more' : 'greater than 0'} and no more than 20,000 mm.`) }
+        onBlur={(event) => commit(event.currentTarget.value)}
+        onKeyDown={(event) => {
+          if (event.key !== 'Enter') return
+          event.preventDefault()
+          commit(event.currentTarget.value)
         }}
       />
       {error && <span id={errorId} className="field-error">{error}</span>}

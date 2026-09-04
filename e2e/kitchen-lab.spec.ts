@@ -61,7 +61,7 @@ test('edits, simulates, compares, exports, and restores the example kitchen', as
   await expect(page.getByLabel(/Active layout variant/i)).toHaveValue(/layout-/)
   await page.getByRole('button', { name: /Select Tandoor/i }).click()
   await page.getByLabel(/^X position \(mm\)$/i).fill('2300')
-  await page.getByLabel(/^X position \(mm\)$/i).press('Tab')
+  await page.getByLabel(/^X position \(mm\)$/i).press('Enter')
 
   await page.getByRole('button', { name: /Simulate/i }).click()
   await page.getByRole('button', { name: /Run 60-minute service/i }).click()

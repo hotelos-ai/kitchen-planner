@@ -26,12 +26,16 @@ const NumberField = ({ label, value, onChange }: { label: string; value: number;
 
 const TextField = ({ label, value, onCommit }: { label: string; value: string; onCommit(value: string): void }) => {
   const [draft, setDraft] = useState(value)
-  const commit = () => {
-    const next = draft.trim()
+  const commit = (rawValue = draft) => {
+    const next = rawValue.trim()
     if (next) onCommit(next)
     else setDraft(value)
   }
-  return <label>{label}<input value={draft} onChange={(event) => setDraft(event.target.value)} onBlur={commit} onKeyDown={(event) => { if (event.key === 'Enter') event.currentTarget.blur() }} /></label>
+  return <label>{label}<input value={draft} onChange={(event) => setDraft(event.target.value)} onBlur={(event) => commit(event.currentTarget.value)} onKeyDown={(event) => {
+    if (event.key !== 'Enter') return
+    event.preventDefault()
+    commit(event.currentTarget.value)
+  }} /></label>
 }
 
 export function SpaceItemInspector({ store, selection, onClearSelection }: Props) {

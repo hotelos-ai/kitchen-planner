@@ -77,6 +77,20 @@ it('allows an industrial stainless-steel shelf height to be edited', async () =>
   expect(getActiveItem(store.getState(), 'ss-shelf').heightMm).toBe(2200)
 })
 
+it('commits inspector dimensions when Enter is pressed', async () => {
+  const user = userEvent.setup()
+  const store = createProjectStore(createSeedProject())
+  store.getState().selectItems(['tandoor'])
+  render(<EquipmentInspector store={store} />)
+
+  const width = screen.getByLabelText(/^Width \(mm\)$/i)
+  await user.clear(width)
+  await user.type(width, '1350{Enter}')
+
+  expect(getActiveItem(store.getState(), 'tandoor').widthMm).toBe(1350)
+  expect(screen.getByLabelText(/^Width \(mm\)$/i)).toHaveValue('1350')
+})
+
 it('allows every shelf tier elevation to be customized without resizing the rack', async () => {
   const user = userEvent.setup()
   const project = createSeedProject()
@@ -94,8 +108,7 @@ it('allows every shelf tier elevation to be customized without resizing the rack
 
   const shelfA = screen.getByLabelText('Shelf A elevation (in)')
   await user.clear(shelfA)
-  await user.type(shelfA, '12')
-  await user.tab()
+  await user.type(shelfA, '12{Enter}')
 
   const updated = getActiveItem(store.getState(), 'ss-shelf')
   expect(updated.shelfElevationsMm?.[0]).toBeCloseTo(304.8)
