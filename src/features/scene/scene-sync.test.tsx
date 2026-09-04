@@ -10,6 +10,7 @@ import { appStateStore } from '../../state/app-state-store'
 import { projectStore } from '../../state/project-store'
 import { SceneWorkspace, type SceneRendererProps } from './SceneWorkspace'
 import { buildWallSegments } from './ArchitectureMesh'
+import { equipmentSceneKey } from './equipment-scene-key'
 
 describe('3D scene synchronization', () => {
   beforeEach(() => {
@@ -17,6 +18,19 @@ describe('3D scene synchronization', () => {
     appStateStore.getState().reset()
   })
   afterEach(() => vi.restoreAllMocks())
+
+  it('recreates procedural geometry whenever any item dimension changes', () => {
+    const item = createCatalogEquipmentItem({
+      catalogId: 'storage-freestanding-shelving',
+      componentId: 'resizable-shelf',
+      position: { xMm: 0, yMm: 0 },
+    })
+    const originalKey = equipmentSceneKey(item)
+
+    expect(equipmentSceneKey({ ...item, widthMm: item.widthMm + 100 })).not.toBe(originalKey)
+    expect(equipmentSceneKey({ ...item, depthMm: item.depthMm + 100 })).not.toBe(originalKey)
+    expect(equipmentSceneKey({ ...item, heightMm: item.heightMm + 100 })).not.toBe(originalKey)
+  })
 
   it('uses the active item geometry and synchronizes selection', async () => {
     const FakeSceneRenderer = ({ items, onSelect }: { items: EquipmentItem[]; onSelect(id: string): void }) => (

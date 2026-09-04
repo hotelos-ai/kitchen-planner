@@ -2,6 +2,7 @@ import { BoxPart, Foot, KitchenSurfaceMaterial, TubularLeg } from './parts'
 import type { EquipmentVisualProps } from './types'
 import { physicalConfigurationDetails } from '../../../domain/equipment-configurations'
 import { shelfElevationsMmForItem } from '../../../domain/shelf-elevations'
+import { overshelfPostGeometry } from '../equipment-elevation'
 
 const safe = (value: number, minimum = .04) => Math.max(minimum, value)
 const positions = (count: number) => Array.from({ length: count }, (_, index) => index)
@@ -56,12 +57,13 @@ export function StorageWallShelfVisual({ item, widthM, depthM }: EquipmentVisual
 StorageWallShelfVisual.displayName = 'StorageWallShelfVisual'
 
 export function StorageOvershelfVisual({ item, widthM, depthM }: EquipmentVisualProps) {
-  const elevations = shelfElevationsMmForItem(item)
-  const shelfY = Math.max(...elevations, .45)
-  const postHeight = Math.max(.3, shelfY)
+  const elevations = shelfElevationsMmForItem(item).map((value) => value / 1000)
+  const { bottomM: postBottom, heightM: postHeight } = overshelfPostGeometry(item)
   return <group>
-    {elevations.map((elevationMm, index) => <ShelfDeck key={index} widthM={widthM} depthM={depthM} y={elevationMm / 1000} />)}
-    {[-1, 1].map((side) => <TubularLeg key={side} x={side * (widthM / 2 - .05)} z={0} height={postHeight} radius={.018} />)}
+    {elevations.map((elevationM, index) => <ShelfDeck key={index} widthM={widthM} depthM={depthM} y={elevationM} />)}
+    {[-1, 1].map((side) => <group key={side} position={[0, postBottom, 0]}>
+      <TubularLeg x={side * (widthM / 2 - .05)} z={0} height={postHeight} radius={.018} />
+    </group>)}
   </group>
 }
 StorageOvershelfVisual.displayName = 'StorageOvershelfVisual'
@@ -145,7 +147,7 @@ StorageTrayRackVisual.displayName = 'StorageTrayRackVisual'
 
 export function StorageOverheadVisual({ item, widthM, depthM, heightM }: EquipmentVisualProps) {
   const deckY = Math.max(.65, (physicalConfigurationDetails(item).elevationMm ?? heightM * 700) / 1000)
-  const rodHeight = Math.max(.12, heightM - deckY)
+  const rodHeight = Math.max(.12, heightM)
   return <group>
     <ShelfDeck widthM={widthM} depthM={depthM} y={deckY} thickness={.055} />
     {[-1, 1].flatMap((x) => [-1, 1].map((z) => <mesh key={`${x}-${z}`} position={[x * widthM * .42, deckY + rodHeight / 2, z * depthM * .38]}>

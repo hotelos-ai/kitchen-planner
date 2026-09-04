@@ -3,6 +3,8 @@ import type { KitchenProject, LayoutVariant } from '../../domain/project'
 import { ArchitectureMesh } from './ArchitectureMesh'
 import { Clearances } from './Clearances'
 import { EquipmentMesh } from './EquipmentMesh'
+import { elevatedShelfOffsetMm } from './equipment-elevation'
+import { equipmentSceneKey } from './equipment-scene-key'
 
 type Props = {
   project: KitchenProject
@@ -13,22 +15,6 @@ type Props = {
   showLabels?: boolean
   onSelect(id: string): void
   onClearSelection(): void
-}
-
-// Configuration changes can alter the entire procedural model while preserving
-// the component id. Give that model its own lifecycle so React Three Fiber never
-// retains geometry or materials from the previous configuration.
-function equipmentSceneKey(item: LayoutVariant['equipment'][number]): string {
-  return [
-    item.id,
-    item.category,
-    item.configurationPreset ?? 'custom',
-    item.visualPreset ?? 'generic',
-    item.appearanceSkinId ?? 'default',
-    item.accessFlow?.inputFace ?? '',
-    item.accessFlow?.outputFace ?? '',
-    item.shelfElevationsMm?.join(',') ?? '',
-  ].join(':')
 }
 
 // eslint-disable-next-line react-refresh/only-export-components
@@ -48,7 +34,7 @@ export function KitchenScene({ project, variant, selectedIds, showClearances, wa
       </Environment>
       <group onPointerMissed={onClearSelection}>
         <ArchitectureMesh architecture={architecture} wallsTransparent={wallsTransparent} showLabels={showLabels} />
-        {variant.equipment.map((item) => <EquipmentMesh key={equipmentSceneKey(item)} item={item} selected={selectedIds.includes(item.id)} wallHeightMm={architecture.wallHeightMm} showLabels={showLabels} onSelect={onSelect} />)}
+        {variant.equipment.map((item) => <EquipmentMesh key={equipmentSceneKey(item)} item={item} selected={selectedIds.includes(item.id)} wallHeightMm={architecture.wallHeightMm} elevationOffsetMm={elevatedShelfOffsetMm(item, variant.equipment)} showLabels={showLabels} onSelect={onSelect} />)}
         <Clearances items={variant.equipment} architecture={architecture} displayUnit={project.displayUnit} visible={showClearances} showLabels={showLabels} />
         <Grid args={[12, 12]} position={[1.95, -.006, 3.325]} cellSize={.1} cellThickness={.25} cellColor="#9ea9a5" sectionSize={1} sectionThickness={.8} sectionColor="#6e7f79" fadeDistance={14} infiniteGrid />
       </group>

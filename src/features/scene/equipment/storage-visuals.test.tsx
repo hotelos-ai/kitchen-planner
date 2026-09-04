@@ -58,8 +58,18 @@ describe('storage visual elevation model', () => {
     />)
 
     const decks = deckElevations(container)
-    expect(decks).toEqual([(preset.elevationMm ?? 0) / 1000 - .56, (preset.elevationMm ?? 0) / 1000 - .28, (preset.elevationMm ?? 0) / 1000])
+    expect(decks).toEqual([(preset.elevationMm ?? 0) / 1000 - .3, (preset.elevationMm ?? 0) / 1000 - .15, (preset.elevationMm ?? 0) / 1000])
     expect(decks[2]).toBeGreaterThanOrEqual(1.5)
+  })
+
+  it('resizes the shelf stack with the configured item height', () => {
+    const compact = itemWithPreset('storage-wall-shelf', 'wall-shelf-three-tier')
+    const tall = { ...compact, heightMm: 600 }
+    const { container, rerender } = render(<StorageWallShelfVisual item={compact} widthM={1.2} depthM={.35} heightM={.3} />)
+
+    expect(deckElevations(container)).toEqual([1.2, 1.35, 1.5])
+    rerender(<StorageWallShelfVisual item={tall} widthM={1.2} depthM={.35} heightM={.6} />)
+    expect(deckElevations(container)).toEqual([.9, 1.2, 1.5])
   })
 
   it('renders custom shelf elevations in the 3D model', () => {

@@ -16,8 +16,9 @@ export function defaultShelfElevationsMm(item: EquipmentItem): number[] {
 
   if (configuration.mounting === 'wall' || configuration.mounting === 'overhead') {
     const top = Math.max(450, configuration.elevationMm ?? item.heightMm)
-    const spacing = item.catalogId === 'storage-wall-shelf' ? 280 : 300
-    return Array.from({ length: count }, (_, index) => Math.max(0, top - spacing * (count - index - 1)))
+    if (count === 1) return [top]
+    const bottom = Math.max(0, top - item.heightMm)
+    return Array.from({ length: count }, (_, index) => Math.round(bottom + (top - bottom) * (index / (count - 1))))
   }
 
   const mobile = configuration.mobile
