@@ -39,6 +39,10 @@ export const equipmentSchema = z.object({
   removable: z.boolean(),
   capabilities: z.array(capabilitySchema),
   clearance: clearanceSchema.optional(),
+  accessFlow: z.object({
+    inputFace: z.enum(['front', 'back', 'left', 'right']),
+    outputFace: z.enum(['front', 'back', 'left', 'right']),
+  }).strict().optional(),
   approximate: z.boolean().optional(),
   notes: z.string().optional(),
   visualPreset: z.string().min(1).optional(),
@@ -54,7 +58,7 @@ export const architectureSchema = z.object({
   openings: z.array(z.object({
     id: z.string().min(1),
     label: z.string().min(1),
-    kind: z.enum(['door', 'service-window', 'sealed-opening']),
+    kind: z.enum(['door', 'window', 'service-window', 'sealed-opening']),
     wall: z.enum(['top', 'right', 'bottom', 'left']),
     segmentIndex: z.number().int().nonnegative().max(999).optional(),
     offsetMm: z.number().nonnegative().finite(),
@@ -63,6 +67,8 @@ export const architectureSchema = z.object({
     heightMm: z.number().positive().finite().optional(),
     flow: z.enum(['entry', 'clean-out', 'dirty-in', 'closed']).optional(),
     swingDepthMm: z.number().nonnegative().finite().optional(),
+    swingHinge: z.enum(['start', 'end']).optional(),
+    swingDirection: z.enum(['inward', 'outward']).optional(),
   }).strict()),
   pillars: z.array(rectSchema),
   storageZones: z.array(rectSchema.extend({ label: z.string().min(1), adjacent: z.boolean() }).strict()),

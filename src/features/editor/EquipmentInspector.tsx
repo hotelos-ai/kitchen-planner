@@ -5,6 +5,7 @@ import { formatLengthInput, parseLength } from '../../domain/units'
 import type { ProjectStore } from '../../state/project-store'
 import { getActiveItem } from '../../state/project-store'
 import { EquipmentConfigurationField } from './EquipmentConfigurationField'
+import { equipmentAccessFlow } from '../../domain/equipment-access'
 
 type Props = { store: ProjectStore }
 
@@ -13,10 +14,11 @@ type LengthFieldProps = {
   valueMm: number
   unit: 'mm' | 'cm' | 'in' | 'ft'
   disabled?: boolean
+  allowZero?: boolean
   onCommit(valueMm: number): void
 }
 
-function LengthField({ label, valueMm, unit, disabled, onCommit }: LengthFieldProps) {
+function LengthField({ label, valueMm, unit, disabled, allowZero = false, onCommit }: LengthFieldProps) {
   const [draft, setDraft] = useState(() => formatLengthInput(valueMm, unit))
   const [error, setError] = useState('')
   const errorId = useId()
@@ -32,9 +34,9 @@ function LengthField({ label, valueMm, unit, disabled, onCommit }: LengthFieldPr
         onBlur={() => {
           try {
             const parsed = parseLength(draft, unit)
-            if (!Number.isFinite(parsed) || parsed <= 0 || parsed > 20000) throw new Error('range')
+            if (!Number.isFinite(parsed) || parsed < (allowZero ? 0 : Number.EPSILON) || parsed > 20000) throw new Error('range')
             onCommit(parsed); setError('')
-          } catch { setDraft(formatLengthInput(valueMm, unit)); setError('Enter a length greater than 0 and no more than 20,000 mm.') }
+          } catch { setDraft(formatLengthInput(valueMm, unit)); setError(`Enter a length ${allowZero ? 'of 0 or more' : 'greater than 0'} and no more than 20,000 mm.`) }
         }}
       />
       {error && <span id={errorId} className="field-error">{error}</span>}
@@ -56,6 +58,7 @@ export function EquipmentInspector({ store }: Props) {
     return <aside className="inspector empty-inspector"><div><span className="eyebrow">Inspector</span><h2>No item selected</h2><p>Select an equipment footprint to edit its size, position, and metadata.</p></div></aside>
   }
   const confirmRemove = confirmRemoveId === item.id
+  const accessFlow = equipmentAccessFlow(item)
 
   const update = (patch: Partial<EquipmentItem>) => {
     store.getState().updateItem(item.id, patch)
@@ -74,6 +77,22 @@ export function EquipmentInspector({ store }: Props) {
       </div>
       <LengthField key={`height-${item.id}-${item.heightMm}-${project.displayUnit}`} label="Height" valueMm={item.heightMm} unit={project.displayUnit} disabled={item.dimensionsLocked} onCommit={(heightMm) => update({ heightMm })} />
       <label className="checkbox-row"><input aria-label="Lock dimensions" type="checkbox" checked={item.dimensionsLocked} onChange={(event) => store.getState().setDimensionsLocked(item.id, event.target.checked)} />Lock dimensions</label>
+      {item.capabilities.includes('dish-wash') && accessFlow && <details className="capability-editor" open>
+        <summary>Dishwasher rack flow</summary>
+        <div>
+          <label>Racks enter from
+            <select aria-label="Dishwasher input side" value={accessFlow.inputFace} onChange={(event) => update({ accessFlow: { ...accessFlow, inputFace: event.target.value as typeof accessFlow.inputFace } })}>
+              <option value="front">Front</option><option value="back">Back</option><option value="left">Left side</option><option value="right">Right side</option>
+            </select>
+          </label>
+          <label>Clean racks exit from
+            <select aria-label="Dishwasher output side" value={accessFlow.outputFace} onChange={(event) => update({ accessFlow: { ...accessFlow, outputFace: event.target.value as typeof accessFlow.outputFace } })}>
+              <option value="front">Front</option><option value="back">Back</option><option value="left">Left side</option><option value="right">Right side</option>
+            </select>
+          </label>
+          <p className="field-error" style={{ color: 'var(--ink-4)' }}>Choose front-to-side flow for a corner pass-through setup.</p>
+        </div>
+      </details>}
       <div className="field-pair">
         <LengthField key={`x-${item.id}-${item.xMm}-${project.displayUnit}`} label="X position" valueMm={item.xMm} unit={project.displayUnit} onCommit={(xMm) => store.getState().moveItems([item.id], { x: xMm, y: item.yMm })} />
         <LengthField key={`y-${item.id}-${item.yMm}-${project.displayUnit}`} label="Y position" valueMm={item.yMm} unit={project.displayUnit} onCommit={(yMm) => store.getState().moveItems([item.id], { x: item.xMm, y: yMm })} />
@@ -90,10 +109,10 @@ export function EquipmentInspector({ store }: Props) {
             </select>
           </label>
           <div className="field-pair">
-            <LengthField key={`cf-${item.id}-${item.clearance?.frontMm ?? 1}-${project.displayUnit}`} label="Front" valueMm={item.clearance?.frontMm ?? 1} unit={project.displayUnit} onCommit={(frontMm) => update({ clearance: { kind: item.clearance?.kind ?? (item.category === 'cooking' ? 'heat' : 'work'), frontMm } })} />
-            <LengthField key={`cb-${item.id}-${item.clearance?.backMm ?? 0}-${project.displayUnit}`} label="Back" valueMm={item.clearance?.backMm ?? 0} unit={project.displayUnit} onCommit={(backMm) => update({ clearance: { kind: item.clearance?.kind ?? (item.category === 'cooking' ? 'heat' : 'work'), frontMm: item.clearance?.frontMm ?? 1, backMm } })} />
-            <LengthField key={`cl-${item.id}-${item.clearance?.leftMm ?? 0}-${project.displayUnit}`} label="Left" valueMm={item.clearance?.leftMm ?? 0} unit={project.displayUnit} onCommit={(leftMm) => update({ clearance: { kind: item.clearance?.kind ?? (item.category === 'cooking' ? 'heat' : 'work'), frontMm: item.clearance?.frontMm ?? 1, leftMm } })} />
-            <LengthField key={`cr-${item.id}-${item.clearance?.rightMm ?? 0}-${project.displayUnit}`} label="Right" valueMm={item.clearance?.rightMm ?? 0} unit={project.displayUnit} onCommit={(rightMm) => update({ clearance: { kind: item.clearance?.kind ?? (item.category === 'cooking' ? 'heat' : 'work'), frontMm: item.clearance?.frontMm ?? 1, rightMm } })} />
+            <LengthField allowZero key={`cf-${item.id}-${item.clearance?.frontMm ?? 0}-${project.displayUnit}`} label="Front" valueMm={item.clearance?.frontMm ?? 0} unit={project.displayUnit} onCommit={(frontMm) => update({ clearance: { ...item.clearance, kind: item.clearance?.kind ?? (item.category === 'cooking' ? 'heat' : 'work'), frontMm } })} />
+            <LengthField allowZero key={`cb-${item.id}-${item.clearance?.backMm ?? 0}-${project.displayUnit}`} label="Back" valueMm={item.clearance?.backMm ?? 0} unit={project.displayUnit} onCommit={(backMm) => update({ clearance: { ...item.clearance, kind: item.clearance?.kind ?? (item.category === 'cooking' ? 'heat' : 'work'), frontMm: item.clearance?.frontMm ?? 0, backMm } })} />
+            <LengthField allowZero key={`cl-${item.id}-${item.clearance?.leftMm ?? 0}-${project.displayUnit}`} label="Left" valueMm={item.clearance?.leftMm ?? 0} unit={project.displayUnit} onCommit={(leftMm) => update({ clearance: { ...item.clearance, kind: item.clearance?.kind ?? (item.category === 'cooking' ? 'heat' : 'work'), frontMm: item.clearance?.frontMm ?? 0, leftMm } })} />
+            <LengthField allowZero key={`cr-${item.id}-${item.clearance?.rightMm ?? 0}-${project.displayUnit}`} label="Right" valueMm={item.clearance?.rightMm ?? 0} unit={project.displayUnit} onCommit={(rightMm) => update({ clearance: { ...item.clearance, kind: item.clearance?.kind ?? (item.category === 'cooking' ? 'heat' : 'work'), frontMm: item.clearance?.frontMm ?? 0, rightMm } })} />
           </div>
           <p className="field-error" style={{ color: 'var(--ink-4)' }}>Clearances drive plan checks and 3D overlays.</p>
         </div>

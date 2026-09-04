@@ -31,7 +31,7 @@ const pointSchema = z.object({ xMm: coordinateSchema, yMm: coordinateSchema }).s
 const openingSchema = z.object({
   id: idSchema,
   label: labelSchema,
-  kind: z.enum(['door', 'service-window', 'sealed-opening']),
+  kind: z.enum(['door', 'window', 'service-window', 'sealed-opening']),
   wall: z.enum(['top', 'right', 'bottom', 'left']),
   segmentIndex: z.number().int().nonnegative().max(999).optional(),
   offsetMm: coordinateSchema,
@@ -40,6 +40,8 @@ const openingSchema = z.object({
   heightMm: dimensionSchema.optional(),
   flow: z.enum(['entry', 'clean-out', 'dirty-in', 'closed']).optional(),
   swingDepthMm: coordinateSchema.optional(),
+  swingHinge: z.enum(['start', 'end']).optional(),
+  swingDirection: z.enum(['inward', 'outward']).optional(),
 }).strict()
 const pillarSchema = z.object({
   id: idSchema,
@@ -66,7 +68,7 @@ const roomPatchSchema = z.object({
 }).strict().refine((patch) => Object.keys(patch).length > 0, 'Room patch cannot be empty')
 const openingPatchSchema = z.object({
   label: labelSchema.optional(),
-  kind: z.enum(['door', 'service-window', 'sealed-opening']).optional(),
+  kind: z.enum(['door', 'window', 'service-window', 'sealed-opening']).optional(),
   wall: z.enum(['top', 'right', 'bottom', 'left']).optional(),
   segmentIndex: z.union([z.number().int().nonnegative().max(999), z.null()]).optional(),
   offsetMm: coordinateSchema.optional(),
@@ -75,6 +77,8 @@ const openingPatchSchema = z.object({
   heightMm: nullableDimensionSchema.optional(),
   flow: z.union([z.enum(['entry', 'clean-out', 'dirty-in', 'closed']), z.null()]).optional(),
   swingDepthMm: z.union([coordinateSchema, z.null()]).optional(),
+  swingHinge: z.union([z.enum(['start', 'end']), z.null()]).optional(),
+  swingDirection: z.union([z.enum(['inward', 'outward']), z.null()]).optional(),
 }).strict().refine((patch) => Object.keys(patch).length > 0, 'Opening patch cannot be empty')
 const pillarPatchSchema = z.object({
   xMm: coordinateSchema.optional(),
@@ -155,7 +159,7 @@ const roomJsonSchema = () => objectSchema([], {
 const openingFields = (patch: boolean) => ({
   ...(!patch ? { id: { type: 'string' } } : {}),
   label: { type: 'string' },
-  kind: enumSchema(['door', 'service-window', 'sealed-opening']),
+  kind: enumSchema(['door', 'window', 'service-window', 'sealed-opening']),
   wall: enumSchema(['top', 'right', 'bottom', 'left']),
   segmentIndex: patch ? nullableNumber : { type: 'number' },
   offsetMm: { type: 'number' }, widthMm: { type: 'number' },
@@ -163,6 +167,8 @@ const openingFields = (patch: boolean) => ({
   heightMm: patch ? nullableNumber : { type: 'number' },
   flow: patch ? { type: ['string', 'null'], enum: ['entry', 'clean-out', 'dirty-in', 'closed', null] } : enumSchema(['entry', 'clean-out', 'dirty-in', 'closed']),
   swingDepthMm: patch ? nullableNumber : { type: 'number' },
+  swingHinge: patch ? { type: ['string', 'null'], enum: ['start', 'end', null] } : enumSchema(['start', 'end']),
+  swingDirection: patch ? { type: ['string', 'null'], enum: ['inward', 'outward', null] } : enumSchema(['inward', 'outward']),
 })
 const openingJsonSchema = () => objectSchema(['id', 'label', 'kind', 'wall', 'offsetMm', 'widthMm'], openingFields(false))
 const openingPatchJsonSchema = () => objectSchema([], openingFields(true))

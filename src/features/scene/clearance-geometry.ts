@@ -1,5 +1,6 @@
 import type { Architecture, DisplayUnit, EquipmentItem } from '../../domain/project'
 import { formatLength } from '../../domain/units'
+import { doorSwingGeometry } from '../../domain/opening-geometry'
 
 type Style = { fill: string; outline: string; hatch: string }
 
@@ -25,6 +26,7 @@ export type ArcClearanceDescriptor = Style & {
   yMm: number
   radiusMm: number
   rotationDeg: number
+  sweepDeg: number
 }
 
 export type ClearanceDescriptor = RectClearanceDescriptor | ArcClearanceDescriptor
@@ -49,16 +51,14 @@ export function buildClearanceDescriptors(items: readonly EquipmentItem[], archi
   })
 
   architecture.openings.filter((opening) => opening.kind === 'door' && opening.swingDepthMm).forEach((opening) => {
-    const midpoint = opening.offsetMm
-    const xMm = opening.wall === 'right' ? architecture.widthMm : opening.wall === 'left' ? 0 : midpoint
-    const yMm = opening.wall === 'bottom' ? architecture.depthMm : opening.wall === 'top' ? 0 : midpoint
-    const rotationDeg = opening.wall === 'right' ? 180 : opening.wall === 'bottom' ? -90 : opening.wall === 'left' ? 0 : 90
-    descriptors.push({ id: `swing-${opening.id}`, shape: 'arc', kind: 'door-swing', label: `${opening.label} swing · ${formatLength(opening.swingDepthMm!, unit)}`, xMm, yMm, radiusMm: opening.swingDepthMm!, rotationDeg, ...STYLES['door-swing'] })
+    const swing = doorSwingGeometry(architecture, opening)
+    if (!swing) return
+    descriptors.push({ id: `swing-${opening.id}`, shape: 'arc', kind: 'door-swing', label: `${opening.label} swing · ${formatLength(opening.swingDepthMm!, unit)}`, xMm: swing.hinge.x, yMm: swing.hinge.y, radiusMm: swing.radiusMm, rotationDeg: swing.startAngleRad * 180 / Math.PI, sweepDeg: swing.sweepAngleRad * 180 / Math.PI, ...STYLES['door-swing'] })
   })
 
   items.filter((item) => item.category === 'cold' && /fridge|freezer/i.test(item.label)).forEach((item) => {
     const radiusMm = Math.min(item.widthMm, item.clearance?.frontMm ?? item.depthMm)
-    descriptors.push({ id: `swing-${item.id}`, shape: 'arc', kind: 'door-swing', label: `Door swing · ${formatLength(radiusMm, unit)}`, xMm: item.xMm, yMm: item.yMm + item.depthMm, radiusMm, rotationDeg: item.rotationDeg, ...STYLES['door-swing'] })
+    descriptors.push({ id: `swing-${item.id}`, shape: 'arc', kind: 'door-swing', label: `Door swing · ${formatLength(radiusMm, unit)}`, xMm: item.xMm, yMm: item.yMm + item.depthMm, radiusMm, rotationDeg: item.rotationDeg, sweepDeg: 90, ...STYLES['door-swing'] })
   })
   return descriptors
 }

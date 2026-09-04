@@ -2,6 +2,7 @@ import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { expect, it } from 'vitest'
 import { createSeedProject } from '../../domain/seed-project'
+import { createCatalogEquipmentItem } from '../../domain/catalog/kitchen-catalog'
 import { createProjectStore, getActiveItem } from '../../state/project-store'
 import { EquipmentInspector } from './EquipmentInspector'
 
@@ -39,4 +40,39 @@ it('offers all known configurations for a custom component', () => {
   expect(screen.getByRole('option', { name: 'Tandoor' })).toBeInTheDocument()
   expect(screen.getByRole('option', { name: 'Pass-through dishwasher' })).toBeInTheDocument()
   expect(getActiveItem(store.getState(), customId).configurationPreset).toBeUndefined()
+})
+
+it('configures a dishwasher with a front input and side output', async () => {
+  const user = userEvent.setup()
+  const store = createProjectStore(createSeedProject())
+  store.getState().selectItems(['dishwasher'])
+  render(<EquipmentInspector store={store} />)
+
+  expect(screen.getByLabelText('Dishwasher input side')).toHaveValue('front')
+  await user.selectOptions(screen.getByLabelText('Dishwasher output side'), 'left')
+
+  expect(getActiveItem(store.getState(), 'dishwasher').accessFlow).toEqual({
+    inputFace: 'front',
+    outputFace: 'left',
+  })
+})
+
+it('allows an industrial stainless-steel shelf height to be edited', async () => {
+  const user = userEvent.setup()
+  const project = createSeedProject()
+  project.variants[0].equipment = [createCatalogEquipmentItem({
+    catalogId: 'storage-freestanding-shelving',
+    componentId: 'ss-shelf',
+    position: { xMm: 500, yMm: 500 },
+  })]
+  const store = createProjectStore(project)
+  store.getState().selectItems(['ss-shelf'])
+  render(<EquipmentInspector store={store} />)
+
+  const height = screen.getByLabelText(/^Height \(mm\)$/i)
+  await user.clear(height)
+  await user.type(height, '2200')
+  await user.tab()
+
+  expect(getActiveItem(store.getState(), 'ss-shelf').heightMm).toBe(2200)
 })

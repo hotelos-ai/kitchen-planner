@@ -66,6 +66,7 @@ describe('commercial kitchen catalog', () => {
       'waste-mobile-bin', 'janitorial-mop-sink',
       'utility-canopy-hood', 'utility-gas-point',
       'architecture-door', 'architecture-service-window',
+      'architecture-window',
       'custom-component',
     ].forEach((id) => expect(ids.has(id), id).toBe(true))
     expect(KITCHEN_CATALOG.find((entry) => entry.catalogId === 'custom-component')).toMatchObject({
@@ -83,6 +84,13 @@ describe('commercial kitchen catalog', () => {
     })
     expect(STORAGE_CATALOG.find((entry) => entry.catalogId === 'storage-mobile-rack')).toMatchObject({
       placementRules: { mounting: 'floor' }, tags: expect.arrayContaining(['mobile']),
+    })
+    expect(STORAGE_CATALOG.find((entry) => entry.catalogId === 'storage-freestanding-shelving')).toMatchObject({
+      displayName: 'Industrial stainless-steel shelving',
+      typicalDimensions: { heightMm: 1800 },
+      minimumDimensions: { heightMm: 900 },
+      maximumDimensions: { heightMm: 2800 },
+      appearanceSkinIds: expect.arrayContaining(['stainless-brushed']),
     })
   })
 

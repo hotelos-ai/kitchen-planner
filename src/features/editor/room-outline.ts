@@ -1,4 +1,5 @@
 import type { Architecture, PointMm } from '../../domain/project'
+import { architectureOpeningEnds } from '../../domain/opening-geometry'
 
 export type SegmentHit = { segmentIndex: number; point: PointMm; distanceMm: number }
 
@@ -233,13 +234,10 @@ export function moveZoneRect(architecture: Architecture, index: number, point: P
 const MIN_OPENING_MM = 200
 
 export function openingEnds(architecture: Architecture, opening: { wall?: string; segmentIndex?: number; offsetMm: number; widthMm: number }): { start: PointMm; end: PointMm } {
-  const segment = segmentOf(architecture, opening)
-  if (!segment) return { start: { x: 0, y: 0 }, end: { x: 0, y: 0 } }
-  const dx = segment.end.x - segment.start.x
-  const dy = segment.end.y - segment.start.y
-  const length = Math.hypot(dx, dy) || 1
-  const at = (along: number) => ({ x: segment.start.x + (dx / length) * along, y: segment.start.y + (dy / length) * along })
-  return { start: at(opening.offsetMm), end: at(opening.offsetMm + opening.widthMm) }
+  return architectureOpeningEnds(architecture, {
+    ...opening,
+    wall: opening.wall === 'top' || opening.wall === 'right' || opening.wall === 'bottom' || opening.wall === 'left' ? opening.wall : 'top',
+  })
 }
 
 export function resizeOpening(architecture: Architecture, index: number, end: 'start' | 'end', point: PointMm, snapMm: number): Architecture {
@@ -264,7 +262,7 @@ export function resizeOpening(architecture: Architecture, index: number, end: 's
   return { ...architecture, openings }
 }
 
-export function createOpeningAt(architecture: Architecture, entry: { label: string; kind: 'door' | 'service-window'; widthMm: number }, point: PointMm, dragTo: PointMm | null, snapMm: number): Architecture {
+export function createOpeningAt(architecture: Architecture, entry: { label: string; kind: 'door' | 'window' | 'service-window'; widthMm: number }, point: PointMm, dragTo: PointMm | null, snapMm: number): Architecture {
   const from = dragTo ?? point
   const polygon = architecture.roomPolygon
   const nearest = nearestSegment(polygon, from)
@@ -286,18 +284,20 @@ export function createOpeningAt(architecture: Architecture, entry: { label: stri
     { wall: 'left', distance: midpoint.x },
   ]
   const wall = wallCandidates.sort((left, right) => left.distance - right.distance)[0].wall
-  const serviceWindow = entry.kind === 'service-window'
+  const glazedOpening = entry.kind === 'service-window' || entry.kind === 'window'
   return {
     ...architecture,
     openings: [...architecture.openings, {
-      id: makeId(serviceWindow ? 'service-window' : 'door'),
+      id: makeId(entry.kind),
       label: entry.label,
       kind: entry.kind,
       wall,
       segmentIndex: nearest.segmentIndex,
       offsetMm,
       widthMm,
-      ...(serviceWindow ? { sillHeightMm: 900, heightMm: 900, flow: 'clean-out' as const } : { flow: 'entry' as const, swingDepthMm: widthMm }),
+      ...(glazedOpening
+        ? { sillHeightMm: entry.kind === 'window' ? 1_000 : 900, heightMm: entry.kind === 'window' ? 1_200 : 900, flow: entry.kind === 'window' ? 'closed' as const : 'clean-out' as const }
+        : { flow: 'entry' as const, swingDepthMm: widthMm, swingHinge: 'start' as const, swingDirection: 'inward' as const }),
     }],
   }
 }
@@ -329,7 +329,7 @@ function appendRectItem(architecture: Architecture, entry: { id: string; label: 
   return { ...architecture, storageZones: [...architecture.storageZones, { id: makeId('storage-zone'), label: entry.label, xMm: rect.xMm, yMm: rect.yMm, widthMm: rect.widthMm, depthMm: rect.depthMm, adjacent: false }] }
 }
 
-export type PlacementSpec = { catalogId: string; label: string; kind: 'pillar' | 'partition' | 'zone' | 'door' | 'service-window'; widthMm: number; depthMm: number; round?: boolean }
+export type PlacementSpec = { catalogId: string; label: string; kind: 'pillar' | 'partition' | 'zone' | 'door' | 'window' | 'service-window'; widthMm: number; depthMm: number; round?: boolean }
 
 export function constrainToAxes(from: PointMm, to: PointMm): PointMm {
   const dx = to.x - from.x

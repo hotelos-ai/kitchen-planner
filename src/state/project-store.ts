@@ -205,7 +205,7 @@ export function createProjectStore(initialProject: KitchenProject): ProjectStore
           dimensions: { widthMm: patch.widthMm ?? current.widthMm, depthMm: patch.depthMm ?? current.depthMm, ...(patch.heightMm !== undefined ? { heightMm: patch.heightMm } : {}) },
         })
         if (patch.rotationDeg !== undefined && patch.rotationDeg !== current.rotationDeg) operations.push({ type: 'rotate_components', variantId: activeVariantId(), componentIds: [id], deltaDeg: patch.rotationDeg - current.rotationDeg })
-        const componentPatch = Object.fromEntries(Object.entries(patch).filter(([key, value]) => value !== undefined && ['label', 'category', 'heightMm', 'capabilities', 'clearance', 'approximate', 'notes'].includes(key)))
+        const componentPatch = Object.fromEntries(Object.entries(patch).filter(([key, value]) => value !== undefined && ['label', 'category', 'heightMm', 'capabilities', 'clearance', 'accessFlow', 'approximate', 'notes'].includes(key)))
         if (Object.keys(componentPatch).length) operations.push({ type: 'update_component', variantId: activeVariantId(), componentId: id, patch: componentPatch })
         if (operations.length) applyOperations(operations, 'Update component')
       },
@@ -234,7 +234,7 @@ export function createProjectStore(initialProject: KitchenProject): ProjectStore
           const architecture = variant.architecture
           if (catalogId === 'architecture-no-go-zone') return null
           let patch: Record<string, unknown> | undefined
-          if (catalogId === 'architecture-door' || catalogId === 'architecture-service-window') {
+          if (entry.tags.includes('opening')) {
             const segments = architecture.roomPolygon.map((start, segmentIndex) => {
               const end = architecture.roomPolygon[(segmentIndex + 1) % architecture.roomPolygon.length]
               const dx = end.x - start.x; const dy = end.y - start.y
@@ -251,11 +251,16 @@ export function createProjectStore(initialProject: KitchenProject): ProjectStore
               { wall: 'top' as const, value: midpoint.y }, { wall: 'right' as const, value: architecture.widthMm - midpoint.x },
               { wall: 'bottom' as const, value: architecture.depthMm - midpoint.y }, { wall: 'left' as const, value: midpoint.x },
             ].sort((left, right) => left.value - right.value)
-            const serviceWindow = catalogId === 'architecture-service-window'
+            const serviceWindow = catalogId === 'architecture-service-window' || catalogId === 'architecture-dirty-window' || catalogId === 'architecture-pass-hatch'
+            const regularWindow = catalogId === 'architecture-window'
             patch = { openings: [...architecture.openings, {
-              id, label: entry.displayName, kind: serviceWindow ? 'service-window' : 'door', wall: edgeDistances[0].wall,
+              id, label: entry.displayName, kind: serviceWindow ? 'service-window' : regularWindow ? 'window' : 'door', wall: edgeDistances[0].wall,
               segmentIndex: target.segmentIndex, offsetMm, widthMm,
-              ...(serviceWindow ? { sillHeightMm: 900, heightMm: 900, flow: 'clean-out' as const } : { flow: 'entry' as const, swingDepthMm: widthMm }),
+              ...(serviceWindow
+                ? { sillHeightMm: 900, heightMm: 900, flow: catalogId === 'architecture-dirty-window' ? 'dirty-in' as const : 'clean-out' as const }
+                : regularWindow
+                  ? { sillHeightMm: 1_000, heightMm: entry.typicalDimensions.heightMm, flow: 'closed' as const }
+                  : { flow: 'entry' as const, swingDepthMm: widthMm, swingHinge: 'start' as const, swingDirection: 'inward' as const }),
             }] }
           } else if (catalogId === 'architecture-pillar' || catalogId === 'architecture-partition') {
             patch = { pillars: [...architecture.pillars, { id, xMm: position.xMm, yMm: position.yMm, widthMm: entry.typicalDimensions.widthMm, depthMm: entry.typicalDimensions.depthMm }] }

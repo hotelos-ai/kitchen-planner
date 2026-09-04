@@ -1,4 +1,5 @@
 import { pointInPolygon, polygonsOverlap, rotatedFootprint } from './geometry'
+import { doorSwingGeometry } from './opening-geometry'
 import { isFloorObstacle } from './catalog/floor-obstacle'
 import type { Architecture, EquipmentItem, LayoutConstraints, Opening, PointMm, RectMm } from './project'
 
@@ -65,41 +66,8 @@ const polygonInsideRoom = (polygon: PointMm[], room: PointMm[]) => polygon.every
   return insideOrBoundary(point, room) && insideOrBoundary(midpoint, room)
 })
 
-const roomCentroid = (room: readonly PointMm[]): PointMm => ({
-  x: room.reduce((sum, point) => sum + point.x, 0) / Math.max(1, room.length),
-  y: room.reduce((sum, point) => sum + point.y, 0) / Math.max(1, room.length),
-})
-
-const openingLine = (architecture: Architecture, opening: Opening): [PointMm, PointMm] | undefined => {
-  if (opening.segmentIndex !== undefined) {
-    const segmentStart = architecture.roomPolygon[opening.segmentIndex]
-    const segmentEnd = architecture.roomPolygon[(opening.segmentIndex + 1) % architecture.roomPolygon.length]
-    if (!segmentStart || !segmentEnd) return undefined
-    const length = Math.hypot(segmentEnd.x - segmentStart.x, segmentEnd.y - segmentStart.y) || 1
-    const unit = { x: (segmentEnd.x - segmentStart.x) / length, y: (segmentEnd.y - segmentStart.y) / length }
-    const start = { x: segmentStart.x + unit.x * opening.offsetMm, y: segmentStart.y + unit.y * opening.offsetMm }
-    return [start, { x: start.x + unit.x * opening.widthMm, y: start.y + unit.y * opening.widthMm }]
-  }
-  if (opening.wall === 'top') return [{ x: opening.offsetMm, y: 0 }, { x: opening.offsetMm + opening.widthMm, y: 0 }]
-  if (opening.wall === 'bottom') return [{ x: opening.offsetMm, y: architecture.depthMm }, { x: opening.offsetMm + opening.widthMm, y: architecture.depthMm }]
-  if (opening.wall === 'left') return [{ x: 0, y: opening.offsetMm }, { x: 0, y: opening.offsetMm + opening.widthMm }]
-  return [{ x: architecture.widthMm, y: opening.offsetMm }, { x: architecture.widthMm, y: opening.offsetMm + opening.widthMm }]
-}
-
 const doorSwingPolygon = (architecture: Architecture, opening: Opening): PointMm[] | undefined => {
-  const line = openingLine(architecture, opening)
-  const depth = opening.swingDepthMm ?? 0
-  if (!line || depth <= 0) return undefined
-  const [start, end] = line
-  const edge = { x: end.x - start.x, y: end.y - start.y }
-  const length = Math.hypot(edge.x, edge.y) || 1
-  const candidates = [{ x: -edge.y / length, y: edge.x / length }, { x: edge.y / length, y: -edge.x / length }]
-  const center = roomCentroid(architecture.roomPolygon)
-  const midpoint = { x: (start.x + end.x) / 2, y: (start.y + end.y) / 2 }
-  const inward = candidates.sort((left, right) =>
-    Math.hypot(midpoint.x + left.x * depth - center.x, midpoint.y + left.y * depth - center.y)
-      - Math.hypot(midpoint.x + right.x * depth - center.x, midpoint.y + right.y * depth - center.y))[0]
-  return [start, end, { x: end.x + inward.x * depth, y: end.y + inward.y * depth }, { x: start.x + inward.x * depth, y: start.y + inward.y * depth }]
+  return doorSwingGeometry(architecture, opening)?.envelope
 }
 
 export function doorSwingEnvelopes(architecture: Architecture): readonly { opening: Opening; polygon: PointMm[] }[] {

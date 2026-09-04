@@ -33,7 +33,7 @@ export function ArchitectureLayer({ architecture, pixelsPerMm: scale, originX, o
       {architecture.openings.map((opening) => {
         const ends = openingEnds(architecture, opening)
         const points = [originX + px(ends.start.x), originY + px(ends.start.y), originX + px(ends.end.x), originY + px(ends.end.y)]
-        const color = opening.flow === 'clean-out' ? '#4b7ce1' : opening.flow === 'dirty-in' ? '#a47932' : opening.flow === 'closed' ? '#a32f1d' : '#5e6b5a'
+        const color = opening.kind === 'window' ? '#56879b' : opening.flow === 'clean-out' ? '#4b7ce1' : opening.flow === 'dirty-in' ? '#a47932' : opening.flow === 'closed' ? '#a32f1d' : '#5e6b5a'
         return (
           <Group key={opening.id}>
             <Line points={points} stroke={color} strokeWidth={opening.kind === 'sealed-opening' ? 7 : 5} dash={opening.kind === 'sealed-opening' ? [5, 4] : undefined} />

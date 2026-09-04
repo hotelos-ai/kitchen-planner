@@ -1,5 +1,6 @@
 import { Edges, Html } from '@react-three/drei'
 import type { ServiceWindowFixture } from './wall-geometry'
+import { serviceWindowArrowDirection } from './service-window-direction'
 
 const toWorld = (millimetres: number) => millimetres / 1000
 
@@ -8,7 +9,9 @@ export function ServiceWindowMesh({ fixture, showLabels = true }: { fixture: Ser
   const openingHeight = toWorld(fixture.openingHeightMm)
   const isClean = fixture.flow === 'clean-out'
   const color = isClean ? '#2f827f' : '#b6842c'
-  const direction = isClean ? -1 : 1
+  // The arrow mesh points opposite its signed offset after the X-axis rotation.
+  // Positive therefore points out through the wall; negative points into the room.
+  const direction = serviceWindowArrowDirection(fixture.flow)
   return (
     <group position={[toWorld(fixture.centerMm.x), toWorld(fixture.sillHeightMm), toWorld(fixture.centerMm.z)]} rotation={[0, fixture.rotationYRad, 0]}>
       <mesh position={[0, .03, 0]} castShadow receiveShadow>

@@ -43,7 +43,7 @@ export interface RectMm {
 export interface Opening {
   id: string
   label: string
-  kind: 'door' | 'service-window' | 'sealed-opening'
+  kind: 'door' | 'window' | 'service-window' | 'sealed-opening'
   wall: 'top' | 'right' | 'bottom' | 'left'
   /** Zero-based roomPolygon edge target; wall remains the rectangular/migration fallback. */
   segmentIndex?: number
@@ -53,6 +53,8 @@ export interface Opening {
   heightMm?: Millimetres
   flow?: 'entry' | 'clean-out' | 'dirty-in' | 'closed'
   swingDepthMm?: Millimetres
+  swingHinge?: 'start' | 'end'
+  swingDirection?: 'inward' | 'outward'
 }
 
 export interface StorageZone extends RectMm {
@@ -83,6 +85,13 @@ export interface ClearanceSpec {
   kind: 'work' | 'door-swing' | 'heat' | 'service'
 }
 
+export type EquipmentAccessFace = 'front' | 'back' | 'left' | 'right'
+
+export interface EquipmentAccessFlow {
+  inputFace: EquipmentAccessFace
+  outputFace: EquipmentAccessFace
+}
+
 export interface EquipmentItem {
   id: string
   catalogId?: string
@@ -99,6 +108,7 @@ export interface EquipmentItem {
   removable: boolean
   capabilities: StationCapability[]
   clearance?: ClearanceSpec
+  accessFlow?: EquipmentAccessFlow
   approximate?: boolean
   notes?: string
   visualPreset?: string

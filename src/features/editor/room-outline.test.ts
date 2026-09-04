@@ -214,6 +214,13 @@ describe('shift constraints and canvas creation', () => {
     expect(created.widthMm).toBe(900)
   })
 
+  it('creates a regular window without assigning service flow', () => {
+    const next = createOpeningAt(architecture, { label: 'Natural light', kind: 'window', widthMm: 1200 }, { x: 500, y: 0 }, { x: 1700, y: 0 }, 100)
+    expect(next.openings.at(-1)).toMatchObject({
+      kind: 'window', label: 'Natural light', widthMm: 1200, sillHeightMm: 1000, heightMm: 1200, flow: 'closed',
+    })
+  })
+
   it('resizes a pillar from a corner handle', () => {
     const withPillar: Architecture = { ...architecture, pillars: [{ id: 'p1', xMm: 500, yMm: 500, widthMm: 400, depthMm: 400 }] }
     const next = resizePillarRect(withPillar, 0, 'br', { x: 1400, y: 900 }, 100)

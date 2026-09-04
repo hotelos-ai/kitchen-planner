@@ -44,4 +44,16 @@ describe('wall geometry', () => {
     expect(fixture.centerMm.z).toBeCloseTo(353.553)
     expect(fixture.rotationYRad).toBeCloseTo(-Math.PI / 4)
   })
+
+  it('cuts a regular window into the wall without creating a service fixture', () => {
+    const withWindow = structuredClone(architecture)
+    withWindow.openings = [{
+      id: 'daylight', label: 'Natural light', kind: 'window', wall: 'top', segmentIndex: 0,
+      offsetMm: 500, widthMm: 1200, sillHeightMm: 1000, heightMm: 1200, flow: 'closed',
+    }]
+
+    const windowPanels = buildWallPanels(withWindow).filter((panel) => panel.openingId === 'daylight')
+    expect(windowPanels.map((panel) => panel.part).sort()).toEqual(['above', 'below'])
+    expect(serviceWindowFixtures(withWindow)).toEqual([])
+  })
 })

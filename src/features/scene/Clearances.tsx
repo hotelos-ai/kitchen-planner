@@ -31,20 +31,23 @@ function RectClearance({ zone, showLabels }: { zone: RectClearanceDescriptor; sh
 
 function ArcClearance({ zone, showLabels }: { zone: ArcClearanceDescriptor; showLabels: boolean }) {
   const radius = toWorld(zone.radiusMm)
+  const sweep = THREE.MathUtils.degToRad(zone.sweepDeg)
+  const end = [Math.cos(sweep) * radius, .03, Math.sin(sweep) * radius] as [number, number, number]
+  const midpoint = [Math.cos(sweep / 2) * radius * .72, .06, Math.sin(sweep / 2) * radius * .72] as [number, number, number]
   return (
     <group position={[toWorld(zone.xMm), 0, toWorld(zone.yMm)]} rotation={[0, -THREE.MathUtils.degToRad(zone.rotationDeg), 0]}>
       <mesh position={[0, .02, 0]} rotation={[-Math.PI / 2, 0, 0]} raycast={() => null}>
-        <circleGeometry args={[radius, 36, 0, Math.PI / 2]} />
+        <circleGeometry args={[radius, 36, 0, sweep]} />
         <meshBasicMaterial color={zone.fill} transparent opacity={.18} side={THREE.DoubleSide} depthWrite={false} />
       </mesh>
       <mesh position={[0, .029, 0]} rotation={[-Math.PI / 2, 0, 0]} raycast={() => null}>
-        <ringGeometry args={[Math.max(0, radius - .022), radius, 36, 1, 0, Math.PI / 2]} />
+        <ringGeometry args={[Math.max(0, radius - .022), radius, 36, 1, 0, sweep]} />
         <meshBasicMaterial color={zone.outline} transparent opacity={.98} side={THREE.DoubleSide} depthWrite={false} />
       </mesh>
       <Line points={[[0, .03, 0], [radius, .03, 0]]} color={zone.outline} lineWidth={2} raycast={() => null} />
-      <Line points={[[0, .03, 0], [0, .03, radius]]} color={zone.outline} lineWidth={2} raycast={() => null} />
+      <Line points={[[0, .03, 0], end]} color={zone.outline} lineWidth={2} raycast={() => null} />
       <mesh position={[0, .04, 0]} raycast={() => null}><cylinderGeometry args={[.045, .045, .035, 16]} /><meshBasicMaterial color={zone.outline} /></mesh>
-      {showLabels && <Html position={[radius * .58, .06, radius * .58]} center distanceFactor={8} className="clearance-label door-swing"><span>{zone.label}</span></Html>}
+      {showLabels && <Html position={midpoint} center distanceFactor={8} className="clearance-label door-swing"><span>{zone.label}</span></Html>}
     </group>
   )
 }

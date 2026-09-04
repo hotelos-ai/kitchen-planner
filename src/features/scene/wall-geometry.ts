@@ -74,7 +74,7 @@ export function buildWallPanels(architecture: Architecture): WallPanel[] {
     let cursor = 0
     openings.forEach(({ opening, start: openingStart, end: openingEnd }) => {
       append(cursor, openingStart, architecture.wallHeightMm, 0, 'run')
-      if (opening.kind === 'service-window') {
+      if (opening.kind === 'service-window' || opening.kind === 'window') {
         const sill = Math.min(architecture.wallHeightMm, opening.sillHeightMm ?? 950)
         const openingHeight = Math.min(opening.heightMm ?? 900, architecture.wallHeightMm - sill)
         append(openingStart, openingEnd, sill, 0, 'below', opening.id)

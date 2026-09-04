@@ -41,7 +41,7 @@ export function RoomEditorPanel({ store, selection, onClearSelection, onSelectIt
           {architecture.openings.length === 0 && <p className="stage-summary">None yet — add one from the catalog.</p>}
           {architecture.openings.map((opening) => (
             <button key={opening.id} type="button" className="equipment-row" onClick={() => onSelectItem({ kind: 'opening', id: opening.id })}>
-              <span className="category-dot" style={{ background: opening.kind === 'service-window' ? 'var(--cat-cold)' : 'var(--cat-prep)' }} />
+              <span className="category-dot" style={{ background: opening.kind === 'service-window' || opening.kind === 'window' ? 'var(--cat-cold)' : 'var(--cat-prep)' }} />
               <span><strong>{opening.label}</strong><small>{opening.widthMm} mm · {opening.flow ?? 'closed'}</small></span>
             </button>
           ))}

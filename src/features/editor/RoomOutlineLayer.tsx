@@ -116,7 +116,7 @@ export function RoomOutlineLayer({ architecture, pixelsPerMm, originX, originY, 
     if (!placement || !placing) { onPlacementDone(); return }
     let to = placing.to
     if (shiftKey) to = constrainToAxes(placing.from, to)
-    const next = placement.kind === 'door' || placement.kind === 'service-window'
+    const next = placement.kind === 'door' || placement.kind === 'window' || placement.kind === 'service-window'
       ? createOpeningAt(architecture, { label: placement.label, kind: placement.kind, widthMm: placement.widthMm }, placing.from, to, snapMm)
       : createRectItemAt(architecture, { id: placement.catalogId, label: placement.label, kind: placement.kind === 'zone' ? 'zone' : 'pillar', widthMm: placement.widthMm, depthMm: placement.depthMm }, placing.from, to, snapMm)
     onCommit(next)
@@ -194,7 +194,7 @@ export function RoomOutlineLayer({ architecture, pixelsPerMm, originX, originY, 
       {placement && placing && (() => {
         const a = toPx(placing.from)
         const b = toPx(placing.to)
-        return placement.kind === 'door' || placement.kind === 'service-window'
+        return placement.kind === 'door' || placement.kind === 'window' || placement.kind === 'service-window'
           ? <Line points={[a.x, a.y, b.x, b.y]} stroke="#ca4e8e" strokeWidth={10} opacity={0.55} lineCap="round" listening={false} />
           : <Rect x={Math.min(a.x, b.x)} y={Math.min(a.y, b.y)} width={Math.abs(a.x - b.x)} height={Math.abs(a.y - b.y)} fill="rgba(202,78,142,0.10)" stroke="#ca4e8e" strokeWidth={2} dash={[9, 7]} listening={false} />
       })()}

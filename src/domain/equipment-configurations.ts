@@ -1,10 +1,12 @@
 import type {
   ClearanceSpec,
   EquipmentCategory,
+  EquipmentAccessFlow,
   EquipmentItem,
   StationCapability,
 } from './project'
 import { getCatalogEntry } from './catalog/kitchen-catalog'
+import { accessFlowForConfiguration } from './equipment-access'
 
 export type EquipmentConfigurationFamily =
   | 'refrigeration'
@@ -26,6 +28,7 @@ export type EquipmentConfiguration = {
   capabilities: StationCapability[]
   clearance: ClearanceSpec
   visualPreset: string
+  accessFlow?: EquipmentAccessFlow
   notes?: string
 }
 
@@ -61,6 +64,7 @@ const configuration = (
   capabilities: StationCapability[],
   clearance: ClearanceSpec,
   visualPreset: string,
+  accessFlow?: EquipmentAccessFlow,
   description = label,
 ): EquipmentConfiguration => ({
   id,
@@ -74,6 +78,7 @@ const configuration = (
   capabilities,
   clearance,
   visualPreset,
+  ...(accessFlow ? { accessFlow } : {}),
 })
 
 export const EQUIPMENT_CONFIGURATIONS: readonly EquipmentConfiguration[] = [
@@ -99,8 +104,8 @@ export const EQUIPMENT_CONFIGURATIONS: readonly EquipmentConfiguration[] = [
   configuration('wash-single', 'washing', 'Single sink', 'washing', 700, 700, 850, ['dish-pre-rinse'], { kind: 'work', frontMm: 800 }, 'single-sink'),
   configuration('wash-double', 'washing', 'Double sink', 'washing', 1200, 700, 850, ['dish-pre-rinse'], { kind: 'work', frontMm: 900 }, 'double-sink'),
   configuration('wash-pre-rinse', 'washing', 'Pre-rinse sink', 'washing', 700, 700, 850, ['dish-pre-rinse'], { kind: 'work', frontMm: 800 }, 'pre-rinse-sink'),
-  configuration('wash-undercounter-dishwasher', 'washing', 'Under-counter dishwasher', 'washing', 700, 750, 850, ['dish-wash'], { kind: 'work', frontMm: 900 }, 'dishwasher'),
-  configuration('wash-pass-through-dishwasher', 'washing', 'Pass-through dishwasher', 'washing', 750, 800, 1500, ['dish-wash'], { kind: 'work', frontMm: 1000 }, 'pass-through-dishwasher'),
+  configuration('wash-undercounter-dishwasher', 'washing', 'Under-counter dishwasher', 'washing', 700, 750, 850, ['dish-wash'], { kind: 'work', frontMm: 900 }, 'dishwasher', { inputFace: 'front', outputFace: 'front' }),
+  configuration('wash-pass-through-dishwasher', 'washing', 'Pass-through dishwasher', 'washing', 750, 800, 1500, ['dish-wash'], { kind: 'work', frontMm: 1000, rightMm: 900 }, 'pass-through-dishwasher', { inputFace: 'front', outputFace: 'right' }),
   configuration('hood-wall-canopy', 'ventilation', 'Wall canopy hood', 'hood', 3500, 1100, 600, [], { kind: 'service', frontMm: 0 }, 'canopy-hood'),
   configuration('hood-island-canopy', 'ventilation', 'Island canopy hood', 'hood', 3500, 1600, 600, [], { kind: 'service', frontMm: 0 }, 'island-hood'),
 ]
@@ -161,6 +166,7 @@ function catalogConfigurations(item: EquipmentItem): EquipmentConfiguration[] {
     const clearanceKind = ['door-swing', 'heat', 'service'].includes(preset.clearance.kind)
       ? preset.clearance.kind as ClearanceSpec['kind']
       : 'work'
+    const accessFlow = accessFlowForConfiguration(preset.id)
     return {
       id: preset.id,
       family: 'catalog',
@@ -173,6 +179,7 @@ function catalogConfigurations(item: EquipmentItem): EquipmentConfiguration[] {
       capabilities: [...preset.capabilities] as StationCapability[],
       clearance: { kind: clearanceKind, frontMm: preset.clearance.frontMm, leftMm: preset.clearance.leftMm, rightMm: preset.clearance.rightMm, backMm: preset.clearance.backMm },
       visualPreset: entry.constructorKey,
+      ...(accessFlow ? { accessFlow } : {}),
     }
   })
 }
@@ -227,6 +234,7 @@ export function applyEquipmentConfiguration(item: EquipmentItem, configurationId
     heightMm: selected.heightMm,
     capabilities: [...selected.capabilities],
     clearance: structuredClone(selected.clearance),
+    accessFlow: selected.accessFlow ? structuredClone(selected.accessFlow) : undefined,
     visualPreset: selected.visualPreset,
     configurationPreset: selected.id,
     dimensionsLocked: false,
@@ -246,4 +254,5 @@ export function isEquipmentConfigurationModified(item: EquipmentItem): boolean {
     || item.visualPreset !== selected.visualPreset
     || !sameCapabilities(item.capabilities, selected.capabilities)
     || !sameClearance(item.clearance, selected.clearance)
+    || JSON.stringify(item.accessFlow) !== JSON.stringify(selected.accessFlow)
 }

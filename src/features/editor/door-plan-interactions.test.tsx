@@ -30,6 +30,15 @@ describe('door interactions in the plan view', () => {
     expect(store.getState().selectedIds).toEqual([])
     expect(screen.getByRole('complementary', { name: 'Selected opening' })).toBeInTheDocument()
     expect(screen.getByLabelText('Swing depth (mm)')).toHaveValue(900)
+    expect(screen.queryByRole('region', { name: 'Layout checks' })).not.toBeInTheDocument()
+    expect(screen.queryByLabelText('Display units')).not.toBeInTheDocument()
+
+    await user.selectOptions(screen.getByLabelText('Door hinge side'), 'end')
+    await user.selectOptions(screen.getByLabelText('Door opening direction'), 'outward')
+    expect(getActiveVariant(store.getState()).architecture.openings.find((opening) => opening.id === 'd2')).toMatchObject({
+      swingHinge: 'end',
+      swingDirection: 'outward',
+    })
 
     const label = screen.getByLabelText('Label')
     await user.clear(label)

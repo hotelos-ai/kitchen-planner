@@ -83,4 +83,17 @@ describe('navigation grid', () => {
     ] }, 100, { bodyRadiusMm: 0 })
     expect(grid.isWalkable({ x: 500, y: 500 })).toBe(true)
   })
+
+  it('uses both configured dishwasher rack-flow faces', () => {
+    const dishwasher: EquipmentItem = {
+      id: 'corner-dishwasher', label: 'Corner dishwasher', category: 'washing',
+      widthMm: 700, depthMm: 750, heightMm: 1500, xMm: 1000, yMm: 1000, rotationDeg: 0,
+      dimensionsLocked: false, movable: true, removable: true, capabilities: ['dish-wash'],
+      accessFlow: { inputFace: 'front', outputFace: 'right' },
+    }
+    expect(stationApproachPoints(dishwasher)).toEqual([
+      { x: 1350, y: 1900 },
+      { x: 1850, y: 1375 },
+    ])
+  })
 })

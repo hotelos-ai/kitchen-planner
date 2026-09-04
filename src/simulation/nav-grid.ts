@@ -3,6 +3,7 @@ import { getCatalogEntry } from '../domain/catalog/kitchen-catalog'
 import { isFloorObstacle } from '../domain/catalog/floor-obstacle'
 import type { CatalogEntry } from '../domain/catalog/types'
 import type { Architecture, EquipmentItem, LayoutConstraints, PointMm, RectMm } from '../domain/project'
+import { equipmentAccessFlow } from '../domain/equipment-access'
 import type { NavCell, NavGrid } from './types'
 
 type GridInput = {
@@ -73,6 +74,11 @@ export function stationApproachPoints(
     back: { x: item.widthMm / 2, y: -offsetMm },
     left: { x: -offsetMm, y: item.depthMm / 2 },
     right: { x: item.widthMm + offsetMm, y: item.depthMm / 2 },
+  }
+  const accessFlow = face === undefined ? equipmentAccessFlow(item) : undefined
+  if (accessFlow) {
+    return [...new Set([accessFlow.inputFace, accessFlow.outputFace])]
+      .map((approach) => transformLocalPoint(item, localPoints[approach]!))
   }
   const intendedFace = face ?? getCatalogEntry(item.catalogId ?? '')?.intendedApproachFace
   if (intendedFace === 'none') return []

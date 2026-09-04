@@ -55,21 +55,37 @@ export function SpaceItemInspector({ store, selection, onClearSelection }: Props
     const patch = (partial: Partial<typeof opening>) => apply({ ...architecture, openings: architecture.openings.map((candidate, position) => position === index ? { ...candidate, ...partial } : candidate) })
     return (
       <aside className="inspector space-item-inspector" aria-label="Selected opening">
-        <div className="panel-heading"><span className="eyebrow">{opening.kind === 'service-window' ? 'Service window' : 'Door'}</span><h2>{opening.label}</h2></div>
+        <div className="panel-heading"><span className="eyebrow">{opening.kind === 'service-window' ? 'Service window' : opening.kind === 'window' ? 'Window' : 'Door'}</span><h2>{opening.label}</h2></div>
         <TextField key={`${opening.id}-${opening.label}`} label="Label" value={opening.label} onCommit={(label) => patch({ label })} />
         <div className="field-pair">
           <NumberField label="Offset (mm)" value={opening.offsetMm} onChange={(offsetMm) => patch({ offsetMm })} />
           <NumberField label="Width (mm)" value={opening.widthMm} onChange={(widthMm) => patch({ widthMm })} />
           {opening.kind === 'door' && <NumberField label="Swing depth (mm)" value={opening.swingDepthMm ?? opening.widthMm} onChange={(swingDepthMm) => patch({ swingDepthMm })} />}
+          {(opening.kind === 'window' || opening.kind === 'service-window') && <NumberField label="Sill height (mm)" value={opening.sillHeightMm ?? 900} onChange={(sillHeightMm) => patch({ sillHeightMm })} />}
+          {(opening.kind === 'window' || opening.kind === 'service-window') && <NumberField label="Opening height (mm)" value={opening.heightMm ?? 900} onChange={(heightMm) => patch({ heightMm })} />}
         </div>
-        <label>Flow
+        {opening.kind === 'door' && <div className="field-pair">
+          <label>Hinge side
+            <select aria-label="Door hinge side" value={opening.swingHinge ?? 'start'} onChange={(event) => patch({ swingHinge: event.target.value as NonNullable<typeof opening.swingHinge> })}>
+              <option value="start">Start of opening</option>
+              <option value="end">End of opening</option>
+            </select>
+          </label>
+          <label>Opening direction
+            <select aria-label="Door opening direction" value={opening.swingDirection ?? 'inward'} onChange={(event) => patch({ swingDirection: event.target.value as NonNullable<typeof opening.swingDirection> })}>
+              <option value="inward">Into room</option>
+              <option value="outward">Out of room</option>
+            </select>
+          </label>
+        </div>}
+        {opening.kind !== 'window' && <label>Flow
           <select value={opening.flow ?? 'closed'} onChange={(event) => patch({ flow: event.target.value as typeof opening.flow })}>
             <option value="entry">Entry</option>
             <option value="clean-out">Clean out</option>
             <option value="dirty-in">Dirty in</option>
             <option value="closed">Closed</option>
           </select>
-        </label>
+        </label>}
         <div className="inspector-actions">
           <button type="button" className="danger-button" onClick={remove}>Remove</button>
         </div>

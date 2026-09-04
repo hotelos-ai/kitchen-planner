@@ -35,7 +35,7 @@ describe('advanced polygon room editor', () => {
     expect(value.roomPolygon).toHaveLength(4)
   })
 
-  it('adds doors, service windows, pillars, and storage zones as first-class geometry', async () => {
+  it('adds doors, regular windows, service windows, pillars, and storage zones as first-class geometry', async () => {
     vi.stubGlobal('crypto', { randomUUID: () => 'geometry-id' })
     const user = userEvent.setup()
     let value = room()
@@ -44,19 +44,21 @@ describe('advanced polygon room editor', () => {
 
     await user.click(screen.getByRole('button', { name: 'Add door opening' }))
     expect(value.openings[0]).toMatchObject({ kind: 'door', wall: 'top', widthMm: 900 })
+    await user.click(screen.getByRole('button', { name: 'Add regular window' }))
+    expect(value.openings[1]).toMatchObject({ kind: 'window', flow: 'closed', sillHeightMm: 1000, heightMm: 1200 })
     await user.click(screen.getByRole('button', { name: 'Add service window' }))
-    expect(value.openings[1]).toMatchObject({ kind: 'service-window', flow: 'clean-out' })
+    expect(value.openings[2]).toMatchObject({ kind: 'service-window', flow: 'clean-out' })
     await user.click(screen.getByRole('button', { name: 'Add pillar' }))
     expect(value.pillars[0]).toMatchObject({ widthMm: 400, depthMm: 400 })
     await user.click(screen.getByRole('button', { name: 'Add storage zone' }))
     expect(value.storageZones[0]).toMatchObject({ label: 'Storage zone', adjacent: true })
 
-    await user.selectOptions(screen.getByLabelText('Opening 2 flow'), 'dirty-in')
-    await user.selectOptions(screen.getByLabelText('Opening 2 wall segment'), '2')
+    await user.selectOptions(screen.getByLabelText('Opening 3 flow'), 'dirty-in')
+    await user.selectOptions(screen.getByLabelText('Opening 3 wall segment'), '2')
     await user.clear(screen.getByLabelText('Pillar 1 width (mm)'))
     await user.type(screen.getByLabelText('Pillar 1 width (mm)'), '650')
-    expect(value.openings[1].flow).toBe('dirty-in')
-    expect((value.openings[1] as typeof value.openings[number] & { segmentIndex?: number }).segmentIndex).toBe(1)
+    expect(value.openings[2].flow).toBe('dirty-in')
+    expect((value.openings[2] as typeof value.openings[number] & { segmentIndex?: number }).segmentIndex).toBe(1)
     expect(value.pillars[0].widthMm).toBe(650)
   })
 })

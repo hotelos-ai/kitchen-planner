@@ -40,7 +40,7 @@ const pillarSchema = rectSchema.extend({ shape: z.literal('round').optional() })
 const openingSchema = z.object({
   id: idSchema,
   label: nameSchema,
-  kind: z.enum(['door', 'service-window', 'sealed-opening']),
+  kind: z.enum(['door', 'window', 'service-window', 'sealed-opening']),
   wall: z.enum(['top', 'right', 'bottom', 'left']),
   segmentIndex: z.number().int().nonnegative().max(999).optional(),
   offsetMm: z.number().finite().nonnegative().max(1_000_000),
@@ -49,6 +49,8 @@ const openingSchema = z.object({
   heightMm: dimensionSchema.optional(),
   flow: z.enum(['entry', 'clean-out', 'dirty-in', 'closed']).optional(),
   swingDepthMm: z.number().finite().nonnegative().max(100_000).optional(),
+  swingHinge: z.enum(['start', 'end']).optional(),
+  swingDirection: z.enum(['inward', 'outward']).optional(),
 }).strict()
 
 const storageZoneSchema = rectSchema.extend({
@@ -71,7 +73,7 @@ const granularStorageZoneSchema = granularPillarSchema.extend({
 
 const openingPatchSchema = z.object({
   label: nameSchema.optional(),
-  kind: z.enum(['door', 'service-window', 'sealed-opening']).optional(),
+  kind: z.enum(['door', 'window', 'service-window', 'sealed-opening']).optional(),
   wall: z.enum(['top', 'right', 'bottom', 'left']).optional(),
   segmentIndex: z.union([z.number().int().nonnegative().max(999), z.null()]).optional(),
   offsetMm: architectureCoordinateSchema.optional(),
@@ -80,6 +82,8 @@ const openingPatchSchema = z.object({
   heightMm: z.union([dimensionSchema, z.null()]).optional(),
   flow: z.union([z.enum(['entry', 'clean-out', 'dirty-in', 'closed']), z.null()]).optional(),
   swingDepthMm: z.union([architectureCoordinateSchema, z.null()]).optional(),
+  swingHinge: z.union([z.enum(['start', 'end']), z.null()]).optional(),
+  swingDirection: z.union([z.enum(['inward', 'outward']), z.null()]).optional(),
 }).strict().refine((patch) => Object.keys(patch).length > 0, 'Opening patch cannot be empty')
 
 const pillarPatchSchema = z.object({
@@ -136,6 +140,10 @@ const componentPatchSchema = z.object({
     rightMm: z.number().finite().nonnegative().max(100_000).optional(),
     backMm: z.number().finite().nonnegative().max(100_000).optional(),
     kind: z.enum(['work', 'door-swing', 'heat', 'service']),
+  }).strict().optional(),
+  accessFlow: z.object({
+    inputFace: z.enum(['front', 'back', 'left', 'right']),
+    outputFace: z.enum(['front', 'back', 'left', 'right']),
   }).strict().optional(),
   approximate: z.boolean().optional(),
   notes: z.string().max(4_000).optional(),

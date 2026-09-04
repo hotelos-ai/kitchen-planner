@@ -32,6 +32,8 @@ export interface SpatialOpening {
   heightMm?: Millimetres
   flow?: string
   swingDepthMm?: Millimetres
+  swingHinge?: 'start' | 'end'
+  swingDirection?: 'inward' | 'outward'
 }
 
 export interface SpatialZone extends SpatialRect { label: string }

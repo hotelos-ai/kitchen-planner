@@ -21,10 +21,12 @@ export function PolygonRoomEditor({ value, onChange }: Props) {
     ...value,
     storageZones: value.storageZones.map((zone, candidate) => candidate === index ? { ...zone, ...patch } : zone),
   })
-  const addOpening = (kind: 'door' | 'service-window') => {
+  const addOpening = (kind: 'door' | 'window' | 'service-window') => {
     const opening: Opening = kind === 'door'
-      ? { id: makeId('door'), label: 'Door', kind, wall: 'top', offsetMm: 500, widthMm: 900, flow: 'entry', swingDepthMm: 900 }
-      : { id: makeId('service-window'), label: 'Service window', kind, wall: 'top', offsetMm: 1500, widthMm: 900, sillHeightMm: 900, heightMm: 1000, flow: 'clean-out' }
+      ? { id: makeId('door'), label: 'Door', kind, wall: 'top', offsetMm: 500, widthMm: 900, flow: 'entry', swingDepthMm: 900, swingHinge: 'start', swingDirection: 'inward' }
+      : kind === 'window'
+        ? { id: makeId('window'), label: 'Window', kind, wall: 'top', offsetMm: 1500, widthMm: 1200, sillHeightMm: 1_000, heightMm: 1_200, flow: 'closed' }
+        : { id: makeId('service-window'), label: 'Service window', kind, wall: 'top', offsetMm: 1500, widthMm: 900, sillHeightMm: 900, heightMm: 1000, flow: 'clean-out' }
     onChange({ ...value, openings: [...value.openings, opening] })
   }
 
@@ -102,16 +104,25 @@ export function PolygonRoomEditor({ value, onChange }: Props) {
               {`Opening ${index + 1} width (mm)`}
               <input type="number" min="100" step="100" value={opening.widthMm} onChange={(event) => updateOpening(index, { widthMm: numberValue(event.target.value) })} />
             </label>
-            <label>
+            {opening.kind === 'door' && <>
+              <label>{`Opening ${index + 1} hinge side`}<select value={opening.swingHinge ?? 'start'} onChange={(event) => updateOpening(index, { swingHinge: event.target.value as NonNullable<Opening['swingHinge']> })}><option value="start">Start of opening</option><option value="end">End of opening</option></select></label>
+              <label>{`Opening ${index + 1} direction`}<select value={opening.swingDirection ?? 'inward'} onChange={(event) => updateOpening(index, { swingDirection: event.target.value as NonNullable<Opening['swingDirection']> })}><option value="inward">Into room</option><option value="outward">Out of room</option></select></label>
+            </>}
+            {(opening.kind === 'window' || opening.kind === 'service-window') && <>
+              <label>{`Opening ${index + 1} sill height (mm)`}<input type="number" min="0" step="100" value={opening.sillHeightMm ?? 900} onChange={(event) => updateOpening(index, { sillHeightMm: numberValue(event.target.value) })} /></label>
+              <label>{`Opening ${index + 1} opening height (mm)`}<input type="number" min="100" step="100" value={opening.heightMm ?? 900} onChange={(event) => updateOpening(index, { heightMm: numberValue(event.target.value) })} /></label>
+            </>}
+            {opening.kind !== 'window' && <label>
               {`Opening ${index + 1} flow`}
               <select value={opening.flow ?? 'closed'} onChange={(event) => updateOpening(index, { flow: event.target.value as Opening['flow'] })}>
                 <option value="entry">Entry</option><option value="clean-out">Clean out</option><option value="dirty-in">Dirty in</option><option value="closed">Closed</option>
               </select>
-            </label>
+            </label>}
             <button type="button" aria-label={`Remove opening ${index + 1}`} onClick={() => onChange({ ...value, openings: value.openings.filter((_, candidate) => candidate !== index) })}>Remove</button>
           </div>
         ))}
         <button type="button" onClick={() => addOpening('door')}>Add door opening</button>
+        <button type="button" onClick={() => addOpening('window')}>Add regular window</button>
         <button type="button" onClick={() => addOpening('service-window')}>Add service window</button>
       </fieldset>
 

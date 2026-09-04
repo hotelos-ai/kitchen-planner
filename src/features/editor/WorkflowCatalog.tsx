@@ -77,7 +77,7 @@ function SpaceCatalog({ store, onBeginPlacement }: { store: ProjectStore; onBegi
         catalogId: entry.catalogId,
         label: entry.displayName,
         kind: entry.tags.includes('opening')
-          ? (entry.tags.includes('service') ? 'service-window' : 'door')
+          ? (entry.tags.includes('service') ? 'service-window' : entry.tags.includes('window') ? 'window' : 'door')
           : entry.tags.includes('zone') ? 'zone' : 'pillar',
         widthMm: entry.typicalDimensions.widthMm,
         depthMm: entry.typicalDimensions.depthMm,
@@ -122,7 +122,7 @@ function SpaceCatalog({ store, onBeginPlacement }: { store: ProjectStore; onBegi
   )
 }
 
-export function WorkflowCatalog({ store, stage }: Props) {
-  if (stage === 'space') return <SpaceCatalog store={store} />
+export function WorkflowCatalog({ store, stage, onBeginPlacement }: Props) {
+  if (stage === 'space') return <SpaceCatalog store={store} onBeginPlacement={onBeginPlacement} />
   return <EquipmentLibrary store={store} stage={stage} />
 }

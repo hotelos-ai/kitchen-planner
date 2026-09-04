@@ -5,7 +5,7 @@ import {
 } from '../domain/requirements/operational-requirements'
 import { getCatalogEntry } from '../domain/catalog/kitchen-catalog'
 import { pointInPolygon, rotatedFootprint } from '../domain/geometry'
-import type { EquipmentItem, StaffRole, StationCapability } from '../domain/project'
+import type { EquipmentItem, PointMm, StaffRole, StationCapability } from '../domain/project'
 import { stationApproachPoints } from './nav-grid'
 import { isFloorObstacle } from '../domain/catalog/floor-obstacle'
 import type { SimulationInput } from './types'
@@ -74,13 +74,16 @@ export function validateSimulationInput(input: SimulationInput & Pick<Operationa
     const otherFootprints = input.equipment.filter((item) => item.id !== station.id && isFloorObstacle(item))
       .map((item) => ({ item, footprint: rotatedFootprint(item) }))
     const approaches = stationApproachPoints(station)
-    const available = approaches.some((approach) => pointInPolygon(approach, input.architecture.roomPolygon)
-      && otherFootprints.every(({ footprint }) => !pointInPolygon(approach, footprint)))
+    const approachAvailable = (approach: PointMm) => pointInPolygon(approach, input.architecture.roomPolygon)
+      && otherFootprints.every(({ footprint }) => !pointInPolygon(approach, footprint))
+    const available = station.accessFlow ? approaches.every(approachAvailable) : approaches.some(approachAvailable)
     if (!available) {
       const obstructors = otherFootprints.filter(({ footprint }) => approaches.some((approach) => pointInPolygon(approach, footprint)))
       errors.push(error(
         'station-approach-blocked',
-        `${station.label} does not have a walkable modeled work approach.`,
+        station.accessFlow
+          ? `${station.label} does not have walkable access at every configured rack input/output face.`
+          : `${station.label} does not have a walkable modeled work approach.`,
         [station.id, ...obstructors.map(({ item }) => item.id)],
         { source: 'modeled-clearance', scope: 'layout' },
       ))

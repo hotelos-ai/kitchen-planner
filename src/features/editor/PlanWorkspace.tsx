@@ -372,8 +372,8 @@ export function PlanWorkspace({
               ) : (
                 <EquipmentInspector store={store} />
               ))}
-              {selectedIds.length === 0 && !essentialsVisible && <LayoutDiagnostics store={store} />}
-              {selectedIds.length === 0 && <ProjectSettings store={store} stage={stage} />}
+              {selectedIds.length === 0 && !spaceSelection && !essentialsVisible && <LayoutDiagnostics store={store} />}
+              {selectedIds.length === 0 && !spaceSelection && <ProjectSettings store={store} stage={stage} />}
             </div>
           )}
         </div>
