@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useMemo, useState } from 'react'
+import { lazy, Suspense, useEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent, type PointerEvent } from 'react'
 import { useStore } from 'zustand'
 import { createBrowserAutoLayoutRunner } from '../features/optimizer/browser-auto-layout-runner'
 import { evaluateOperationalRequirements } from '../domain/requirements/operational-requirements'
@@ -27,6 +27,70 @@ const CompareWorkspace = lazy(() => import('../features/compare/CompareWorkspace
 const AutoLayoutWorkspace = lazy(() => import('../features/optimizer/AutoLayoutWorkspace').then((module) => ({ default: module.AutoLayoutWorkspace })))
 
 export type WorkspaceView = ViewMode
+
+const MIN_SPLIT_PLAN_PERCENT = 30
+const MAX_SPLIT_PLAN_PERCENT = 75
+const DEFAULT_SPLIT_PLAN_PERCENT = 50
+
+function clampSplitPlanPercent(value: number) {
+  return Math.min(MAX_SPLIT_PLAN_PERCENT, Math.max(MIN_SPLIT_PLAN_PERCENT, value))
+}
+
+function SplitWorkspaceDivider({ value, onChange }: { value: number; onChange(value: number): void }) {
+  const dragging = useRef(false)
+  const resizeFromPointer = (event: PointerEvent<HTMLDivElement>) => {
+    if (!dragging.current) return
+    const workspace = event.currentTarget.parentElement
+    if (!workspace) return
+    const bounds = workspace.getBoundingClientRect()
+    if (bounds.width === 0) return
+    onChange(clampSplitPlanPercent(((event.clientX - bounds.left) / bounds.width) * 100))
+  }
+
+  const stopPointerResize = (event: PointerEvent<HTMLDivElement>) => {
+    dragging.current = false
+    if (event.currentTarget.hasPointerCapture?.(event.pointerId)) event.currentTarget.releasePointerCapture?.(event.pointerId)
+  }
+
+  const resizeFromKeyboard = (event: KeyboardEvent<HTMLDivElement>) => {
+    let nextValue: number | null = null
+    if (event.key === 'ArrowLeft') nextValue = value - 2
+    if (event.key === 'ArrowRight') nextValue = value + 2
+    if (event.key === 'Home') nextValue = MIN_SPLIT_PLAN_PERCENT
+    if (event.key === 'End') nextValue = MAX_SPLIT_PLAN_PERCENT
+    if (nextValue === null) return
+    event.preventDefault()
+    onChange(clampSplitPlanPercent(nextValue))
+  }
+
+  return (
+    <div
+      className="split-workspace-divider"
+      role="separator"
+      aria-label="Resize split view"
+      aria-orientation="vertical"
+      aria-valuemin={MIN_SPLIT_PLAN_PERCENT}
+      aria-valuemax={MAX_SPLIT_PLAN_PERCENT}
+      aria-valuenow={Math.round(value)}
+      aria-valuetext={`${Math.round(value)}% floor plan, ${Math.round(100 - value)}% 3D view`}
+      tabIndex={0}
+      title="Drag to resize · Arrow keys to adjust · Double-click to reset"
+      onPointerDown={(event) => {
+        event.preventDefault()
+        dragging.current = true
+        event.currentTarget.setPointerCapture?.(event.pointerId)
+      }}
+      onPointerMove={resizeFromPointer}
+      onPointerUp={stopPointerResize}
+      onPointerCancel={stopPointerResize}
+      onLostPointerCapture={() => { dragging.current = false }}
+      onKeyDown={resizeFromKeyboard}
+      onDoubleClick={() => onChange(DEFAULT_SPLIT_PLAN_PERCENT)}
+    >
+      <span aria-hidden="true"><i /><i /><i /></span>
+    </div>
+  )
+}
 
 export function App() {
   const stage = useStore(appStateStore, (state) => state.stage)
@@ -79,6 +143,7 @@ export function App() {
   const [agentActivityBaseline, setAgentActivityBaseline] = useState(agentActivityVersion)
   const startScreenVisible = showStartScreen && agentActivityVersion === agentActivityBaseline
   const [activatedWorkspaceViews, setActivatedWorkspaceViews] = useState({ plan: false, scene: false })
+  const [splitPlanPercent, setSplitPlanPercent] = useState(DEFAULT_SPLIT_PLAN_PERCENT)
 
   useEffect(() => () => appStateStore.getState().reset(), [])
 
@@ -109,6 +174,11 @@ export function App() {
   const sceneViewActive = !startScreenVisible && overlay === null && stage !== 'simulate' && (view === 'scene' || view === 'split')
   const mountPlanWorkspace = planViewActive || activatedWorkspaceViews.plan
   const mountSceneWorkspace = sceneViewActive || activatedWorkspaceViews.scene
+  const splitViewActive = view === 'split' && overlay === null && stage !== 'simulate'
+  const splitWorkspaceStyle = splitViewActive ? {
+    '--split-plan-share': `${splitPlanPercent}fr`,
+    '--split-scene-share': `${100 - splitPlanPercent}fr`,
+  } as CSSProperties : undefined
   if ((planViewActive && !activatedWorkspaceViews.plan) || (sceneViewActive && !activatedWorkspaceViews.scene)) {
     setActivatedWorkspaceViews({
       plan: activatedWorkspaceViews.plan || planViewActive,
@@ -225,7 +295,7 @@ export function App() {
               onOpenProject={(opened) => { projectStore.getState().replaceProject(opened); beginSession(); setStage('space') }}
             />
           ) : (
-          <section className={`workspace-surfaces${view === 'split' && overlay === null && stage !== 'simulate' ? ' split-workspace' : ''}`}>
+          <section className={`workspace-surfaces${splitViewActive ? ' split-workspace' : ''}`} style={splitWorkspaceStyle}>
             {overlay === 'compare' && <div className="workspace-surface active"><CompareWorkspace /></div>}
             {overlay === 'auto-layout' && <div className="workspace-surface active"><AutoLayoutWorkspace runner={autoLayoutRunner} /></div>}
             {overlay === null && stage === 'simulate' && <div className="workspace-surface active"><SimulationWorkspace /></div>}
@@ -293,6 +363,9 @@ export function App() {
                       onAddLayout={openWizard}
                     />
                   </div>
+                )}
+                {splitViewActive && (
+                  <SplitWorkspaceDivider value={splitPlanPercent} onChange={setSplitPlanPercent} />
                 )}
                 {mountSceneWorkspace && (
                   <div

@@ -1,6 +1,6 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { beforeEach, describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { createSeedProject } from '../domain/seed-project'
 import { appStateStore } from '../state/app-state-store'
 import { getActiveItem, getVariantItem, projectStore } from '../state/project-store'
@@ -39,6 +39,27 @@ describe('App', () => {
     expect(screen.getByLabelText('3D kitchen workspace')).toBe(scene)
     expect(plan.closest('[data-workspace-surface]')).toHaveAttribute('aria-hidden', 'false')
     expect(scene.closest('[data-workspace-surface]')).toHaveAttribute('aria-hidden', 'false')
+    const divider = screen.getByRole('separator', { name: 'Resize split view' })
+    expect(divider).toHaveAttribute('aria-valuenow', '50')
+    const workspace = divider.parentElement!
+    vi.spyOn(workspace, 'getBoundingClientRect').mockReturnValue({
+      x: 0, y: 0, left: 0, top: 0, right: 1000, bottom: 700, width: 1000, height: 700, toJSON: () => ({}),
+    })
+    let capturedPointer: number | undefined
+    divider.setPointerCapture = (pointerId) => { capturedPointer = pointerId }
+    divider.hasPointerCapture = (pointerId) => capturedPointer === pointerId
+    divider.releasePointerCapture = () => { capturedPointer = undefined }
+    fireEvent.pointerDown(divider, { pointerId: 1, clientX: 500 })
+    fireEvent.pointerMove(divider, { pointerId: 1, clientX: 650 })
+    fireEvent.pointerUp(divider, { pointerId: 1, clientX: 650 })
+    expect(divider).toHaveAttribute('aria-valuenow', '65')
+    divider.focus()
+    await userEvent.keyboard('{ArrowRight}')
+    expect(divider).toHaveAttribute('aria-valuenow', '67')
+    await userEvent.keyboard('{End}')
+    expect(divider).toHaveAttribute('aria-valuenow', '75')
+    await userEvent.dblClick(divider)
+    expect(divider).toHaveAttribute('aria-valuenow', '50')
 
     await userEvent.click(screen.getByRole('button', { name: 'Plan' }))
     expect(screen.getByLabelText('2D plan workspace')).toBe(plan)

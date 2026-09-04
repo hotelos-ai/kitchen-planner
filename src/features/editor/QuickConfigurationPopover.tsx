@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react'
+import { useStore } from 'zustand'
 import { APPEARANCE_SKINS } from '../../domain/catalog/appearance-skins'
 import { getCatalogEntry } from '../../domain/catalog/kitchen-catalog'
 import type { EquipmentItem } from '../../domain/project'
-import type { ProjectStore } from '../../state/project-store'
+import { getActiveVariant, type ProjectStore } from '../../state/project-store'
 import { EquipmentConfigurationField } from './EquipmentConfigurationField'
 import type { OverlayPosition } from './ComponentContextMenu'
 
@@ -16,10 +17,11 @@ export function QuickConfigurationPopover({ item, store, mode, position, onClose
   onClose(): void
   onSkinChange?(itemId: string, skinId: string): void
 }) {
-  const entry = item.catalogId ? getCatalogEntry(item.catalogId) : undefined
+  const liveItem = useStore(store, (state) => getActiveVariant(state).equipment.find((candidate) => candidate.id === item.id)) ?? item
+  const entry = liveItem.catalogId ? getCatalogEntry(liveItem.catalogId) : undefined
   const compatibleSkins = APPEARANCE_SKINS.filter((skin) => !entry || entry.appearanceSkinIds.includes(skin.skinId))
-  const [skinId, setSkinId] = useState(() => compatibleSkins.some((skin) => skin.skinId === item.appearanceSkinId)
-    ? item.appearanceSkinId!
+  const [skinId, setSkinId] = useState(() => compatibleSkins.some((skin) => skin.skinId === liveItem.appearanceSkinId)
+    ? liveItem.appearanceSkinId!
     : compatibleSkins[0]?.skinId ?? '')
 
   useEffect(() => {
@@ -33,7 +35,7 @@ export function QuickConfigurationPopover({ item, store, mode, position, onClose
   }, [onClose])
 
   const configuring = mode === 'configure'
-  const label = configuring ? `Quick configure ${item.label}` : `Choose skin for ${item.label}`
+  const label = configuring ? `Quick configure ${liveItem.label}` : `Choose skin for ${liveItem.label}`
   return <section
     role="dialog"
     aria-label={label}
@@ -45,12 +47,12 @@ export function QuickConfigurationPopover({ item, store, mode, position, onClose
       <strong>{label}</strong>
       <button type="button" aria-label="Close quick configuration" onClick={onClose}>×</button>
     </div>
-    {configuring ? <EquipmentConfigurationField item={item} store={store} /> : <>
+    {configuring ? <EquipmentConfigurationField item={liveItem} store={store} onApplied={onClose} /> : <>
       <label>Appearance skin<select aria-label="Appearance skin" value={skinId} onChange={(event) => setSkinId(event.target.value)}>
         {compatibleSkins.map((skin) => <option key={skin.skinId} value={skin.skinId}>{skin.displayName}</option>)}
       </select></label>
       <button type="button" disabled={!skinId.trim()} onClick={() => {
-        onSkinChange?.(item.id, skinId.trim())
+        onSkinChange?.(liveItem.id, skinId.trim())
         onClose()
       }}>Apply skin</button>
     </>}

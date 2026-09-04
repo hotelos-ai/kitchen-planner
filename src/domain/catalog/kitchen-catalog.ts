@@ -243,6 +243,9 @@ const stationCapabilities = new Set<StationCapability>([
   'clean-landing', 'hand-wash', 'mix',
 ])
 
+export const isStationCapability = (capability: string): capability is StationCapability =>
+  stationCapabilities.has(capability as StationCapability)
+
 export function createCatalogEquipmentItem(input: CreateCatalogEquipmentInput): EquipmentItem {
   const catalogEntry = getCatalogEntry(input.catalogId)
   if (!catalogEntry) throw new Error(`Unknown catalog component: ${input.catalogId}`)
@@ -273,7 +276,7 @@ export function createCatalogEquipmentItem(input: CreateCatalogEquipmentInput): 
     dimensionsLocked: false,
     movable: catalogEntry.category !== 'architecture',
     removable: true,
-    capabilities: physicalConfiguration.capabilities.filter((capability): capability is StationCapability => stationCapabilities.has(capability as StationCapability)),
+    capabilities: physicalConfiguration.capabilities.filter(isStationCapability),
     clearance: { frontMm: physicalConfiguration.clearance.frontMm, leftMm: physicalConfiguration.clearance.leftMm, rightMm: physicalConfiguration.clearance.rightMm, backMm: physicalConfiguration.clearance.backMm, kind: clearanceKind },
     accessFlow: accessFlowForConfiguration(configurationId),
     visualPreset: catalogEntry.constructorKey,

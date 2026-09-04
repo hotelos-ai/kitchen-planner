@@ -5,8 +5,11 @@ import { beforeAll, describe, expect, it, vi } from 'vitest'
 import { createSeedProject } from '../../domain/seed-project'
 import { createProjectStore, getActiveItem } from '../../state/project-store'
 import { CATALOG_DRAG_MIME } from '../../domain/catalog/catalog-drag'
+import { createCatalogEquipmentItem } from '../../domain/catalog/kitchen-catalog'
+import type { EquipmentItem } from '../../domain/project'
 
 type LayerHarnessProps = {
+  items: EquipmentItem[]
   onQuickConfigure(id: string, position: { x: number; y: number }): void
   onOpenContextMenu(id: string, position: { x: number; y: number }): void
 }
@@ -28,10 +31,13 @@ vi.mock('./RoomOutlineLayer', () => ({
   ),
 }))
 vi.mock('./EquipmentNode', () => ({
-  EquipmentLayer: (props: LayerHarnessProps) => <div>
-    <button type="button" onClick={() => props.onQuickConfigure('tandoor', { x: 100, y: 120 })}>Open quick configuration</button>
-    <button type="button" onClick={() => props.onOpenContextMenu('tandoor', { x: 200, y: 220 })}>Open component menu</button>
-  </div>,
+  EquipmentLayer: (props: LayerHarnessProps) => {
+    const targetId = props.items.find((item) => item.id === 'ss-shelf')?.id ?? 'tandoor'
+    return <div>
+      <button type="button" onClick={() => props.onQuickConfigure(targetId, { x: 100, y: 120 })}>Open quick configuration</button>
+      <button type="button" onClick={() => props.onOpenContextMenu(targetId, { x: 200, y: 220 })}>Open component menu</button>
+    </div>
+  },
 }))
 
 import { PlanCanvas } from './PlanCanvas'
@@ -115,6 +121,26 @@ describe('PlanCanvas component gestures', () => {
     expect(store.getState().project.variants[0].equipment).toHaveLength(1)
     expect(store.getState().project.variants[0].equipment[0]).toMatchObject({ catalogId: 'prep-work-table' })
     expect(store.getState().selectedIds).toHaveLength(1)
+  })
+
+  it('saves a shelf configuration selected from the right-click menu', async () => {
+    const user = userEvent.setup()
+    const project = createSeedProject()
+    project.variants[0].equipment = [createCatalogEquipmentItem({
+      catalogId: 'storage-wall-shelf',
+      componentId: 'ss-shelf',
+      configurationId: 'wall-shelf-one-tier',
+      position: { xMm: 500, yMm: 0 },
+    })]
+    const store = createProjectStore(project)
+    render(<PlanCanvas store={store} showReference={false} />)
+
+    await user.click(screen.getByRole('button', { name: 'Open component menu' }))
+    await user.click(screen.getByRole('menuitem', { name: 'Configure' }))
+    await user.selectOptions(screen.getByLabelText('Equipment configuration'), 'wall-shelf-three-tier')
+
+    expect(getActiveItem(store.getState(), 'ss-shelf').configurationPreset).toBe('wall-shelf-three-tier')
+    expect(screen.queryByRole('dialog', { name: /Quick configure/i })).not.toBeInTheDocument()
   })
 
   it('keeps door interaction enabled in the layout plan', async () => {

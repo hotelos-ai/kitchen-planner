@@ -26,6 +26,27 @@ const deckElevations = (container: HTMLElement) => [...container.querySelectorAl
   .map((deck) => deck.yM)
 
 describe('storage visual elevation model', () => {
+  it('updates a mounted wall shelf from one tier to three tiers', () => {
+    const entry = getCatalogEntry('storage-wall-shelf')!
+    const oneTier = entry.physicalConfigurations.find((candidate) => candidate.id === 'wall-shelf-one-tier')!
+    const threeTier = entry.physicalConfigurations.find((candidate) => candidate.id === 'wall-shelf-three-tier')!
+    const { container, rerender } = render(<StorageWallShelfVisual
+      item={itemWithPreset('storage-wall-shelf', oneTier.id)}
+      widthM={1.2}
+      depthM={.35}
+      heightM={.3}
+    />)
+
+    expect(deckElevations(container)).toHaveLength(1)
+    rerender(<StorageWallShelfVisual
+      item={itemWithPreset('storage-wall-shelf', threeTier.id)}
+      widthM={1.2}
+      depthM={.35}
+      heightM={.9}
+    />)
+    expect(deckElevations(container)).toHaveLength(3)
+  })
+
   it('anchors wall shelf decks at the configured preset elevation', () => {
     const entry = getCatalogEntry('storage-wall-shelf')!
     const preset = entry.physicalConfigurations.find((candidate) => candidate.id === 'wall-shelf-three-tier')!

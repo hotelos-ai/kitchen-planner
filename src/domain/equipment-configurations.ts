@@ -5,7 +5,7 @@ import type {
   EquipmentItem,
   StationCapability,
 } from './project'
-import { getCatalogEntry } from './catalog/kitchen-catalog'
+import { getCatalogEntry, isStationCapability } from './catalog/kitchen-catalog'
 import { accessFlowForConfiguration } from './equipment-access'
 
 export type EquipmentConfigurationFamily =
@@ -176,7 +176,7 @@ function catalogConfigurations(item: EquipmentItem): EquipmentConfiguration[] {
       widthMm: preset.dimensions.widthMm,
       depthMm: preset.dimensions.depthMm,
       heightMm: preset.dimensions.heightMm,
-      capabilities: [...preset.capabilities] as StationCapability[],
+      capabilities: preset.capabilities.filter(isStationCapability),
       clearance: { kind: clearanceKind, frontMm: preset.clearance.frontMm, leftMm: preset.clearance.leftMm, rightMm: preset.clearance.rightMm, backMm: preset.clearance.backMm },
       visualPreset: entry.constructorKey,
       ...(accessFlow ? { accessFlow } : {}),

@@ -3,6 +3,8 @@ import { useEffect } from 'react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { EquipmentItem } from '../../domain/project'
+import { createCatalogEquipmentItem } from '../../domain/catalog/kitchen-catalog'
+import { physicalConfigurationDetails } from '../../domain/equipment-configurations'
 import { createSeedProject } from '../../domain/seed-project'
 import { appStateStore } from '../../state/app-state-store'
 import { projectStore } from '../../state/project-store'
@@ -169,6 +171,29 @@ describe('3D scene synchronization', () => {
     expect(screen.getByTestId('live-fridge-configuration')).toHaveTextContent('Chest freezer:1200:chest-freezer')
     expect(mounts).toBe(1)
     expect(screen.getByTestId('kitchen-scene')).toHaveAttribute('data-renderer-generation', '0')
+  })
+
+  it('publishes shelf tier configuration changes to the live 3D renderer', () => {
+    const project = createSeedProject()
+    project.variants[0].equipment = [createCatalogEquipmentItem({
+      catalogId: 'storage-wall-shelf',
+      componentId: 'scene-shelf',
+      configurationId: 'wall-shelf-one-tier',
+      position: { xMm: 400, yMm: 0 },
+    })]
+    projectStore.getState().replaceProject(project)
+    let mounts = 0
+    const ShelfRenderer = ({ items }: SceneRendererProps) => {
+      useEffect(() => { mounts += 1 }, [])
+      return <output data-testid="live-shelf-tiers">{physicalConfigurationDetails(items[0]).tierCount}</output>
+    }
+
+    render(<SceneWorkspace renderer={ShelfRenderer} />)
+    expect(screen.getByTestId('live-shelf-tiers')).toHaveTextContent('1')
+    act(() => projectStore.getState().applyEquipmentConfiguration('scene-shelf', 'wall-shelf-three-tier'))
+
+    expect(screen.getByTestId('live-shelf-tiers')).toHaveTextContent('3')
+    expect(mounts).toBe(1)
   })
 
   it('publishes live x, y, and elevation without remounting the renderer', () => {
