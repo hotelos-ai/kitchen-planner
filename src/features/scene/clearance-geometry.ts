@@ -1,6 +1,6 @@
 import type { Architecture, DisplayUnit, EquipmentItem } from '../../domain/project'
 import { formatLength } from '../../domain/units'
-import { doorSwingGeometry } from '../../domain/opening-geometry'
+import { doorSwingGeometries } from '../../domain/opening-geometry'
 
 type Style = { fill: string; outline: string; hatch: string }
 
@@ -51,9 +51,8 @@ export function buildClearanceDescriptors(items: readonly EquipmentItem[], archi
   })
 
   architecture.openings.filter((opening) => opening.kind === 'door' && opening.swingDepthMm).forEach((opening) => {
-    const swing = doorSwingGeometry(architecture, opening)
-    if (!swing) return
-    descriptors.push({ id: `swing-${opening.id}`, shape: 'arc', kind: 'door-swing', label: `${opening.label} swing · ${formatLength(opening.swingDepthMm!, unit)}`, xMm: swing.hinge.x, yMm: swing.hinge.y, radiusMm: swing.radiusMm, rotationDeg: swing.startAngleRad * 180 / Math.PI, sweepDeg: swing.sweepAngleRad * 180 / Math.PI, ...STYLES['door-swing'] })
+    const swings = doorSwingGeometries(architecture, opening)
+    swings.forEach((swing, index) => descriptors.push({ id: swings.length === 1 ? `swing-${opening.id}` : `swing-${opening.id}-${index + 1}`, shape: 'arc', kind: 'door-swing', label: `${opening.label} swing · ${formatLength(swing.radiusMm, unit)}`, xMm: swing.hinge.x, yMm: swing.hinge.y, radiusMm: swing.radiusMm, rotationDeg: swing.startAngleRad * 180 / Math.PI, sweepDeg: swing.sweepAngleRad * 180 / Math.PI, ...STYLES['door-swing'] }))
   })
 
   items.filter((item) => item.category === 'cold' && /fridge|freezer/i.test(item.label)).forEach((item) => {

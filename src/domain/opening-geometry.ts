@@ -57,15 +57,17 @@ export type DoorSwingGeometry = {
   envelope: PointMm[]
 }
 
-export function doorSwingGeometry(architecture: Architecture, opening: Opening): DoorSwingGeometry | undefined {
-  const radiusMm = opening.swingDepthMm ?? 0
-  if (opening.kind !== 'door' || radiusMm <= 0) return undefined
-  const ends = architectureOpeningEnds(architecture, opening)
-  const hinge = opening.swingHinge === 'end' ? ends.end : ends.start
-  const closedEnd = opening.swingHinge === 'end' ? ends.start : ends.end
+const swingForLeaf = (
+  architecture: Architecture,
+  ends: { start: PointMm; end: PointMm },
+  hinge: PointMm,
+  closedEnd: PointMm,
+  radiusMm: number,
+  direction: Opening['swingDirection'],
+): DoorSwingGeometry => {
   const inward = inwardNormal(architecture, ends.start, ends.end)
-  const direction = opening.swingDirection === 'outward' ? { x: -inward.x, y: -inward.y } : inward
-  const openEnd = { x: hinge.x + direction.x * radiusMm, y: hinge.y + direction.y * radiusMm }
+  const openingNormal = direction === 'outward' ? { x: -inward.x, y: -inward.y } : inward
+  const openEnd = { x: hinge.x + openingNormal.x * radiusMm, y: hinge.y + openingNormal.y * radiusMm }
   const startAngleRad = Math.atan2(closedEnd.y - hinge.y, closedEnd.x - hinge.x)
   const targetAngleRad = Math.atan2(openEnd.y - hinge.y, openEnd.x - hinge.x)
   let sweepAngleRad = targetAngleRad - startAngleRad
@@ -86,4 +88,29 @@ export function doorSwingGeometry(architecture: Architecture, opening: Opening):
     arc,
     envelope: [hinge, ...arc],
   }
+}
+
+/** All swept leaves for a door. Sliding doors intentionally have no swing envelope. */
+export function doorSwingGeometries(architecture: Architecture, opening: Opening): DoorSwingGeometry[] {
+  if (opening.kind !== 'door' || opening.doorType === 'sliding' || opening.doorType === 'double-sliding') return []
+  const ends = architectureOpeningEnds(architecture, opening)
+  if (opening.doorType === 'double-hinged') {
+    const midpoint = { x: (ends.start.x + ends.end.x) / 2, y: (ends.start.y + ends.end.y) / 2 }
+    const leafRadiusMm = Math.min(opening.swingDepthMm ?? opening.widthMm / 2, opening.widthMm / 2)
+    if (leafRadiusMm <= 0) return []
+    return [
+      swingForLeaf(architecture, ends, ends.start, midpoint, leafRadiusMm, opening.swingDirection),
+      swingForLeaf(architecture, ends, ends.end, midpoint, leafRadiusMm, opening.swingDirection),
+    ]
+  }
+  const radiusMm = opening.swingDepthMm ?? opening.widthMm
+  if (radiusMm <= 0) return []
+  const hinge = opening.swingHinge === 'end' ? ends.end : ends.start
+  const closedEnd = opening.swingHinge === 'end' ? ends.start : ends.end
+  return [swingForLeaf(architecture, ends, hinge, closedEnd, radiusMm, opening.swingDirection)]
+}
+
+/** Backwards-compatible accessor for callers that only need the first leaf. */
+export function doorSwingGeometry(architecture: Architecture, opening: Opening): DoorSwingGeometry | undefined {
+  return doorSwingGeometries(architecture, opening)[0]
 }

@@ -142,7 +142,7 @@ export function createSeedProject(): KitchenProject {
       { x: 0, y: 6650 },
     ],
     openings: [
-      { id: 'd2', label: 'D2 · staff + receiving', kind: 'door', wall: 'left', offsetMm: 5550, widthMm: 900, flow: 'entry', swingDepthMm: 900, swingHinge: 'start', swingDirection: 'inward' },
+      { id: 'd2', label: 'D2 · staff + receiving', kind: 'door', wall: 'left', offsetMm: 5550, widthMm: 900, flow: 'entry', doorType: 'hinged', swingDepthMm: 900, swingHinge: 'start', swingDirection: 'inward' },
       { id: 'd6', label: 'D6 · permanently closed', kind: 'sealed-opening', wall: 'top', offsetMm: 2450, widthMm: 900, flow: 'closed' },
       { id: 'clean-window', label: 'Clean service window', kind: 'service-window', wall: 'right', offsetMm: 2050, widthMm: 900, sillHeightMm: 950, heightMm: 900, flow: 'clean-out' },
       { id: 'dirty-window', label: 'Dirty service window', kind: 'service-window', wall: 'right', offsetMm: 3850, widthMm: 900, sillHeightMm: 950, heightMm: 900, flow: 'dirty-in' },

@@ -31,6 +31,7 @@ export interface SpatialOpening {
   sillHeightMm?: Millimetres
   heightMm?: Millimetres
   flow?: string
+  doorType?: 'hinged' | 'double-hinged' | 'sliding' | 'double-sliding'
   swingDepthMm?: Millimetres
   swingHinge?: 'start' | 'end'
   swingDirection?: 'inward' | 'outward'

@@ -76,6 +76,18 @@ describe('project schema', () => {
     expect(projectSchema.safeParse(segmented).success).toBe(false)
   })
 
+  it('accepts supported door types and rejects unknown mechanisms', () => {
+    const typed = structuredClone(validProject)
+    ;(typed.variants[0].architecture.openings as unknown[]).push({
+      id: 'sliding-entry', label: 'Sliding entry', kind: 'door', wall: 'top', offsetMm: 500, widthMm: 1_200,
+      flow: 'entry', doorType: 'sliding', swingHinge: 'end',
+    })
+    expect(projectSchema.safeParse(typed).success).toBe(true)
+
+    Object.assign(typed.variants[0].architecture.openings[0] as object, { doorType: 'revolving' })
+    expect(projectSchema.safeParse(typed).success).toBe(false)
+  })
+
   it('accepts a nonempty equipment configuration identifier', () => {
     const configured = structuredClone(validProject)
     Object.assign(configured.variants[0].equipment[0], { configurationPreset: 'hot-tandoor' })

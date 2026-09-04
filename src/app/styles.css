@@ -233,6 +233,11 @@ button { cursor: pointer; }
 .plan-workspace.compact .editor-layout.inspector-collapsed,
 .plan-workspace.compact .editor-layout.catalog-collapsed.inspector-collapsed { grid-template-columns: minmax(0, 1fr); }
 .plan-workspace.compact .canvas-column { grid-template-rows: minmax(0, 1fr); }
+.plan-workspace.compact .compact-inspector-drawer { position: absolute; z-index: 12; top: 0; right: 0; bottom: 0; width: min(320px, calc(100% - 44px)); height: auto; border-left: 1px solid var(--rule); background: var(--paper); box-shadow: -10px 0 28px rgba(28, 42, 28, 0.14); }
+.plan-workspace.compact .editor-layout.inspector-collapsed .compact-inspector-drawer { transform: translateX(100%); }
+.compact-inspector-toggle { position: absolute; z-index: 10; top: 12px; right: 12px; min-height: 30px; border: 1px solid var(--rule-2); border-radius: var(--control-radius); padding: 0 10px; color: var(--ink-2); background: rgba(251, 250, 245, 0.94); box-shadow: var(--shadow-pop); font-size: 11.5px; font-weight: 600; }
+.compact-inspector-close { position: absolute; z-index: 2; top: 8px; right: 8px; width: 28px; height: 28px; border: 0; border-radius: 50%; color: var(--ink-3); background: var(--bone); font-size: 17px; line-height: 1; }
+.compact-inspector-close:hover { color: var(--ink); background: var(--rule); }
 .scene-workspace.compact .scene-toolbar { min-height: 44px; }
 .scene-workspace.compact .scene-legend span:not(:last-child) { display: none; }
 
@@ -620,6 +625,9 @@ button { cursor: pointer; }
 .canvas-status span:last-child { margin-left: auto; }
 .plan-canvas { position: relative; min-height: 0; overflow: hidden; background: var(--paper-hi); }
 .plan-canvas canvas { position: relative; z-index: 2; }
+.canvas-placement-hint { position: absolute; z-index: 5; top: 12px; left: 50%; display: grid; gap: 2px; max-width: calc(100% - 28px); border: 1px solid rgba(202, 78, 142, 0.45); border-radius: 8px; padding: 8px 12px; color: var(--ink-2); background: rgba(251, 250, 245, 0.96); box-shadow: var(--shadow-pop); text-align: center; transform: translateX(-50%); pointer-events: none; }
+.canvas-placement-hint strong { color: var(--accent-deep); font-size: 11.5px; font-weight: 650; }
+.canvas-placement-hint span { font-size: 10.5px; line-height: 1.35; }
 .component-context-menu { min-width: 182px; display: grid; overflow: hidden; border: 1px solid var(--rule-2); border-radius: var(--control-radius); padding: 5px; background: rgba(251, 250, 245, 0.98); box-shadow: var(--shadow-pop); }
 .component-context-menu button { min-height: 30px; border: 0; border-radius: 5px; padding: 5px 9px; color: var(--ink); background: transparent; font-size: 12px; text-align: left; }
 .component-context-menu button:hover:not(:disabled), .component-context-menu button:focus-visible { background: rgba(12, 30, 3, 0.05); }

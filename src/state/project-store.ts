@@ -260,7 +260,7 @@ export function createProjectStore(initialProject: KitchenProject): ProjectStore
                 ? { sillHeightMm: 900, heightMm: 900, flow: catalogId === 'architecture-dirty-window' ? 'dirty-in' as const : 'clean-out' as const }
                 : regularWindow
                   ? { sillHeightMm: 1_000, heightMm: entry.typicalDimensions.heightMm, flow: 'closed' as const }
-                  : { flow: 'entry' as const, swingDepthMm: widthMm, swingHinge: 'start' as const, swingDirection: 'inward' as const }),
+                  : { flow: 'entry' as const, doorType: 'hinged' as const, swingDepthMm: widthMm, swingHinge: 'start' as const, swingDirection: 'inward' as const }),
             }] }
           } else if (catalogId === 'architecture-pillar' || catalogId === 'architecture-partition') {
             patch = { pillars: [...architecture.pillars, { id, xMm: position.xMm, yMm: position.yMm, widthMm: entry.typicalDimensions.widthMm, depthMm: entry.typicalDimensions.depthMm }] }

@@ -23,7 +23,7 @@ export function PolygonRoomEditor({ value, onChange }: Props) {
   })
   const addOpening = (kind: 'door' | 'window' | 'service-window') => {
     const opening: Opening = kind === 'door'
-      ? { id: makeId('door'), label: 'Door', kind, wall: 'top', offsetMm: 500, widthMm: 900, flow: 'entry', swingDepthMm: 900, swingHinge: 'start', swingDirection: 'inward' }
+      ? { id: makeId('door'), label: 'Door', kind, wall: 'top', offsetMm: 500, widthMm: 900, flow: 'entry', doorType: 'hinged', swingDepthMm: 900, swingHinge: 'start', swingDirection: 'inward' }
       : kind === 'window'
         ? { id: makeId('window'), label: 'Window', kind, wall: 'top', offsetMm: 1500, widthMm: 1200, sillHeightMm: 1_000, heightMm: 1_200, flow: 'closed' }
         : { id: makeId('service-window'), label: 'Service window', kind, wall: 'top', offsetMm: 1500, widthMm: 900, sillHeightMm: 900, heightMm: 1000, flow: 'clean-out' }
@@ -105,8 +105,12 @@ export function PolygonRoomEditor({ value, onChange }: Props) {
               <input type="number" min="100" step="100" value={opening.widthMm} onChange={(event) => updateOpening(index, { widthMm: numberValue(event.target.value) })} />
             </label>
             {opening.kind === 'door' && <>
-              <label>{`Opening ${index + 1} hinge side`}<select value={opening.swingHinge ?? 'start'} onChange={(event) => updateOpening(index, { swingHinge: event.target.value as NonNullable<Opening['swingHinge']> })}><option value="start">Start of opening</option><option value="end">End of opening</option></select></label>
-              <label>{`Opening ${index + 1} direction`}<select value={opening.swingDirection ?? 'inward'} onChange={(event) => updateOpening(index, { swingDirection: event.target.value as NonNullable<Opening['swingDirection']> })}><option value="inward">Into room</option><option value="outward">Out of room</option></select></label>
+              <label>{`Opening ${index + 1} door type`}<select value={opening.doorType ?? 'hinged'} onChange={(event) => updateOpening(index, { doorType: event.target.value as NonNullable<Opening['doorType']> })}><option value="hinged">Single hinged</option><option value="double-hinged">Double hinged</option><option value="sliding">Single sliding</option><option value="double-sliding">Double sliding</option></select></label>
+              {(opening.doorType ?? 'hinged') !== 'double-hinged' && (opening.doorType ?? 'hinged') !== 'double-sliding' && <label>{`Opening ${index + 1} ${(opening.doorType ?? 'hinged') === 'sliding' ? 'slide direction' : 'hinge side'}`}<select value={opening.swingHinge ?? 'start'} onChange={(event) => updateOpening(index, { swingHinge: event.target.value as NonNullable<Opening['swingHinge']> })}><option value="start">Toward first end</option><option value="end">Toward second end</option></select></label>}
+              {(opening.doorType ?? 'hinged') !== 'sliding' && (opening.doorType ?? 'hinged') !== 'double-sliding' && <label>{`Opening ${index + 1} direction`}<select value={opening.swingDirection ?? 'inward'} onChange={(event) => updateOpening(index, { swingDirection: event.target.value as NonNullable<Opening['swingDirection']> })}><option value="inward">Into room</option><option value="outward">Out of room</option></select></label>}
+              {(opening.doorType ?? 'hinged') !== 'double-sliding' && <button type="button" onClick={() => (opening.doorType ?? 'hinged') === 'double-hinged'
+                ? updateOpening(index, { swingDirection: opening.swingDirection === 'outward' ? 'inward' : 'outward' })
+                : updateOpening(index, { swingHinge: opening.swingHinge === 'end' ? 'start' : 'end' })}>Flip door</button>}
             </>}
             {(opening.kind === 'window' || opening.kind === 'service-window') && <>
               <label>{`Opening ${index + 1} sill height (mm)`}<input type="number" min="0" step="100" value={opening.sillHeightMm ?? 900} onChange={(event) => updateOpening(index, { sillHeightMm: numberValue(event.target.value) })} /></label>

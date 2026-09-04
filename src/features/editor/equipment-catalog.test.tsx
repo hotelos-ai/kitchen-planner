@@ -42,6 +42,17 @@ describe('equipment catalog gallery', () => {
     })
   })
 
+  it('surfaces industrial shelving in a dedicated storage tab', async () => {
+    const user = userEvent.setup()
+    render(<EquipmentLibrary store={emptyStore()} />)
+
+    await user.click(screen.getByRole('tab', { name: 'Storage' }))
+
+    expect(screen.getByRole('heading', { name: 'Industrial stainless-steel shelving' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Add Industrial stainless-steel shelving' })).toBeInTheDocument()
+    screen.getAllByTestId('catalog-card').forEach((card) => expect(card).toHaveAttribute('data-category', 'storage'))
+  })
+
   it('renders a useful empty state', async () => {
     render(<EquipmentLibrary store={emptyStore()} />)
     await userEvent.type(screen.getByRole('searchbox', { name: /^Search$/i }), 'no-such-kitchen-component-zzzz')

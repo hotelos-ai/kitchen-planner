@@ -29,6 +29,7 @@ describe('door interactions in the plan view', () => {
     expect(inspector).toHaveAttribute('aria-hidden', 'false')
     expect(store.getState().selectedIds).toEqual([])
     expect(screen.getByRole('complementary', { name: 'Selected opening' })).toBeInTheDocument()
+    expect(screen.getByLabelText('Door type')).toHaveValue('hinged')
     expect(screen.getByLabelText('Swing depth (mm)')).toHaveValue(900)
     expect(screen.queryByRole('region', { name: 'Layout checks' })).not.toBeInTheDocument()
     expect(screen.queryByLabelText('Display units')).not.toBeInTheDocument()
@@ -40,11 +41,39 @@ describe('door interactions in the plan view', () => {
       swingDirection: 'outward',
     })
 
+    await user.click(screen.getByRole('button', { name: 'Flip door' }))
+    expect(getActiveVariant(store.getState()).architecture.openings.find((opening) => opening.id === 'd2')?.swingHinge).toBe('start')
+
+    await user.selectOptions(screen.getByLabelText('Door type'), 'sliding')
+    expect(screen.getByLabelText('Door slide direction')).toHaveValue('start')
+    expect(screen.queryByLabelText('Door opening direction')).not.toBeInTheDocument()
+    expect(screen.queryByLabelText('Swing depth (mm)')).not.toBeInTheDocument()
+    expect(getActiveVariant(store.getState()).architecture.openings.find((opening) => opening.id === 'd2')?.doorType).toBe('sliding')
+
     const label = screen.getByLabelText('Label')
     await user.clear(label)
     await user.type(label, 'Moved staff door')
     await user.tab()
 
     expect(getActiveVariant(store.getState()).architecture.openings.find((opening) => opening.id === 'd2')?.label).toBe('Moved staff door')
+  })
+
+  it('opens and collapses the inspector in split view', async () => {
+    vi.stubGlobal('matchMedia', vi.fn(() => ({ matches: true })))
+    const user = userEvent.setup()
+    const store = createProjectStore(createSeedProject())
+    const { container } = render(<PlanWorkspace store={store} stage="space" compact showCanvas />)
+    const inspector = container.querySelector('[data-editor-drawer="inspector"]')
+
+    expect(inspector).toHaveAttribute('aria-hidden', 'true')
+    expect(screen.getByRole('button', { name: 'Open split-view inspector' })).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Select staff door on plan' }))
+    expect(inspector).toHaveAttribute('aria-hidden', 'false')
+    expect(screen.getByLabelText('Door type')).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Collapse split-view inspector' }))
+    expect(inspector).toHaveAttribute('aria-hidden', 'true')
+    expect(screen.getByRole('button', { name: 'Open split-view inspector' })).toBeInTheDocument()
   })
 })

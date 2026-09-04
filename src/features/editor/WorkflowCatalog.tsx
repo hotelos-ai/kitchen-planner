@@ -40,7 +40,7 @@ function CatalogCard({ entry, displayUnit, onAdd }: { entry: CatalogEntry; displ
         <small>{formatDimensions(entry.typicalDimensions, displayUnit)}</small>
         {utilities && <small className="catalog-meta">{utilities}</small>}
       </div>
-      <button type="button" onClick={onAdd} aria-label={`Add ${entry.displayName}`}>Add</button>
+      <button type="button" onClick={onAdd} aria-label={`Place ${entry.displayName}`}>Place</button>
     </article>
   )
 }
@@ -103,7 +103,7 @@ function SpaceCatalog({ store, onBeginPlacement }: { store: ProjectStore; onBegi
   return (
     <aside className="equipment-library" aria-label="Space components catalog">
       <div className="panel-heading"><span className="eyebrow">Space</span><h2>Build the space</h2></div>
-      <p className="stage-summary space-catalog-hint">Drag the outline on the plan to reshape the room, or add openings, structure, and zones here. Every change applies to all layouts.</p>
+      <p className="stage-summary space-catalog-hint">Choose Place, then click a wall for the standard size or drag along it to set the width. The new item stays selected for editing.</p>
       <label>
         Search
         <input type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Door, window, pillar…" />

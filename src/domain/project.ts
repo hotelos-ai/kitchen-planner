@@ -52,6 +52,8 @@ export interface Opening {
   sillHeightMm?: Millimetres
   heightMm?: Millimetres
   flow?: 'entry' | 'clean-out' | 'dirty-in' | 'closed'
+  /** Defaults to hinged for projects created before configurable door types. */
+  doorType?: 'hinged' | 'double-hinged' | 'sliding' | 'double-sliding'
   swingDepthMm?: Millimetres
   swingHinge?: 'start' | 'end'
   swingDirection?: 'inward' | 'outward'

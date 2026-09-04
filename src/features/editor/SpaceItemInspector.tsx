@@ -53,6 +53,13 @@ export function SpaceItemInspector({ store, selection, onClearSelection }: Props
     if (index < 0) return null
     const opening = architecture.openings[index]
     const patch = (partial: Partial<typeof opening>) => apply({ ...architecture, openings: architecture.openings.map((candidate, position) => position === index ? { ...candidate, ...partial } : candidate) })
+    const doorType = opening.doorType ?? 'hinged'
+    const isSingleDoor = doorType === 'hinged' || doorType === 'sliding'
+    const isSwingingDoor = doorType === 'hinged' || doorType === 'double-hinged'
+    const flipDoor = () => {
+      if (doorType === 'double-hinged') patch({ swingDirection: opening.swingDirection === 'outward' ? 'inward' : 'outward' })
+      else if (doorType === 'hinged' || doorType === 'sliding') patch({ swingHinge: opening.swingHinge === 'end' ? 'start' : 'end' })
+    }
     return (
       <aside className="inspector space-item-inspector" aria-label="Selected opening">
         <div className="panel-heading"><span className="eyebrow">{opening.kind === 'service-window' ? 'Service window' : opening.kind === 'window' ? 'Window' : 'Door'}</span><h2>{opening.label}</h2></div>
@@ -60,24 +67,35 @@ export function SpaceItemInspector({ store, selection, onClearSelection }: Props
         <div className="field-pair">
           <NumberField label="Offset (mm)" value={opening.offsetMm} onChange={(offsetMm) => patch({ offsetMm })} />
           <NumberField label="Width (mm)" value={opening.widthMm} onChange={(widthMm) => patch({ widthMm })} />
-          {opening.kind === 'door' && <NumberField label="Swing depth (mm)" value={opening.swingDepthMm ?? opening.widthMm} onChange={(swingDepthMm) => patch({ swingDepthMm })} />}
+          {opening.kind === 'door' && doorType === 'hinged' && <NumberField label="Swing depth (mm)" value={opening.swingDepthMm ?? opening.widthMm} onChange={(swingDepthMm) => patch({ swingDepthMm })} />}
           {(opening.kind === 'window' || opening.kind === 'service-window') && <NumberField label="Sill height (mm)" value={opening.sillHeightMm ?? 900} onChange={(sillHeightMm) => patch({ sillHeightMm })} />}
           {(opening.kind === 'window' || opening.kind === 'service-window') && <NumberField label="Opening height (mm)" value={opening.heightMm ?? 900} onChange={(heightMm) => patch({ heightMm })} />}
         </div>
-        {opening.kind === 'door' && <div className="field-pair">
-          <label>Hinge side
-            <select aria-label="Door hinge side" value={opening.swingHinge ?? 'start'} onChange={(event) => patch({ swingHinge: event.target.value as NonNullable<typeof opening.swingHinge> })}>
-              <option value="start">Start of opening</option>
-              <option value="end">End of opening</option>
+        {opening.kind === 'door' && <>
+          <label>Door type
+            <select aria-label="Door type" value={doorType} onChange={(event) => patch({ doorType: event.target.value as NonNullable<typeof opening.doorType> })}>
+              <option value="hinged">Single hinged</option>
+              <option value="double-hinged">Double hinged</option>
+              <option value="sliding">Single sliding</option>
+              <option value="double-sliding">Double sliding</option>
             </select>
           </label>
-          <label>Opening direction
+          <div className="field-pair">
+          {isSingleDoor && <label>{doorType === 'sliding' ? 'Slide direction' : 'Hinge side'}
+            <select aria-label={doorType === 'sliding' ? 'Door slide direction' : 'Door hinge side'} value={opening.swingHinge ?? 'start'} onChange={(event) => patch({ swingHinge: event.target.value as NonNullable<typeof opening.swingHinge> })}>
+              <option value="start">Toward first end</option>
+              <option value="end">Toward second end</option>
+            </select>
+          </label>}
+          {isSwingingDoor && <label>Opening direction
             <select aria-label="Door opening direction" value={opening.swingDirection ?? 'inward'} onChange={(event) => patch({ swingDirection: event.target.value as NonNullable<typeof opening.swingDirection> })}>
               <option value="inward">Into room</option>
               <option value="outward">Out of room</option>
             </select>
-          </label>
-        </div>}
+          </label>}
+          </div>
+          <p className="stage-summary">The plan shows the opening path. Use Flip door to reverse the hinge or slide direction.</p>
+        </>}
         {opening.kind !== 'window' && <label>Flow
           <select value={opening.flow ?? 'closed'} onChange={(event) => patch({ flow: event.target.value as typeof opening.flow })}>
             <option value="entry">Entry</option>
@@ -87,6 +105,7 @@ export function SpaceItemInspector({ store, selection, onClearSelection }: Props
           </select>
         </label>}
         <div className="inspector-actions">
+          {opening.kind === 'door' && doorType !== 'double-sliding' && <button type="button" aria-label="Flip door" onClick={flipDoor}>Flip door</button>}
           <button type="button" className="danger-button" onClick={remove}>Remove</button>
         </div>
       </aside>

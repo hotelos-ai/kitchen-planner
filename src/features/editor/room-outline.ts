@@ -297,7 +297,7 @@ export function createOpeningAt(architecture: Architecture, entry: { label: stri
       widthMm,
       ...(glazedOpening
         ? { sillHeightMm: entry.kind === 'window' ? 1_000 : 900, heightMm: entry.kind === 'window' ? 1_200 : 900, flow: entry.kind === 'window' ? 'closed' as const : 'clean-out' as const }
-        : { flow: 'entry' as const, swingDepthMm: widthMm, swingHinge: 'start' as const, swingDirection: 'inward' as const }),
+        : { flow: 'entry' as const, doorType: 'hinged' as const, swingDepthMm: widthMm, swingHinge: 'start' as const, swingDirection: 'inward' as const }),
     }],
   }
 }

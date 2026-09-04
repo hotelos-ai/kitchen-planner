@@ -11,7 +11,7 @@ describe('space workflow catalog', () => {
     const onBeginPlacement = vi.fn()
     render(<WorkflowCatalog store={createProjectStore(createSeedProject())} stage="space" onBeginPlacement={onBeginPlacement} />)
 
-    await user.click(screen.getByRole('button', { name: 'Add Regular window' }))
+    await user.click(screen.getByRole('button', { name: 'Place Regular window' }))
     expect(onBeginPlacement).toHaveBeenCalledWith(expect.objectContaining({
       catalogId: 'architecture-window',
       kind: 'window',

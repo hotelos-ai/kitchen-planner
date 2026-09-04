@@ -1,5 +1,5 @@
 import { pointInPolygon, polygonsOverlap, rotatedFootprint } from './geometry'
-import { doorSwingGeometry } from './opening-geometry'
+import { doorSwingGeometries } from './opening-geometry'
 import { isFloorObstacle } from './catalog/floor-obstacle'
 import type { Architecture, EquipmentItem, LayoutConstraints, Opening, PointMm, RectMm } from './project'
 
@@ -66,15 +66,10 @@ const polygonInsideRoom = (polygon: PointMm[], room: PointMm[]) => polygon.every
   return insideOrBoundary(point, room) && insideOrBoundary(midpoint, room)
 })
 
-const doorSwingPolygon = (architecture: Architecture, opening: Opening): PointMm[] | undefined => {
-  return doorSwingGeometry(architecture, opening)?.envelope
-}
-
 export function doorSwingEnvelopes(architecture: Architecture): readonly { opening: Opening; polygon: PointMm[] }[] {
-  return architecture.openings.flatMap((opening) => {
-    const polygon = opening.kind === 'door' ? doorSwingPolygon(architecture, opening) : undefined
-    return polygon ? [{ opening, polygon }] : []
-  })
+  return architecture.openings.flatMap((opening) => opening.kind === 'door'
+    ? doorSwingGeometries(architecture, opening).map((swing) => ({ opening, polygon: swing.envelope }))
+    : [])
 }
 
 export function analyzeLayout(architecture: Architecture, equipment: readonly EquipmentItem[], options: LayoutDiagnosticOptions = {}): LayoutIssue[] {

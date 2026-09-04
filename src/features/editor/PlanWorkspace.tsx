@@ -198,6 +198,7 @@ export function PlanWorkspace({
   const [localReference, setLocalReference] = useState(showReference)
   const [placement, setPlacement] = useState<PlacementSpec | null>(null)
   const [spaceSelection, setSpaceSelection] = useState<SpaceSelection>(null)
+  const [compactInspectorOpen, setCompactInspectorOpen] = useState(false)
   const [localCatalogOpen, setLocalCatalogOpen] = useState(includeToolbar ? drawersInitiallyOpen() : catalogOpen)
   const [localInspectorOpen, setLocalInspectorOpen] = useState(includeToolbar ? drawersInitiallyOpen() : inspectorOpen)
 
@@ -205,13 +206,14 @@ export function PlanWorkspace({
     setSpaceSelection(selection)
     if (!selection) return
     store.getState().clearSelection()
+    if (compact) setCompactInspectorOpen(true)
     setLocalInspectorOpen(true)
     onInspectorOpenChange?.(true)
   }
 
   const referenceVisible = includeToolbar ? localReference : showReference
   const catalogVisible = includeToolbar ? localCatalogOpen : catalogOpen
-  const inspectorVisible = (includeToolbar ? localInspectorOpen : inspectorOpen) || essentialsVisible || revisionsVisible
+  const inspectorVisible = (compact ? compactInspectorOpen : includeToolbar ? localInspectorOpen : inspectorOpen) || essentialsVisible || revisionsVisible
 
   const continueToEquipment = () => {
     const layouts = store.getState().project.variants.length
@@ -289,7 +291,7 @@ export function PlanWorkspace({
             }}
           />
         )}
-        <div className={`editor-layout${compact ? ' split-pane' : ''}${!compact && catalogVisible ? '' : ' catalog-collapsed'}${!compact && inspectorVisible ? '' : ' inspector-collapsed'}`}>
+        <div className={`editor-layout${compact ? ' split-pane' : ''}${!compact && catalogVisible ? '' : ' catalog-collapsed'}${inspectorVisible ? '' : ' inspector-collapsed'}`}>
           {!compact && (
             <div className="editor-drawer catalog-drawer" data-editor-drawer="catalog" aria-hidden={!catalogVisible}>
               <WorkflowCatalog store={store} stage={stage} onBeginPlacement={setPlacement} />
@@ -304,6 +306,7 @@ export function PlanWorkspace({
                 onPlacementDone={() => setPlacement(null)}
                 selectedSpaceItem={spaceSelection}
                 onSelectItem={selectSpaceItem}
+                onEquipmentSelect={() => { if (compact) setCompactInspectorOpen(true) }}
                 showReference={compact ? false : referenceVisible}
                 sourceImageUrl={sourceImage.url}
                 sourceOpacity={sourceOpacity}
@@ -338,8 +341,9 @@ export function PlanWorkspace({
               />
             )}
           </div>
-          {!compact && (
-            <div className="editor-drawer right-panel inspector-drawer" data-editor-drawer="inspector" aria-hidden={!inspectorVisible}>
+          {compact && !inspectorVisible && <button type="button" className="compact-inspector-toggle" aria-label="Open split-view inspector" onClick={() => setCompactInspectorOpen(true)}>Inspector</button>}
+          <div className={`editor-drawer right-panel inspector-drawer${compact ? ' compact-inspector-drawer' : ''}`} data-editor-drawer="inspector" aria-hidden={!inspectorVisible}>
+              {compact && <button type="button" className="compact-inspector-close" aria-label="Collapse split-view inspector" onClick={() => setCompactInspectorOpen(false)}>×</button>}
               {essentialsVisible && (
                 <section className="essentials-dialog in-panel" role="dialog" aria-modal="true" aria-label="Validate plan">
                   <button type="button" className="workspace-modal-close" aria-label="Close essentials checker" onClick={() => setEssentialsVisible(false)}>×</button>
@@ -375,7 +379,6 @@ export function PlanWorkspace({
               {selectedIds.length === 0 && !spaceSelection && !essentialsVisible && <LayoutDiagnostics store={store} />}
               {selectedIds.length === 0 && !spaceSelection && <ProjectSettings store={store} stage={stage} />}
             </div>
-          )}
         </div>
       </section>
       {!compact && activeClosedLayout && (

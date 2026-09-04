@@ -87,7 +87,8 @@ const workspaceOperationDefinitions: Record<string, Schema> = {
   o: strictObject({
     id: ref('i'), label: ref('n'), kind: { enum: ['door', 'window', 'service-window', 'sealed-opening'] }, wall: { enum: ['top', 'right', 'bottom', 'left'] },
     segmentIndex: { type: 'integer', minimum: 0, maximum: 999 }, offsetMm: ref('a'), widthMm: ref('d'), sillHeightMm: ref('k'),
-    heightMm: ref('d'), flow: { enum: ['entry', 'clean-out', 'dirty-in', 'closed'] }, swingDepthMm: ref('k'),
+    heightMm: ref('d'), flow: { enum: ['entry', 'clean-out', 'dirty-in', 'closed'] }, doorType: { enum: ['hinged', 'double-hinged', 'sliding', 'double-sliding'] }, swingDepthMm: ref('k'),
+    swingHinge: { enum: ['start', 'end'] }, swingDirection: { enum: ['inward', 'outward'] },
   }, ['id', 'label', 'kind', 'wall', 'offsetMm', 'widthMm']),
   q: strictObject({ ...rectProperties, shape: { const: 'round' } }, ['id', 'xMm', 'yMm', 'widthMm', 'depthMm']),
   Q: strictObject({ id: ref('i'), xMm: ref('a'), yMm: ref('a'), widthMm: ref('d'), depthMm: ref('d') }, ['id', 'xMm', 'yMm', 'widthMm', 'depthMm']),
@@ -100,7 +101,7 @@ const workspaceOperationDefinitions: Record<string, Schema> = {
   m: strictObject({ label: ref('n'), capability: ref('c'), activeSeconds: { type: 'number', exclusiveMinimum: 0, maximum: 86_400 }, passiveSeconds: ref('t') }, ['label', 'capability', 'activeSeconds']),
   e: strictObject({ id: ref('i'), name: ref('n'), sharePct: { type: 'number', minimum: 0, maximum: 100 }, source: { enum: ['user-provided', 'imported', 'template-estimate', 'system-inferred'] }, steps: { type: 'array', minItems: 1, maxItems: 24, items: ref('m') } }, ['id', 'name', 'sharePct', 'source', 'steps']),
   C: strictPatch({ label: ref('n'), xMm: ref('x'), yMm: ref('x'), category: { enum: ['cooking', 'cold', 'prep', 'washing', 'landing', 'storage', 'hood', 'custom'] }, heightMm: ref('d'), capabilities: { type: 'array', maxItems: 100, items: ref('c') }, clearance: ref('l'), accessFlow: ref('D'), approximate: booleanSchema, notes: { type: 'string' } }),
-  O: strictPatch({ label: ref('n'), kind: { enum: ['door', 'window', 'service-window', 'sealed-opening'] }, wall: { enum: ['top', 'right', 'bottom', 'left'] }, segmentIndex: nullable({ type: 'integer', minimum: 0, maximum: 999 }), offsetMm: ref('a'), widthMm: ref('d'), sillHeightMm: nullable(ref('a')), heightMm: nullable(ref('d')), flow: nullable({ enum: ['entry', 'clean-out', 'dirty-in', 'closed'] }), swingDepthMm: nullable(ref('a')) }),
+  O: strictPatch({ label: ref('n'), kind: { enum: ['door', 'window', 'service-window', 'sealed-opening'] }, wall: { enum: ['top', 'right', 'bottom', 'left'] }, segmentIndex: nullable({ type: 'integer', minimum: 0, maximum: 999 }), offsetMm: ref('a'), widthMm: ref('d'), sillHeightMm: nullable(ref('a')), heightMm: nullable(ref('d')), flow: nullable({ enum: ['entry', 'clean-out', 'dirty-in', 'closed'] }), doorType: nullable({ enum: ['hinged', 'double-hinged', 'sliding', 'double-sliding'] }), swingDepthMm: nullable(ref('a')), swingHinge: nullable({ enum: ['start', 'end'] }), swingDirection: nullable({ enum: ['inward', 'outward'] }) }),
   P: strictPatch({ xMm: ref('a'), yMm: ref('a'), widthMm: ref('d'), depthMm: ref('d') }),
   G: strictPatch({ xMm: ref('a'), yMm: ref('a'), widthMm: ref('d'), depthMm: ref('d'), label: ref('n'), adjacent: booleanSchema }),
   A: strictPatch({ widthMm: ref('d'), depthMm: ref('d'), wallHeightMm: ref('d'), roomPolygon: { type: 'array', minItems: 3, maxItems: 1000, items: ref('p') }, openings: { type: 'array', maxItems: 1000, items: ref('o') }, pillars: { type: 'array', maxItems: 1000, items: ref('q') }, storageZones: { type: 'array', maxItems: 1000, items: ref('g') }, locked: booleanSchema }),
@@ -188,12 +189,9 @@ const operationSchemaDescription: JsonSchemaObject = {
   ...({ $defs: workspaceOperationDefinitions } as Record<string, unknown>),
   required: ['expectedRevision', 'operations'],
   properties: {
-    expectedRevision: { type: 'integer', minimum: 0, description: 'Revision read from get_layout or get_workspace_guide; stale writes fail.' },
-    operations: {
-      ...operationsSchema,
-      description: 'Ordered atomic batch. See get_workspace_guide for numeric constraints. Any invalid item rejects the batch.',
-    },
-    intent: { type: 'string', maxLength: 2000, description: 'Optional history label.' },
+    expectedRevision: { type: 'integer', minimum: 0 },
+    operations: operationsSchema,
+    intent: { type: 'string', maxLength: 2000 },
   },
 }
 
@@ -218,8 +216,7 @@ export function createWriteTools(deps: WriteToolDependencies): WebMcpToolDefinit
   const previewLayoutChanges: WebMcpToolDefinition = {
     name: 'preview_layout_changes',
     title: 'Preview layout changes',
-    description:
-      'Validate an operation batch without mutation. Returns a single-use previewToken bound to its batch and revision, with changed IDs, warnings, normalized operations, and diagnostics. Commit it with apply_layout_changes.',
+    description: 'Validate an operation batch and return a single-use token, changes, warnings, and diagnostics.',
     inputSchema: operationSchemaDescription,
     annotations: { readOnlyHint: true },
     execute: (input) => {
@@ -259,8 +256,7 @@ export function createWriteTools(deps: WriteToolDependencies): WebMcpToolDefinit
   const applyLayoutChanges: WebMcpToolDefinition = {
     name: 'apply_layout_changes',
     title: 'Apply layout changes',
-    description:
-      'Commit a preview token or direct revision-guarded batch. Optional keys deduplicate retries; identical keyless retries are also deduplicated. Each batch is one undo step.',
+    description: 'Commit kitchen edits.',
     inputSchema: {
       type: 'object',
       additionalProperties: false,
@@ -272,11 +268,11 @@ export function createWriteTools(deps: WriteToolDependencies): WebMcpToolDefinit
         ],
       } as Record<string, unknown>),
       properties: {
-        previewToken: { type: 'string', minLength: 1, maxLength: 200, description: 'Single-use preview token; do not mix with direct fields.' },
-        expectedRevision: { type: 'integer', minimum: 0, description: 'Latest revision for direct apply.' },
-        operations: { ...operationsSchema, description: 'Direct operation batch.' },
-        intent: { type: 'string', maxLength: 2000, description: 'Optional history label.' },
-        idempotencyKey: { type: 'string', minLength: 1, maxLength: 200, description: 'Optional retry key.' },
+        previewToken: { type: 'string', minLength: 1, maxLength: 200 },
+        expectedRevision: { type: 'integer', minimum: 0 },
+        operations: operationsSchema,
+        intent: { type: 'string', maxLength: 2000 },
+        idempotencyKey: { type: 'string', minLength: 1, maxLength: 200 },
       },
     },
     execute: (input, context) => {

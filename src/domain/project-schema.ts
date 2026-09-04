@@ -66,6 +66,7 @@ export const architectureSchema = z.object({
     sillHeightMm: z.number().nonnegative().finite().optional(),
     heightMm: z.number().positive().finite().optional(),
     flow: z.enum(['entry', 'clean-out', 'dirty-in', 'closed']).optional(),
+    doorType: z.enum(['hinged', 'double-hinged', 'sliding', 'double-sliding']).optional(),
     swingDepthMm: z.number().nonnegative().finite().optional(),
     swingHinge: z.enum(['start', 'end']).optional(),
     swingDirection: z.enum(['inward', 'outward']).optional(),

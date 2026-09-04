@@ -33,12 +33,13 @@ type Props = {
   onPlacementDone?(): void
   selectedSpaceItem?: { kind: 'pillar' | 'zone' | 'opening'; id: string } | null
   onSelectItem?(selection: { kind: 'pillar' | 'zone' | 'opening'; id: string } | null): void
+  onEquipmentSelect?(): void
 }
 
 type ContextRequest = { itemId: string; position: OverlayPosition }
 type QuickRequest = ContextRequest & { mode: QuickConfigurationMode }
 
-export function PlanCanvas({ store, showReference, sourceImageUrl = '/reference/kitchen-sketch.webp', sourceOpacity = 22, mode = 'layout', variantOverride, readOnly = false, onInspectComponentIn3D, onComponentLockChange, onSkinChange, onWarningBadgeClick, placement = null, onPlacementDone, selectedSpaceItem = null, onSelectItem }: Props) {
+export function PlanCanvas({ store, showReference, sourceImageUrl = '/reference/kitchen-sketch.webp', sourceOpacity = 22, mode = 'layout', variantOverride, readOnly = false, onInspectComponentIn3D, onComponentLockChange, onSkinChange, onWarningBadgeClick, placement = null, onPlacementDone, selectedSpaceItem = null, onSelectItem, onEquipmentSelect }: Props) {
   const containerRef = useRef<HTMLDivElement>(null)
   const [size, setSize] = useState({ width: 740, height: 720 })
   const [contextRequest, setContextRequest] = useState<ContextRequest>()
@@ -107,6 +108,7 @@ export function PlanCanvas({ store, showReference, sourceImageUrl = '/reference/
 
   const selectItems = (ids: string[]) => {
     if (ids.length > 0) onSelectItem?.(null)
+    if (ids.length > 0) onEquipmentSelect?.()
     if (readOnly) setPreviewSelectedIds(ids)
     else store.getState().selectItems(ids)
   }
@@ -165,6 +167,8 @@ export function PlanCanvas({ store, showReference, sourceImageUrl = '/reference/
             originY={originY}
             snapMm={project.snapMm}
             onSelect={(id, additive) => {
+              onSelectItem?.(null)
+              onEquipmentSelect?.()
               if (readOnly) setPreviewSelectedIds(additive && previewSelectedIds.includes(id) ? previewSelectedIds.filter((value) => value !== id) : additive ? [...previewSelectedIds, id] : [id])
               else if (additive) store.getState().toggleItemSelection(id)
               else store.getState().selectItems([id])
@@ -179,6 +183,8 @@ export function PlanCanvas({ store, showReference, sourceImageUrl = '/reference/
         {!readOnly && (
           <RoomOutlineLayer
             architecture={variant.architecture}
+            canvasWidth={size.width}
+            canvasHeight={size.height}
             pixelsPerMm={pixelsPerMm}
             originX={originX}
             originY={originY}
@@ -192,6 +198,10 @@ export function PlanCanvas({ store, showReference, sourceImageUrl = '/reference/
           />
         )}
       </Stage>
+      {placement && <div className="canvas-placement-hint" role="status">
+        <strong>Place {placement.label}</strong>
+        <span>Click a wall for the standard size, or drag along it to set the width · Esc cancels</span>
+      </div>}
       {contextRequest && contextItem && <ComponentContextMenu
         item={contextItem}
         locked={contextLocked}

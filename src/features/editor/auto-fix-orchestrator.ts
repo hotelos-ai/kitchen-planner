@@ -282,7 +282,7 @@ function planArchitectureAdditions(project: KitchenProject, active: LayoutVarian
           segmentIndex,
           offsetMm,
           widthMm: spec.widthMm,
-          ...(spec.kind === 'door' ? { swingDepthMm: 900 } : { sillHeightMm: 950, heightMm: 900 }),
+          ...(spec.kind === 'door' ? { doorType: 'hinged' as const, swingDepthMm: 900, swingHinge: 'start' as const, swingDirection: 'inward' as const } : { sillHeightMm: 950, heightMm: 900 }),
         }
         const layoutsNeedingOpening = [...plannedByVariant.values()].filter((variant) =>
           !variant.architecture.openings.some((opening) => opening.kind === spec.kind && opening.flow === spec.flow))

@@ -30,6 +30,8 @@ import {
 
 type Props = {
   architecture: Architecture
+  canvasWidth: number
+  canvasHeight: number
   pixelsPerMm: number
   originX: number
   originY: number
@@ -53,7 +55,7 @@ const isTypingTarget = (target: EventTarget | null) =>
 
 type SelectedItem = { kind: 'pillar' | 'zone' | 'opening'; id: string }
 
-export function RoomOutlineLayer({ architecture, pixelsPerMm, originX, originY, snapMm, editRoomOutline = true, placement, selectedItem = null, onCommit, onPlacementDone, onSelectItem }: Props) {
+export function RoomOutlineLayer({ architecture, canvasWidth, canvasHeight, pixelsPerMm, originX, originY, snapMm, editRoomOutline = true, placement, selectedItem = null, onCommit, onPlacementDone, onSelectItem }: Props) {
   const [dragPolygon, setDragPolygon] = useState<PointMm[] | null>(null)
   const [draggingEdge, setDraggingEdge] = useState<number | null>(null)
   const [selectedVertex, setSelectedVertex] = useState<number | null>(null)
@@ -76,6 +78,7 @@ export function RoomOutlineLayer({ architecture, pixelsPerMm, originX, originY, 
         setSelectedVertex(null)
         onSelectItem?.(null)
         setPlacing(null)
+        if (placement) onPlacementDone()
         return
       }
       if (event.key !== 'Delete' && event.key !== 'Backspace') return
@@ -106,7 +109,7 @@ export function RoomOutlineLayer({ architecture, pixelsPerMm, originX, originY, 
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-  }, [selectedVertex, selectedItem, placement, architecture, onCommit, onSelectItem])
+  }, [selectedVertex, selectedItem, placement, architecture, onCommit, onPlacementDone, onSelectItem])
 
   const toPx = (point: PointMm) => ({ x: originX + point.x * pixelsPerMm, y: originY + point.y * pixelsPerMm })
   const toMm = (x: number, y: number) => ({ x: (x - originX) / pixelsPerMm, y: (y - originY) / pixelsPerMm })
@@ -116,10 +119,21 @@ export function RoomOutlineLayer({ architecture, pixelsPerMm, originX, originY, 
     if (!placement || !placing) { onPlacementDone(); return }
     let to = placing.to
     if (shiftKey) to = constrainToAxes(placing.from, to)
+    const dragged = Math.hypot(to.x - placing.from.x, to.y - placing.from.y) >= snapMm / 2
     const next = placement.kind === 'door' || placement.kind === 'window' || placement.kind === 'service-window'
-      ? createOpeningAt(architecture, { label: placement.label, kind: placement.kind, widthMm: placement.widthMm }, placing.from, to, snapMm)
+      ? createOpeningAt(architecture, { label: placement.label, kind: placement.kind, widthMm: placement.widthMm }, placing.from, dragged ? to : null, snapMm)
       : createRectItemAt(architecture, { id: placement.catalogId, label: placement.label, kind: placement.kind === 'zone' ? 'zone' : 'pillar', widthMm: placement.widthMm, depthMm: placement.depthMm }, placing.from, to, snapMm)
     onCommit(next)
+    if (placement.kind === 'door' || placement.kind === 'window' || placement.kind === 'service-window') {
+      const added = next.openings.at(-1)
+      if (added) onSelectItem?.({ kind: 'opening', id: added.id })
+    } else if (placement.kind === 'zone') {
+      const added = next.storageZones.at(-1)
+      if (added) onSelectItem?.({ kind: 'zone', id: added.id })
+    } else {
+      const added = next.pillars.at(-1)
+      if (added) onSelectItem?.({ kind: 'pillar', id: added.id })
+    }
     setPlacing(null)
     onPlacementDone()
   }
@@ -170,27 +184,7 @@ export function RoomOutlineLayer({ architecture, pixelsPerMm, originX, originY, 
   }
 
   return (
-    <Layer
-      listening
-      onMouseDown={(event) => {
-        if (!placement) return
-        if (event.target !== event.target.getStage()) return
-        const stage = event.target.getStage()
-        const pointer = stage?.getPointerPosition()
-        if (!pointer) return
-        setPlacing({ from: toMm(pointer.x, pointer.y), to: toMm(pointer.x, pointer.y) })
-      }}
-      onMouseMove={(event) => {
-        if (!placement || !placing) return
-        const stage = event.target.getStage()
-        const pointer = stage?.getPointerPosition()
-        if (!pointer) return
-        let to = toMm(pointer.x, pointer.y)
-        if (event.evt.shiftKey) to = constrainToAxes(placing.from, to)
-        setPlacing({ ...placing, to })
-      }}
-      onMouseUp={(event) => { if (placement && placing) commitPlacement(event.evt.shiftKey) }}
-    >
+    <Layer listening>
       {placement && placing && (() => {
         const a = toPx(placing.from)
         const b = toPx(placing.to)
@@ -407,6 +401,27 @@ export function RoomOutlineLayer({ architecture, pixelsPerMm, originX, originY, 
           />
         )
       })}
+      {placement && <Rect
+        x={0}
+        y={0}
+        width={canvasWidth}
+        height={canvasHeight}
+        fill="rgba(255,255,255,0.001)"
+        onMouseDown={(event) => {
+          const pointer = event.target.getStage()?.getPointerPosition()
+          if (!pointer) return
+          setPlacing({ from: toMm(pointer.x, pointer.y), to: toMm(pointer.x, pointer.y) })
+        }}
+        onMouseMove={(event) => {
+          if (!placing) return
+          const pointer = event.target.getStage()?.getPointerPosition()
+          if (!pointer) return
+          let to = toMm(pointer.x, pointer.y)
+          if (event.evt.shiftKey) to = constrainToAxes(placing.from, to)
+          setPlacing({ ...placing, to })
+        }}
+        onMouseUp={(event) => { if (placing) commitPlacement(event.evt.shiftKey) }}
+      />}
     </Layer>
   )
 }

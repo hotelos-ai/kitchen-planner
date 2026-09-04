@@ -16,4 +16,16 @@ describe('clearance descriptors', () => {
     const descriptor = buildClearanceDescriptors(project.variants[0].equipment, project.architecture, 'cm').find((zone) => zone.id === 'clearance-six-burner')
     expect(descriptor?.label).toBe('Heat clearance · 110 cm')
   })
+
+  it('creates two swing zones for double doors and none for sliding doors', () => {
+    const project = createSeedProject()
+    const door = project.architecture.openings.find((opening) => opening.id === 'd2')!
+    door.doorType = 'double-hinged'
+    door.widthMm = 1_800
+    project.variants[0].architecture = structuredClone(project.architecture)
+    expect(buildClearanceDescriptors([], project.architecture, 'mm').filter((zone) => zone.id.startsWith('swing-d2'))).toHaveLength(2)
+
+    door.doorType = 'sliding'
+    expect(buildClearanceDescriptors([], project.architecture, 'mm').filter((zone) => zone.id.startsWith('swing-d2'))).toHaveLength(0)
+  })
 })
